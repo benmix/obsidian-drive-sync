@@ -24,6 +24,7 @@
 		"jiti": "2.6.1"
 	},
 	"dependencies": {
+		"@protontech/drive-sdk": "latest",
 		"obsidian": "latest"
 	}
 }
