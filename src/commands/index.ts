@@ -1,7 +1,8 @@
 import {Notice} from "obsidian";
 import type ProtonDriveSyncPlugin from "../main";
-import {parseSdkOptions} from "../protonDrive/sdkOptions";
+import {buildSdkOptions} from "../protonDrive/sdkOptions";
 import {restoreVaultFromProtonDrive, syncVaultToProtonDrive} from "../protonDrive/sync";
+import {ProtonDriveLoginModal} from "../ui/loginModal";
 
 export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 	plugin.addCommand({
@@ -13,7 +14,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const {options, error} = parseSdkOptions(plugin.settings.sdkOptionsJson);
+			const {options, error} = buildSdkOptions(plugin.settings.sdkOptionsJson, plugin.settings.sessionToken);
 			if (error) {
 				new Notice(error);
 				return;
@@ -26,6 +27,27 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 			}
 
 			new Notice("Unable to connect to Proton Drive. Check the SDK options.");
+		}
+	});
+
+	plugin.addCommand({
+		id: "protondrive-login",
+		name: "Sign in to Proton Drive",
+		callback: () => {
+			new ProtonDriveLoginModal(plugin.app, plugin).open();
+		}
+	});
+
+	plugin.addCommand({
+		id: "protondrive-logout",
+		name: "Sign out of Proton Drive",
+		callback: async () => {
+			await plugin.authService.logout();
+			plugin.settings.sessionToken = "";
+			plugin.settings.accountEmail = "";
+			await plugin.saveSettings();
+			plugin.protonDriveService.disconnect();
+			new Notice("Signed out of Proton Drive.");
 		}
 	});
 
@@ -43,7 +65,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const {options, error} = parseSdkOptions(plugin.settings.sdkOptionsJson);
+			const {options, error} = buildSdkOptions(plugin.settings.sdkOptionsJson, plugin.settings.sessionToken);
 			if (error) {
 				new Notice(error);
 				return;
@@ -79,7 +101,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const {options, error} = parseSdkOptions(plugin.settings.sdkOptionsJson);
+			const {options, error} = buildSdkOptions(plugin.settings.sdkOptionsJson, plugin.settings.sessionToken);
 			if (error) {
 				new Notice(error);
 				return;

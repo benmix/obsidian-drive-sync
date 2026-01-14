@@ -26,8 +26,15 @@ export class ProtonDriveService {
 			this.connecting = null;
 		});
 
-		this.client = await this.connecting;
-		return this.client;
+		try {
+			this.client = await this.connecting;
+			return this.client;
+		} catch (error) {
+			console.warn("Failed to connect to Proton Drive.", error);
+			new Notice("Unable to connect to Proton Drive.");
+			this.client = null;
+			return null;
+		}
 	}
 
 	getClient(): ProtonDriveClient | null {
@@ -47,28 +54,13 @@ export class ProtonDriveService {
 	}
 
 	private async createClient(options: Record<string, unknown>): Promise<ProtonDriveClient | null> {
-		const sdk = await import("@protontech/drive-sdk").catch((error: unknown) => ({
-			__error: error
-		})) as ProtonDriveSdk & {__error?: unknown};
-
-		if ("__error" in sdk) {
-			console.warn("Unable to import @protontech/drive-sdk.", sdk.__error);
-			new Notice("Install @protontech/drive-sdk to enable Proton Drive integration.");
-			return null;
-		}
+		const sdk = await import("@protontech/drive-sdk") as ProtonDriveSdk;
 
 		const createDriveClient = sdk.createDriveClient ?? sdk.default?.createDriveClient;
 		if (!createDriveClient) {
-			new Notice("Proton Drive SDK is missing createDriveClient.");
-			return null;
+			throw new Error("Proton Drive SDK is missing createDriveClient.");
 		}
 
-		try {
-			return await createDriveClient(options);
-		} catch (error) {
-			console.warn("Failed to create Proton Drive client.", error);
-			new Notice("Failed to create Proton Drive client.");
-			return null;
-		}
+		return await createDriveClient(options);
 	}
 }

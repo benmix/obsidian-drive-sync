@@ -3,6 +3,19 @@ export type SdkOptionsParseResult = {
 	error?: string;
 };
 
+export function buildSdkOptions(raw: string, sessionToken?: string): SdkOptionsParseResult {
+	const result = parseSdkOptions(raw);
+	if (result.error) {
+		return result;
+	}
+
+	if (sessionToken && !("sessionToken" in result.options)) {
+		return {options: {...result.options, sessionToken}};
+	}
+
+	return result;
+}
+
 export function parseSdkOptions(raw: string): SdkOptionsParseResult {
 	if (!raw.trim()) {
 		return {options: {}};

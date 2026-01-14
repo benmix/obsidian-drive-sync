@@ -5,12 +5,16 @@ export interface ProtonDriveSettings {
 	enableProtonDrive: boolean;
 	sdkOptionsJson: string;
 	remoteFolderId: string;
+	sessionToken: string;
+	accountEmail: string;
 }
 
 export const DEFAULT_SETTINGS: ProtonDriveSettings = {
 	enableProtonDrive: false,
 	sdkOptionsJson: "",
-	remoteFolderId: ""
+	remoteFolderId: "",
+	sessionToken: "",
+	accountEmail: ""
 };
 
 export class ProtonDriveSettingTab extends PluginSettingTab {
@@ -38,7 +42,7 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Proton Drive SDK options (JSON)")
-			.setDesc("Paste the SDK options JSON required by @protontech/drive-sdk, such as authentication details.")
+			.setDesc("Paste the SDK options JSON required by @protontech/drive-sdk. Session tokens are merged automatically.")
 			.addTextArea(text => text
 				.setPlaceholder("{\n  \"sessionToken\": \"...\"\n}")
 				.setValue(this.plugin.settings.sdkOptionsJson)
@@ -46,6 +50,20 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 					this.plugin.settings.sdkOptionsJson = value;
 					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName("Proton Drive session")
+			.setDesc(this.plugin.settings.accountEmail
+				? `Signed in as ${this.plugin.settings.accountEmail}.`
+				: "Sign in from the command palette to store a session token locally.")
+			.addButton(button => {
+				button.setButtonText("Clear session");
+				button.onClick(async () => {
+					this.plugin.settings.sessionToken = "";
+					this.plugin.settings.accountEmail = "";
+					await this.plugin.saveSettings();
+				});
+			});
 
 		new Setting(containerEl)
 			.setName("Remote folder ID")
