@@ -34,5 +34,6 @@
 			"oxlint --fix",
 			"oxfmt"
 		]
-	}
+	},
+	"packageManager": "pnpm@10.13.1"
 }
