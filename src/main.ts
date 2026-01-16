@@ -1,99 +1,228 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Notice, Plugin } from "obsidian";
+import { registerCommands } from "./commands";
+import { ProtonDriveAuthService } from "./proton-drive/auth";
+import { ProtonDriveService } from "./proton-drive/service";
+import { buildSdkOptions } from "./proton-drive/sdk-options";
+import { ProtonDriveSettingTab, type ProtonDriveSettings, DEFAULT_SETTINGS } from "./settings";
+import { loadPluginData, mergePluginData, savePluginData } from "./data/plugin-data";
+import { LocalFsWatcher, type LocalChange } from "./sync/local-watcher";
+import { planLocalChanges } from "./sync/local-change-planner";
+import { ObsidianLocalFs } from "./sync/local-fs";
+import { ProtonDriveRemoteFs } from "./sync/remote-fs";
+import { SyncEngine } from "./sync/sync-engine";
+import { PluginDataStateStore } from "./sync/state-store";
+import { pollRemoteChanges } from "./sync/remote-poller";
+import { now } from "./sync/utils";
 
-// Remember to rename these classes and interfaces!
+type AutoSyncTrigger = "manual" | "interval" | "local";
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class ProtonDriveSyncPlugin extends Plugin {
+	settings: ProtonDriveSettings;
+	protonDriveService: ProtonDriveService;
+	authService: ProtonDriveAuthService;
+
+	private autoSyncIntervalId: number | null = null;
+	private localWatcher: LocalFsWatcher | null = null;
+	private localChangeQueue: LocalChange[] = [];
+	private localRunTimeout: number | null = null;
+	private autoSyncRunning = false;
+	private autoSyncPending = false;
+	private autoSyncPaused = false;
 
 	async onload() {
-		await this.loadSettings();
+		const data = loadPluginData(this.app);
+		this.settings = { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) };
+		this.protonDriveService = new ProtonDriveService();
+		this.authService = new ProtonDriveAuthService();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
+		this.addSettingTab(new ProtonDriveSettingTab(this.app, this));
+		registerCommands(this);
+		this.refreshAutoSync();
 	}
 
 	onunload() {
+		this.stopAutoSync();
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+	async saveSettings(): Promise<void> {
+		const data = mergePluginData(loadPluginData(this.app));
+		data.settings = { ...this.settings };
+		savePluginData(this.app, data);
 	}
 
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
+	refreshAutoSync(): void {
+		this.stopAutoSync();
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+		if (!this.settings.autoSyncEnabled) {
+			return;
+		}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
+		this.startAutoSync();
 	}
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+	pauseAutoSync(): void {
+		this.autoSyncPaused = true;
+	}
+
+	resumeAutoSync(): void {
+		this.autoSyncPaused = false;
+		this.scheduleAutoSync(0, "manual");
+	}
+
+	isAutoSyncPaused(): boolean {
+		return this.autoSyncPaused;
+	}
+
+	async runAutoSync(force = false): Promise<void> {
+		await this.performAutoSync("manual", force || this.autoSyncPaused);
+	}
+
+	private startAutoSync(): void {
+		this.autoSyncPaused = false;
+		this.localWatcher = new LocalFsWatcher(
+			this.app,
+			(change) => this.handleLocalChange(change),
+			this.registerEvent.bind(this),
+			this.settings.localChangeDebounceMs,
+		);
+		this.localWatcher.start();
+
+		this.autoSyncIntervalId = window.setInterval(() => {
+			void this.performAutoSync("interval");
+		}, this.settings.autoSyncIntervalMs);
+		this.registerInterval(this.autoSyncIntervalId);
+
+		this.scheduleAutoSync(0, "interval");
+	}
+
+	private stopAutoSync(): void {
+		if (this.autoSyncIntervalId !== null) {
+			window.clearInterval(this.autoSyncIntervalId);
+			this.autoSyncIntervalId = null;
+		}
+		if (this.localRunTimeout !== null) {
+			window.clearTimeout(this.localRunTimeout);
+			this.localRunTimeout = null;
+		}
+		if (this.localWatcher) {
+			this.localWatcher.stop();
+			this.localWatcher = null;
+		}
+		this.localChangeQueue = [];
+		this.autoSyncPending = false;
+		this.autoSyncRunning = false;
+	}
+
+	private handleLocalChange(change: LocalChange): void {
+		this.localChangeQueue.push(change);
+		this.scheduleAutoSync(Math.max(500, this.settings.localChangeDebounceMs), "local");
+	}
+
+	private scheduleAutoSync(delayMs: number, trigger: AutoSyncTrigger): void {
+		if (!this.settings.autoSyncEnabled || this.autoSyncPaused) {
+			return;
+		}
+		if (this.localRunTimeout !== null) {
+			return;
+		}
+		this.localRunTimeout = window.setTimeout(() => {
+			this.localRunTimeout = null;
+			void this.performAutoSync(trigger);
+		}, delayMs);
+	}
+
+	private drainLocalChanges(): LocalChange[] {
+		const changes = this.localChangeQueue;
+		this.localChangeQueue = [];
+		return changes;
+	}
+
+	private async performAutoSync(trigger: AutoSyncTrigger, force = false): Promise<void> {
+		if (!this.settings.enableProtonDrive) {
+			return;
+		}
+		if (!this.settings.remoteFolderId.trim()) {
+			return;
+		}
+		if (this.autoSyncPaused && !force) {
+			return;
+		}
+		if (this.autoSyncRunning) {
+			this.autoSyncPending = true;
+			return;
+		}
+
+		this.autoSyncRunning = true;
+
+		try {
+			const { options, error } = buildSdkOptions(
+				this.settings.sdkOptionsJson,
+				this.settings.sessionToken,
+			);
+			if (error) {
+				throw new Error(error);
+			}
+
+			const client = await this.protonDriveService.connect(options);
+			if (!client) {
+				throw new Error("Unable to connect to Proton Drive.");
+			}
+
+			const localFs = new ObsidianLocalFs(this.app);
+			const remoteFs = new ProtonDriveRemoteFs(client, this.settings.remoteFolderId);
+			const stateStore = new PluginDataStateStore(this.app);
+			const state = await stateStore.load();
+			const engine = new SyncEngine(localFs, remoteFs, stateStore);
+			await engine.load();
+
+			const localChanges = this.drainLocalChanges();
+			if (localChanges.length > 0) {
+				const plan = planLocalChanges(localChanges, state);
+				engine.applyEntries(plan.entries);
+				engine.removeEntries(plan.removedPaths);
+				for (const job of plan.jobs) {
+					engine.enqueue(job);
+				}
+			}
+
+			if (trigger !== "local" || localChanges.length === 0) {
+				const remotePlan = await pollRemoteChanges(remoteFs, state);
+				engine.applyEntries(remotePlan.snapshot);
+				engine.removeEntries(remotePlan.removedPaths);
+				for (const job of remotePlan.jobs) {
+					engine.enqueue(job);
+				}
+			}
+
+			if (engine.listJobs().length === 0) {
+				await engine.save({ lastError: undefined, lastErrorAt: undefined });
+				return;
+			}
+
+			await engine.runOnce();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "Auto sync failed.";
+			console.warn("Auto sync failed.", error);
+			await this.recordSyncError(message);
+			if (trigger === "manual") {
+				new Notice(message);
+			}
+		} finally {
+			this.autoSyncRunning = false;
+			if (this.autoSyncPending) {
+				this.autoSyncPending = false;
+				void this.performAutoSync("interval");
+			}
+		}
+	}
+
+	private async recordSyncError(message: string): Promise<void> {
+		const stateStore = new PluginDataStateStore(this.app);
+		const state = await stateStore.load();
+		await stateStore.save({
+			...state,
+			lastError: message,
+			lastErrorAt: now(),
+		});
 	}
 }
