@@ -1,16 +1,16 @@
-import {Notice} from "obsidian";
+import { Notice } from "obsidian";
 import type ProtonDriveSyncPlugin from "../main";
-import {buildSdkOptions} from "../protonDrive/sdkOptions";
+import { buildSdkOptions } from "../proton-drive/sdk-options";
 import {
 	planSync,
 	pollRemoteSync,
 	restoreVaultFromProtonDrive,
 	runPlannedSync,
-	syncVaultToProtonDrive
-} from "../protonDrive/sync";
-import {exportDiagnostics} from "../sync/diagnostics";
-import {ProtonDriveStatusModal} from "../ui/statusModal";
-import {ProtonDriveLoginModal} from "../ui/loginModal";
+	syncVaultToProtonDrive,
+} from "../proton-drive/sync";
+import { exportDiagnostics } from "../sync/diagnostics";
+import { ProtonDriveStatusModal } from "../ui/status-modal";
+import { ProtonDriveLoginModal } from "../ui/login-modal";
 
 export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 	plugin.addCommand({
@@ -22,9 +22,9 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const {options, error} = buildSdkOptions(
+			const { options, error } = buildSdkOptions(
 				plugin.settings.sdkOptionsJson,
-				plugin.settings.sessionToken
+				plugin.settings.sessionToken,
 			);
 			if (error) {
 				new Notice(error);
@@ -38,7 +38,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 			}
 
 			new Notice("Unable to connect to Proton Drive. Check the SDK options.");
-		}
+		},
 	});
 
 	plugin.addCommand({
@@ -46,7 +46,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		name: "Sign in to Proton Drive",
 		callback: () => {
 			new ProtonDriveLoginModal(plugin.app, plugin).open();
-		}
+		},
 	});
 
 	plugin.addCommand({
@@ -59,7 +59,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 			await plugin.saveSettings();
 			plugin.protonDriveService.disconnect();
 			new Notice("Signed out of Proton Drive.");
-		}
+		},
 	});
 
 	plugin.addCommand({
@@ -76,9 +76,9 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const {options, error} = buildSdkOptions(
+			const { options, error } = buildSdkOptions(
 				plugin.settings.sdkOptionsJson,
-				plugin.settings.sessionToken
+				plugin.settings.sessionToken,
 			);
 			if (error) {
 				new Notice(error);
@@ -92,17 +92,13 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 			}
 
 			try {
-				const result = await planSync(
-					plugin.app,
-					client,
-					plugin.settings.remoteFolderId
-				);
+				const result = await planSync(plugin.app, client, plugin.settings.remoteFolderId);
 				new Notice(`Planned ${result.jobsPlanned} jobs across ${result.entries} entries.`);
 			} catch (error) {
 				console.warn("Sync planning failed.", error);
 				new Notice("Sync planning failed. Check the console for details.");
 			}
-		}
+		},
 	});
 
 	plugin.addCommand({
@@ -119,9 +115,9 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const {options, error} = buildSdkOptions(
+			const { options, error } = buildSdkOptions(
 				plugin.settings.sdkOptionsJson,
-				plugin.settings.sessionToken
+				plugin.settings.sessionToken,
 			);
 			if (error) {
 				new Notice(error);
@@ -138,14 +134,14 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				const result = await pollRemoteSync(
 					plugin.app,
 					client,
-					plugin.settings.remoteFolderId
+					plugin.settings.remoteFolderId,
 				);
 				new Notice(`Remote poll queued ${result.jobsPlanned} jobs.`);
 			} catch (error) {
 				console.warn("Remote poll failed.", error);
 				new Notice("Remote poll failed. Check the console for details.");
 			}
-		}
+		},
 	});
 
 	plugin.addCommand({
@@ -162,9 +158,9 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const {options, error} = buildSdkOptions(
+			const { options, error } = buildSdkOptions(
 				plugin.settings.sdkOptionsJson,
-				plugin.settings.sessionToken
+				plugin.settings.sessionToken,
 			);
 			if (error) {
 				new Notice(error);
@@ -181,14 +177,16 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				const result = await runPlannedSync(
 					plugin.app,
 					client,
-					plugin.settings.remoteFolderId
+					plugin.settings.remoteFolderId,
 				);
-				new Notice(`Executed ${result.jobsExecuted} jobs, updated ${result.entriesUpdated} entries.`);
+				new Notice(
+					`Executed ${result.jobsExecuted} jobs, updated ${result.entriesUpdated} entries.`,
+				);
 			} catch (error) {
 				console.warn("Planned sync failed.", error);
 				new Notice("Planned sync failed. Check the console for details.");
 			}
-		}
+		},
 	});
 
 	plugin.addCommand({
@@ -210,7 +208,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				console.warn("Auto sync failed.", error);
 				new Notice("Auto sync failed. Check the console for details.");
 			}
-		}
+		},
 	});
 
 	plugin.addCommand({
@@ -227,9 +225,9 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const {options, error} = buildSdkOptions(
+			const { options, error } = buildSdkOptions(
 				plugin.settings.sdkOptionsJson,
-				plugin.settings.sessionToken
+				plugin.settings.sessionToken,
 			);
 			if (error) {
 				new Notice(error);
@@ -246,14 +244,14 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				const result = await syncVaultToProtonDrive(
 					plugin.app,
 					client,
-					plugin.settings.remoteFolderId
+					plugin.settings.remoteFolderId,
 				);
 				new Notice(`Uploaded ${result.uploaded} files to Proton Drive.`);
 			} catch (error) {
 				console.warn("Vault sync failed.", error);
 				new Notice("Vault sync failed. Check the console for details.");
 			}
-		}
+		},
 	});
 
 	plugin.addCommand({
@@ -270,9 +268,9 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const {options, error} = buildSdkOptions(
+			const { options, error } = buildSdkOptions(
 				plugin.settings.sdkOptionsJson,
-				plugin.settings.sessionToken
+				plugin.settings.sessionToken,
 			);
 			if (error) {
 				new Notice(error);
@@ -289,22 +287,22 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				const result = await restoreVaultFromProtonDrive(
 					plugin.app,
 					client,
-					plugin.settings.remoteFolderId
+					plugin.settings.remoteFolderId,
 				);
 				new Notice(`Downloaded ${result.downloaded} files from Proton Drive.`);
 			} catch (error) {
 				console.warn("Vault restore failed.", error);
 				new Notice("Vault restore failed. Check the console for details.");
 			}
-		}
+		},
 	});
 
 	plugin.addCommand({
 		id: "protondrive-show-status",
 		name: "Show Proton Drive sync status",
 		callback: () => {
-			new ProtonDriveStatusModal(plugin.app).open();
-		}
+			new ProtonDriveStatusModal(plugin.app, plugin).open();
+		},
 	});
 
 	plugin.addCommand({
@@ -318,7 +316,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				console.warn("Diagnostics export failed.", error);
 				new Notice("Diagnostics export failed. Check the console for details.");
 			}
-		}
+		},
 	});
 
 	plugin.addCommand({
@@ -327,6 +325,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		callback: () => {
 			plugin.protonDriveService.disconnect();
 			new Notice("Proton Drive connection reset.");
-		}
+		},
 	});
 }

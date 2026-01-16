@@ -1,4 +1,4 @@
-import {Notice} from "obsidian";
+import { Notice } from "obsidian";
 
 type ProtonDriveAuthClient = {
 	loginWithPassword?: (options: {
@@ -57,12 +57,14 @@ export class ProtonDriveAuthService {
 			return {
 				sessionToken: response.sessionToken,
 				userId: response.userId,
-				userEmail: response.userEmail ?? credentials.username
+				userEmail: response.userEmail ?? credentials.username,
 			};
 		}
 
 		if (response.twoFactorRequired || response.status === "TWO_FACTOR_REQUIRED") {
-			throw new Error("Two-factor authentication is required. Provide a 2FA code and try again.");
+			throw new Error(
+				"Two-factor authentication is required. Provide a 2FA code and try again.",
+			);
 		}
 
 		throw new Error(response.message ?? "Unable to authenticate with Proton Drive.");
@@ -86,7 +88,7 @@ export class ProtonDriveAuthService {
 			return this.authClient;
 		}
 
-		const sdk = await import("@protontech/drive-sdk") as ProtonDriveSdk;
+		const sdk = (await import("@protontech/drive-sdk")) as ProtonDriveSdk;
 		const createAuthClient = sdk.createAuthClient ?? sdk.default?.createAuthClient;
 
 		if (!createAuthClient) {

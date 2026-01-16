@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { loadPluginData } from "../data/pluginData";
+import { loadPluginData } from "../data/plugin-data";
 
 type DiagnosticsReport = {
 	generatedAt: string;

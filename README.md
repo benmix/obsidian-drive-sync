@@ -22,14 +22,14 @@ WIP. See `SPECS.md` and `PLAN.md` for scope, milestones, and design notes.
 ## Development
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 Production build:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 Manual install for testing:

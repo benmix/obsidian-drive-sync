@@ -1,4 +1,4 @@
-import type { SyncJob } from "./indexTypes";
+import type { SyncJob } from "./index-types";
 
 export class SyncJobQueue {
 	private jobs: SyncJob[];
@@ -43,8 +43,6 @@ export class SyncJobQueue {
 	}
 
 	private sort(): void {
-		this.jobs.sort(
-			(a, b) => a.priority - b.priority || a.nextRunAt - b.nextRunAt,
-		);
+		this.jobs.sort((a, b) => a.priority - b.priority || a.nextRunAt - b.nextRunAt);
 	}
 }
