@@ -1,4 +1,4 @@
-import {Notice} from "obsidian";
+import { Notice } from "obsidian";
 
 type ProtonDriveClient = unknown;
 
@@ -42,9 +42,12 @@ export class ProtonDriveService {
 	}
 
 	disconnect() {
-		if (this.client && typeof (this.client as {disconnect?: () => void}).disconnect === "function") {
+		if (
+			this.client &&
+			typeof (this.client as { disconnect?: () => void }).disconnect === "function"
+		) {
 			try {
-				(this.client as {disconnect: () => void}).disconnect();
+				(this.client as { disconnect: () => void }).disconnect();
 			} catch (error) {
 				console.warn("Failed to disconnect Proton Drive client.", error);
 			}
@@ -53,8 +56,10 @@ export class ProtonDriveService {
 		this.client = null;
 	}
 
-	private async createClient(options: Record<string, unknown>): Promise<ProtonDriveClient | null> {
-		const sdk = await import("@protontech/drive-sdk") as ProtonDriveSdk;
+	private async createClient(
+		options: Record<string, unknown>,
+	): Promise<ProtonDriveClient | null> {
+		const sdk = (await import("@protontech/drive-sdk")) as ProtonDriveSdk;
 
 		const createDriveClient = sdk.createDriveClient ?? sdk.default?.createDriveClient;
 		if (!createDriveClient) {

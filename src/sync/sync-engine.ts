@@ -1,11 +1,11 @@
-import type {LocalFileSystem, RemoteFileSystem} from "./types";
-import type {SyncEntry, SyncJob, SyncState} from "./indexTypes";
-import {SyncIndexStore} from "./indexStore";
-import {SyncJobQueue} from "./jobQueue";
-import {reconcileSnapshot} from "./reconciler";
-import {executeJobs} from "./executor";
-import type {StateStore} from "./stateStore";
-import {backoffMs, now} from "./utils";
+import type { LocalFileSystem, RemoteFileSystem } from "./types";
+import type { SyncEntry, SyncJob, SyncState } from "./index-types";
+import { SyncIndexStore } from "./index-store";
+import { SyncJobQueue } from "./job-queue";
+import { reconcileSnapshot } from "./reconciler";
+import { executeJobs } from "./executor";
+import type { StateStore } from "./state-store";
+import { backoffMs, now } from "./utils";
 
 export class SyncEngine {
 	private localFs: LocalFileSystem;
@@ -14,11 +14,7 @@ export class SyncEngine {
 	private index: SyncIndexStore;
 	private queue: SyncJobQueue;
 
-	constructor(
-		localFs: LocalFileSystem,
-		remoteFs: RemoteFileSystem,
-		stateStore: StateStore
-	) {
+	constructor(localFs: LocalFileSystem, remoteFs: RemoteFileSystem, stateStore: StateStore) {
 		this.localFs = localFs;
 		this.remoteFs = remoteFs;
 		this.stateStore = stateStore;
@@ -34,22 +30,21 @@ export class SyncEngine {
 
 	async save(overrides?: Partial<SyncState>): Promise<void> {
 		const base = this.index.toJSON();
+		if (overrides && ("lastError" in overrides || "lastErrorAt" in overrides)) {
+			this.index.setLastError(overrides.lastError, overrides.lastErrorAt);
+		}
 		const state: SyncState = {
 			entries: base.entries,
 			jobs: this.queue.list(),
 			lastSyncAt: base.lastSyncAt,
 			lastError: overrides?.lastError ?? base.lastError,
-			lastErrorAt: overrides?.lastErrorAt ?? base.lastErrorAt
+			lastErrorAt: overrides?.lastErrorAt ?? base.lastErrorAt,
 		};
 		await this.stateStore.save(state);
 	}
 
-	async plan(): Promise<{jobsPlanned: number; entries: number}> {
-		const result = await reconcileSnapshot(
-			this.localFs,
-			this.remoteFs,
-			this.index.toJSON()
-		);
+	async plan(): Promise<{ jobsPlanned: number; entries: number }> {
+		const result = await reconcileSnapshot(this.localFs, this.remoteFs, this.index.toJSON());
 		for (const entry of result.snapshot) {
 			this.index.setEntry(entry);
 		}
@@ -57,20 +52,23 @@ export class SyncEngine {
 		await this.save();
 		return {
 			jobsPlanned: this.queue.list().length,
-			entries: this.index.listEntries().length
+			entries: this.index.listEntries().length,
 		};
 	}
 
-	async runOnce(): Promise<{jobsExecuted: number; entriesUpdated: number}> {
+	async runOnce(): Promise<{ jobsExecuted: number; entriesUpdated: number }> {
 		const jobs = this.queue.list();
-		if (jobs.length === 0) {
-			return {jobsExecuted: 0, entriesUpdated: 0};
+		const nowTs = now();
+		const dueJobs = jobs.filter((job) => job.nextRunAt <= nowTs);
+		const pendingJobs = jobs.filter((job) => job.nextRunAt > nowTs);
+		if (dueJobs.length === 0) {
+			return { jobsExecuted: 0, entriesUpdated: 0 };
 		}
 		let jobsExecuted = 0;
 		const entries: SyncEntry[] = [];
 		const retryJobs: SyncJob[] = [];
 
-		for (const job of jobs) {
+		for (const job of dueJobs) {
 			try {
 				const result = await executeJobs(this.localFs, this.remoteFs, [job]);
 
@@ -82,7 +80,7 @@ export class SyncEngine {
 					...job,
 					attempt: nextAttempt,
 					nextRunAt: now() + backoffMs(nextAttempt),
-					reason: error instanceof Error ? error.message : "retry"
+					reason: error instanceof Error ? error.message : "retry",
 				});
 			}
 		}
@@ -92,6 +90,9 @@ export class SyncEngine {
 		}
 
 		this.queue.clear();
+		if (pendingJobs.length > 0) {
+			this.queue.enqueueMany(pendingJobs);
+		}
 		if (retryJobs.length > 0) {
 			this.queue.enqueueMany(retryJobs);
 		}
@@ -101,13 +102,13 @@ export class SyncEngine {
 		if (retryJobs.length > 0) {
 			await this.save({
 				lastError: "Some jobs failed. Retrying.",
-				lastErrorAt: now()
+				lastErrorAt: now(),
 			});
 		} else {
-			await this.save({lastError: undefined, lastErrorAt: undefined});
+			await this.save({ lastError: undefined, lastErrorAt: undefined });
 		}
 
-		return {jobsExecuted, entriesUpdated: entries.length};
+		return { jobsExecuted, entriesUpdated: entries.length };
 	}
 
 	enqueue(job: SyncJob): void {
@@ -118,5 +119,15 @@ export class SyncEngine {
 		for (const entry of entries) {
 			this.index.setEntry(entry);
 		}
+	}
+
+	removeEntries(paths: string[]): void {
+		for (const path of paths) {
+			this.index.removeEntry(path);
+		}
+	}
+
+	listJobs(): SyncJob[] {
+		return this.queue.list();
 	}
 }

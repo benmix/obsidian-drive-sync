@@ -1,0 +1,19 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"env": {
+		"browser": true
+	},
+	"ignorePatterns": [
+		"example_repo",
+		"node_modules",
+		"dist",
+		"vite.config.ts",
+		"eslint.config.js",
+		"version-bump.mjs",
+		"versions.json",
+		"main.js"
+	],
+	"rules": {
+		"unicorn/no-useless-fallback-in-spread": "off"
+	}
+}

@@ -13,11 +13,7 @@ type ProtonDriveClient = {
 		}) => Promise<Array<{ id: string; name: string }>>;
 		downloadFile?: (options: { id: string }) => Promise<Uint8Array>;
 		deleteFile?: (options: { id: string }) => Promise<void>;
-		moveFile?: (options: {
-			id: string;
-			parentId: string;
-			name?: string;
-		}) => Promise<void>;
+		moveFile?: (options: { id: string; parentId: string; name?: string }) => Promise<void>;
 	};
 };
 
@@ -32,9 +28,7 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 
 	async listFiles(): Promise<RemoteFileEntry[]> {
 		if (!this.client.files?.listFolder) {
-			throw new Error(
-				"Proton Drive SDK does not expose files.listFolder.",
-			);
+			throw new Error("Proton Drive SDK does not expose files.listFolder.");
 		}
 		const entries = await this.client.files.listFolder({
 			parentId: this.remoteFolderId,
@@ -44,16 +38,13 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 			name: entry.name,
 			mtimeMs: (entry as { modificationTime?: number }).modificationTime,
 			size: (entry as { storageSize?: number }).storageSize,
-			revisionId: (entry as { activeRevision?: { uid?: string } })
-				.activeRevision?.uid,
+			revisionId: (entry as { activeRevision?: { uid?: string } }).activeRevision?.uid,
 		}));
 	}
 
 	async uploadFile(path: string, data: Uint8Array): Promise<void> {
 		if (!this.client.files?.uploadFile) {
-			throw new Error(
-				"Proton Drive SDK does not expose files.uploadFile.",
-			);
+			throw new Error("Proton Drive SDK does not expose files.uploadFile.");
 		}
 		await this.client.files.uploadFile({
 			parentId: this.remoteFolderId,
@@ -65,18 +56,14 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 
 	async downloadFile(id: string): Promise<Uint8Array> {
 		if (!this.client.files?.downloadFile) {
-			throw new Error(
-				"Proton Drive SDK does not expose files.downloadFile.",
-			);
+			throw new Error("Proton Drive SDK does not expose files.downloadFile.");
 		}
 		return await this.client.files.downloadFile({ id });
 	}
 
 	async deletePath(id: string): Promise<void> {
 		if (!this.client.files?.deleteFile) {
-			throw new Error(
-				"Proton Drive SDK does not expose files.deleteFile.",
-			);
+			throw new Error("Proton Drive SDK does not expose files.deleteFile.");
 		}
 		await this.client.files.deleteFile({ id });
 	}

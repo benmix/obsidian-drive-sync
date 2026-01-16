@@ -1,9 +1,9 @@
-import type {LocalFileSystem, RemoteFileSystem} from "./types";
+import type { LocalFileSystem, RemoteFileSystem } from "./types";
 
 export async function syncLocalToRemote(
 	localFs: LocalFileSystem,
-	remoteFs: RemoteFileSystem
-): Promise<{uploaded: number}> {
+	remoteFs: RemoteFileSystem,
+): Promise<{ uploaded: number }> {
 	const files = await localFs.listFiles();
 	let uploaded = 0;
 
@@ -13,13 +13,13 @@ export async function syncLocalToRemote(
 		uploaded += 1;
 	}
 
-	return {uploaded};
+	return { uploaded };
 }
 
 export async function syncRemoteToLocal(
 	localFs: LocalFileSystem,
-	remoteFs: RemoteFileSystem
-): Promise<{downloaded: number}> {
+	remoteFs: RemoteFileSystem,
+): Promise<{ downloaded: number }> {
 	const remoteFiles = await remoteFs.listFiles();
 	let downloaded = 0;
 
@@ -29,5 +29,5 @@ export async function syncRemoteToLocal(
 		downloaded += 1;
 	}
 
-	return {downloaded};
+	return { downloaded };
 }

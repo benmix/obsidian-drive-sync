@@ -1,7 +1,7 @@
-import type {LocalFileSystem, RemoteFileSystem} from "./types";
-import type {SyncEntry, SyncJob} from "./indexTypes";
-import {hashBytes} from "./hash";
-import {now} from "./utils";
+import type { LocalFileSystem, RemoteFileSystem } from "./types";
+import type { SyncEntry, SyncJob } from "./index-types";
+import { hashBytes } from "./hash";
+import { now } from "./utils";
 
 export type ExecuteResult = {
 	entries: SyncEntry[];
@@ -11,7 +11,7 @@ export type ExecuteResult = {
 export async function executeJobs(
 	localFs: LocalFileSystem,
 	remoteFs: RemoteFileSystem,
-	jobs: SyncJob[]
+	jobs: SyncJob[],
 ): Promise<ExecuteResult> {
 	const entries: SyncEntry[] = [];
 	let jobsExecuted = 0;
@@ -26,7 +26,7 @@ export async function executeJobs(
 				type: "file",
 				localHash,
 				syncedLocalHash: localHash,
-				lastSyncAt: now()
+				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
 		} else if (job.op === "download") {
@@ -41,7 +41,7 @@ export async function executeJobs(
 				type: "file",
 				localHash,
 				syncedLocalHash: localHash,
-				lastSyncAt: now()
+				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
 		} else if (job.op === "delete-local") {
@@ -50,7 +50,7 @@ export async function executeJobs(
 				relPath: job.path,
 				type: "file",
 				tombstone: true,
-				lastSyncAt: now()
+				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
 		} else if (job.op === "delete-remote") {
@@ -62,7 +62,7 @@ export async function executeJobs(
 				relPath: job.path,
 				type: "file",
 				tombstone: true,
-				lastSyncAt: now()
+				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
 		} else if (job.op === "move-local") {
@@ -71,9 +71,15 @@ export async function executeJobs(
 			}
 			await localFs.movePath(job.fromPath, job.toPath);
 			entries.push({
+				relPath: job.fromPath,
+				type: "file",
+				tombstone: true,
+				lastSyncAt: now(),
+			});
+			entries.push({
 				relPath: job.toPath,
 				type: "file",
-				lastSyncAt: now()
+				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
 		} else if (job.op === "move-remote") {
@@ -81,15 +87,23 @@ export async function executeJobs(
 				throw new Error(`Missing move-remote data for ${job.path}`);
 			}
 			await remoteFs.movePath(job.remoteId, job.toPath);
+			if (job.fromPath) {
+				entries.push({
+					relPath: job.fromPath,
+					type: "file",
+					tombstone: true,
+					lastSyncAt: now(),
+				});
+			}
 			entries.push({
 				relPath: job.toPath,
 				type: "file",
 				remoteId: job.remoteId,
-				lastSyncAt: now()
+				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
 		}
 	}
 
-	return {entries, jobsExecuted};
+	return { entries, jobsExecuted };
 }
