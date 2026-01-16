@@ -1,0 +1,81 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const logger_1 = require("../../tests/logger");
+const interface_1 = require("./interface");
+const coreEventManager_1 = require("./coreEventManager");
+describe('CoreEventManager', () => {
+    let mockApiService;
+    let coreEventManager;
+    const mockLogger = (0, logger_1.getMockLogger)();
+    beforeEach(() => {
+        // Reset mocks
+        jest.clearAllMocks();
+        mockApiService = {
+            getCoreLatestEventId: jest.fn(),
+            getCoreEvents: jest.fn(),
+            getVolumeLatestEventId: jest.fn(),
+            getVolumeEvents: jest.fn(),
+        };
+        coreEventManager = new coreEventManager_1.CoreEventManager(mockLogger, mockApiService);
+    });
+    describe('getLatestEventId', () => {
+        it('should return the latest event ID from API service', async () => {
+            const expectedEventId = 'event-123';
+            mockApiService.getCoreLatestEventId.mockResolvedValue(expectedEventId);
+            const result = await coreEventManager.getLatestEventId();
+            expect(result).toBe(expectedEventId);
+            expect(mockApiService.getCoreLatestEventId).toHaveBeenCalledTimes(1);
+        });
+        it('should handle API service errors', async () => {
+            const error = new Error('API error');
+            mockApiService.getCoreLatestEventId.mockRejectedValue(error);
+            await expect(coreEventManager.getLatestEventId()).rejects.toThrow('API error');
+            expect(mockApiService.getCoreLatestEventId).toHaveBeenCalledTimes(1);
+        });
+    });
+    describe('getEvents', () => {
+        const eventId = 'event1';
+        const latestEventId = 'event2';
+        it('should yield all events when there are actual events', async () => {
+            const mockEvent1 = {
+                type: interface_1.DriveEventType.SharedWithMeUpdated,
+                eventId: 'event-1',
+                treeEventScopeId: 'core',
+            };
+            const mockEvent2 = {
+                type: interface_1.DriveEventType.SharedWithMeUpdated,
+                eventId: 'event-2',
+                treeEventScopeId: 'core',
+            };
+            const mockEvents = {
+                latestEventId,
+                more: false,
+                refresh: false,
+                events: [mockEvent1, mockEvent2],
+            };
+            mockApiService.getCoreEvents.mockResolvedValue(mockEvents);
+            const events = await Array.fromAsync(coreEventManager.getEvents(eventId));
+            expect(events).toHaveLength(2);
+            expect(events[0]).toEqual(mockEvent1);
+            expect(events[1]).toEqual(mockEvent2);
+        });
+        it('should yield FastForward event there are no events but lastEventId changed', async () => {
+            const mockEvents = {
+                latestEventId,
+                more: false,
+                refresh: false,
+                events: [],
+            };
+            mockApiService.getCoreEvents.mockResolvedValue(mockEvents);
+            const events = await Array.fromAsync(coreEventManager.getEvents(eventId));
+            expect(events).toHaveLength(1);
+            expect(events[0]).toEqual({
+                type: interface_1.DriveEventType.FastForward,
+                treeEventScopeId: 'core',
+                eventId: latestEventId,
+            });
+            expect(mockApiService.getCoreEvents).toHaveBeenCalledWith(eventId);
+        });
+    });
+});
+//# sourceMappingURL=coreEventManager.test.js.map

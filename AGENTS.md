@@ -249,3 +249,6 @@ this.registerInterval(window.setInterval(() => { /* ... */ }, 1000));
 - Developer policies: https://docs.obsidian.md/Developer+policies
 - Plugin guidelines: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines
 - Style guide: https://help.obsidian.md/style-guide
+- ProtonDrive WebClient: ./example_repo/WebClients
+- proton-drive-sync：./example_repo/proton-drive-sync
+- proton-drive-sdk：./example_repo/proton-drive-sdk
