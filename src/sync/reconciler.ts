@@ -70,12 +70,14 @@ export async function reconcileSnapshot(
 		snapshot.push(base);
 
 		const prior = state?.entries?.[entry.path];
+		const effectivePrior = prior?.tombstone ? undefined : prior;
 		const localChanged =
-			entry.local && (!prior?.localMtimeMs || entry.local.mtimeMs > prior.localMtimeMs);
+			entry.local &&
+			(!effectivePrior?.localMtimeMs || entry.local.mtimeMs > effectivePrior.localMtimeMs);
 		const remoteChanged =
 			entry.remote &&
-			(!prior?.remoteRev ||
-				(entry.remote.revisionId && entry.remote.revisionId !== prior.remoteRev));
+			(!effectivePrior?.remoteRev ||
+				(entry.remote.revisionId && entry.remote.revisionId !== effectivePrior.remoteRev));
 
 		if (entry.local && !entry.remote) {
 			jobs.push({

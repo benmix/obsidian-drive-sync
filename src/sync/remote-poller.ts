@@ -22,7 +22,7 @@ export async function pollRemoteChanges(
 	const priorByRemoteId = new Map<string, { path: string; entry: SyncEntry }>();
 
 	for (const [path, entry] of Object.entries(state.entries)) {
-		if (entry.remoteId) {
+		if (entry.remoteId && !entry.tombstone) {
 			priorByRemoteId.set(entry.remoteId, { path, entry });
 		}
 	}

@@ -58,14 +58,17 @@ export class SyncEngine {
 
 	async runOnce(): Promise<{ jobsExecuted: number; entriesUpdated: number }> {
 		const jobs = this.queue.list();
-		if (jobs.length === 0) {
+		const nowTs = now();
+		const dueJobs = jobs.filter((job) => job.nextRunAt <= nowTs);
+		const pendingJobs = jobs.filter((job) => job.nextRunAt > nowTs);
+		if (dueJobs.length === 0) {
 			return { jobsExecuted: 0, entriesUpdated: 0 };
 		}
 		let jobsExecuted = 0;
 		const entries: SyncEntry[] = [];
 		const retryJobs: SyncJob[] = [];
 
-		for (const job of jobs) {
+		for (const job of dueJobs) {
 			try {
 				const result = await executeJobs(this.localFs, this.remoteFs, [job]);
 
@@ -87,6 +90,9 @@ export class SyncEngine {
 		}
 
 		this.queue.clear();
+		if (pendingJobs.length > 0) {
+			this.queue.enqueueMany(pendingJobs);
+		}
 		if (retryJobs.length > 0) {
 			this.queue.enqueueMany(retryJobs);
 		}
