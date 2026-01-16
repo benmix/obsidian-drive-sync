@@ -7,7 +7,7 @@
 		"example_repo",
 		"node_modules",
 		"dist",
-		"esbuild.config.mjs",
+		"vite.config.ts",
 		"eslint.config.js",
 		"version-bump.mjs",
 		"versions.json",
