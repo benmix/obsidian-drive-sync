@@ -66,6 +66,7 @@ export async function pollRemoteSync(
 	const engine = new SyncEngine(new ObsidianLocalFs(app), remoteFs, stateStore);
 	await engine.load();
 	engine.applyEntries(result.snapshot);
+	engine.removeEntries(result.removedPaths);
 	for (const job of result.jobs) {
 		engine.enqueue(job);
 	}

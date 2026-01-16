@@ -5,6 +5,7 @@ import { normalizePath, now } from "./utils";
 export type RemotePollResult = {
 	jobs: SyncJob[];
 	snapshot: SyncEntry[];
+	removedPaths: string[];
 };
 
 export async function pollRemoteChanges(
@@ -14,13 +15,39 @@ export async function pollRemoteChanges(
 	const remoteFiles = await remoteFs.listFiles();
 	const jobs: SyncJob[] = [];
 	const snapshot: SyncEntry[] = [];
+	const removedPaths: string[] = [];
 	const nowTs = now();
 	const seen = new Set<string>();
+	const movedFromPaths = new Set<string>();
+	const priorByRemoteId = new Map<string, { path: string; entry: SyncEntry }>();
+
+	for (const [path, entry] of Object.entries(state.entries)) {
+		if (entry.remoteId) {
+			priorByRemoteId.set(entry.remoteId, { path, entry });
+		}
+	}
 
 	for (const file of remoteFiles) {
 		const relPath = normalizePath(file.name);
 		seen.add(relPath);
-		const prior = state.entries[relPath];
+		const prior = state.entries[relPath] ?? priorByRemoteId.get(file.id)?.entry;
+		const priorPath = priorByRemoteId.get(file.id)?.path;
+
+		if (priorPath && priorPath !== relPath) {
+			movedFromPaths.add(priorPath);
+			jobs.push({
+				id: `move-local:${priorPath}:${relPath}`,
+				op: "move-local",
+				path: relPath,
+				fromPath: priorPath,
+				toPath: relPath,
+				priority: 5,
+				attempt: 0,
+				nextRunAt: nowTs,
+				reason: "remote-rename",
+			});
+			removedPaths.push(priorPath);
+		}
 		const changed =
 			!prior?.remoteRev || (file.revisionId && file.revisionId !== prior.remoteRev);
 
@@ -49,7 +76,7 @@ export async function pollRemoteChanges(
 	}
 
 	for (const priorPath of Object.keys(state.entries)) {
-		if (seen.has(priorPath)) {
+		if (seen.has(priorPath) || movedFromPaths.has(priorPath)) {
 			continue;
 		}
 		const prior = state.entries[priorPath];
@@ -66,5 +93,5 @@ export async function pollRemoteChanges(
 		}
 	}
 
-	return { jobs, snapshot };
+	return { jobs, snapshot, removedPaths };
 }

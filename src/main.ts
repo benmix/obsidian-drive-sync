@@ -188,6 +188,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 			if (trigger !== "local" || localChanges.length === 0) {
 				const remotePlan = await pollRemoteChanges(remoteFs, state);
 				engine.applyEntries(remotePlan.snapshot);
+				engine.removeEntries(remotePlan.removedPaths);
 				for (const job of remotePlan.jobs) {
 					engine.enqueue(job);
 				}
