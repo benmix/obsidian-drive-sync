@@ -1,5 +1,5 @@
 import type { App, TAbstractFile, EventRef } from "obsidian";
-import {normalizePath} from "./utils";
+import { normalizePath } from "./utils";
 
 export type LocalChange =
 	| { type: "create"; path: string }
@@ -66,10 +66,7 @@ export class LocalFsWatcher {
 	};
 
 	private queue(change: LocalChange) {
-		const key =
-			change.type === "rename"
-				? `${change.from}->${change.to}`
-				: change.path;
+		const key = change.type === "rename" ? `${change.from}->${change.to}` : change.path;
 		this.pending.set(key, change);
 		this.scheduleFlush();
 	}

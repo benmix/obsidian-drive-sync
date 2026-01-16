@@ -1,11 +1,7 @@
 import type { App } from "obsidian";
-import type { SyncState } from "./indexTypes";
-import { DEFAULT_SYNC_STATE } from "./indexTypes";
-import {
-	loadPluginData,
-	mergePluginData,
-	savePluginData,
-} from "../data/pluginData";
+import type { SyncState } from "./index-types";
+import { DEFAULT_SYNC_STATE } from "./index-types";
+import { loadPluginData, mergePluginData, savePluginData } from "../data/plugin-data";
 
 export type StateStore = {
 	load(): Promise<SyncState>;

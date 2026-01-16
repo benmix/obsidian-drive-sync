@@ -1,18 +1,18 @@
-import type {App} from "obsidian";
-import {ObsidianLocalFs} from "../sync/localFs";
-import {syncLocalToRemote, syncRemoteToLocal} from "../sync/manualSync";
-import {ProtonDriveRemoteFs} from "../sync/remoteFs";
-import {SyncEngine} from "../sync/syncEngine";
-import {PluginDataStateStore} from "../sync/stateStore";
-import {pollRemoteChanges} from "../sync/remotePoller";
+import type { App } from "obsidian";
+import { ObsidianLocalFs } from "../sync/local-fs";
+import { syncLocalToRemote, syncRemoteToLocal } from "../sync/manual-sync";
+import { ProtonDriveRemoteFs } from "../sync/remote-fs";
+import { SyncEngine } from "../sync/sync-engine";
+import { PluginDataStateStore } from "../sync/state-store";
+import { pollRemoteChanges } from "../sync/remote-poller";
 
 type ProtonDriveClient = ConstructorParameters<typeof ProtonDriveRemoteFs>[0];
 
 export async function syncVaultToProtonDrive(
 	app: App,
 	client: ProtonDriveClient,
-	remoteFolderId: string
-): Promise<{uploaded: number}> {
+	remoteFolderId: string,
+): Promise<{ uploaded: number }> {
 	const localFs = new ObsidianLocalFs(app);
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
 	return await syncLocalToRemote(localFs, remoteFs);
@@ -21,8 +21,8 @@ export async function syncVaultToProtonDrive(
 export async function restoreVaultFromProtonDrive(
 	app: App,
 	client: ProtonDriveClient,
-	remoteFolderId: string
-): Promise<{downloaded: number}> {
+	remoteFolderId: string,
+): Promise<{ downloaded: number }> {
 	const localFs = new ObsidianLocalFs(app);
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
 	return await syncRemoteToLocal(localFs, remoteFs);
@@ -31,8 +31,8 @@ export async function restoreVaultFromProtonDrive(
 export async function planSync(
 	app: App,
 	client: ProtonDriveClient,
-	remoteFolderId: string
-): Promise<{jobsPlanned: number; entries: number}> {
+	remoteFolderId: string,
+): Promise<{ jobsPlanned: number; entries: number }> {
 	const localFs = new ObsidianLocalFs(app);
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
 	const stateStore = new PluginDataStateStore(app);
@@ -44,8 +44,8 @@ export async function planSync(
 export async function runPlannedSync(
 	app: App,
 	client: ProtonDriveClient,
-	remoteFolderId: string
-): Promise<{jobsExecuted: number; entriesUpdated: number}> {
+	remoteFolderId: string,
+): Promise<{ jobsExecuted: number; entriesUpdated: number }> {
 	const localFs = new ObsidianLocalFs(app);
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
 	const stateStore = new PluginDataStateStore(app);
@@ -57,8 +57,8 @@ export async function runPlannedSync(
 export async function pollRemoteSync(
 	app: App,
 	client: ProtonDriveClient,
-	remoteFolderId: string
-): Promise<{jobsPlanned: number; entries: number}> {
+	remoteFolderId: string,
+): Promise<{ jobsPlanned: number; entries: number }> {
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
 	const stateStore = new PluginDataStateStore(app);
 	const state = await stateStore.load();
@@ -70,5 +70,5 @@ export async function pollRemoteSync(
 		engine.enqueue(job);
 	}
 	await engine.save();
-	return {jobsPlanned: result.jobs.length, entries: result.snapshot.length};
+	return { jobsPlanned: result.jobs.length, entries: result.snapshot.length };
 }

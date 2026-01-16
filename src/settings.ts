@@ -1,4 +1,4 @@
-import {App, PluginSettingTab, Setting} from "obsidian";
+import { App, PluginSettingTab, Setting } from "obsidian";
 import ProtonDriveSyncPlugin from "./main";
 
 export interface ProtonDriveSettings {
@@ -20,7 +20,7 @@ export const DEFAULT_SETTINGS: ProtonDriveSettings = {
 	accountEmail: "",
 	autoSyncEnabled: false,
 	autoSyncIntervalMs: 300000,
-	localChangeDebounceMs: 800
+	localChangeDebounceMs: 800,
 };
 
 export class ProtonDriveSettingTab extends PluginSettingTab {
@@ -32,44 +32,43 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 
 		containerEl.empty();
 
 		new Setting(containerEl)
 			.setName("Enable Proton Drive integration")
 			.setDesc("Connect to Proton Drive only when you run a command.")
-			.addToggle(toggle =>
-				toggle
-					.setValue(this.plugin.settings.enableProtonDrive)
-					.onChange(async (value) => {
-						this.plugin.settings.enableProtonDrive = value;
-						await this.plugin.saveSettings();
-					})
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.enableProtonDrive).onChange(async (value) => {
+					this.plugin.settings.enableProtonDrive = value;
+					await this.plugin.saveSettings();
+				}),
 			);
 
 		new Setting(containerEl)
 			.setName("Proton Drive SDK options (JSON)")
 			.setDesc(
-				"Paste the SDK options JSON required by @protontech/drive-sdk. Session tokens are merged automatically."
+				"Paste the SDK options JSON required by @protontech/drive-sdk. Session tokens are merged automatically.",
 			)
-			.addTextArea(text =>
+			.addTextArea((text) =>
 				text
 					.setPlaceholder('{\n  "sessionToken": "..."\n}')
 					.setValue(this.plugin.settings.sdkOptionsJson)
 					.onChange(async (value) => {
 						this.plugin.settings.sdkOptionsJson = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Proton Drive session")
-			.setDesc(this.plugin.settings.accountEmail
-				? `Signed in as ${this.plugin.settings.accountEmail}.`
-				: "Sign in from the command palette to store a session token locally."
+			.setDesc(
+				this.plugin.settings.accountEmail
+					? `Signed in as ${this.plugin.settings.accountEmail}.`
+					: "Sign in from the command palette to store a session token locally.",
 			)
-			.addButton(button => {
+			.addButton((button) => {
 				button.setButtonText("Clear session");
 				button.onClick(async () => {
 					this.plugin.settings.sessionToken = "";
@@ -81,33 +80,31 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Remote folder ID")
 			.setDesc("Target Proton Drive folder ID to sync your vault.")
-			.addText(text =>
+			.addText((text) =>
 				text
 					.setPlaceholder("folder-id")
 					.setValue(this.plugin.settings.remoteFolderId)
 					.onChange(async (value) => {
 						this.plugin.settings.remoteFolderId = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Enable auto sync")
 			.setDesc("Schedule periodic sync checks and respond to local changes.")
-			.addToggle(toggle =>
-				toggle
-					.setValue(this.plugin.settings.autoSyncEnabled)
-					.onChange(async (value) => {
-						this.plugin.settings.autoSyncEnabled = value;
-						await this.plugin.saveSettings();
-						this.plugin.refreshAutoSync();
-					})
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.autoSyncEnabled).onChange(async (value) => {
+					this.plugin.settings.autoSyncEnabled = value;
+					await this.plugin.saveSettings();
+					this.plugin.refreshAutoSync();
+				}),
 			);
 
 		new Setting(containerEl)
 			.setName("Auto sync interval (ms)")
 			.setDesc("How often to poll Proton Drive when auto sync is enabled.")
-			.addText(text =>
+			.addText((text) =>
 				text
 					.setPlaceholder("300000")
 					.setValue(String(this.plugin.settings.autoSyncIntervalMs))
@@ -118,13 +115,13 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 							this.plugin.refreshAutoSync();
 						}
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Local change debounce (ms)")
 			.setDesc("Delay before reacting to local file changes.")
-			.addText(text =>
+			.addText((text) =>
 				text
 					.setPlaceholder("800")
 					.setValue(String(this.plugin.settings.localChangeDebounceMs))
@@ -135,7 +132,7 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 							this.plugin.refreshAutoSync();
 						}
-					})
+					}),
 			);
 	}
 }

@@ -10,7 +10,7 @@ export function buildSdkOptions(raw: string, sessionToken?: string): SdkOptionsP
 	}
 
 	if (sessionToken && !("sessionToken" in result.options)) {
-		return {options: {...result.options, sessionToken}};
+		return { options: { ...result.options, sessionToken } };
 	}
 
 	return result;
@@ -18,18 +18,18 @@ export function buildSdkOptions(raw: string, sessionToken?: string): SdkOptionsP
 
 export function parseSdkOptions(raw: string): SdkOptionsParseResult {
 	if (!raw.trim()) {
-		return {options: {}};
+		return { options: {} };
 	}
 
 	try {
 		const parsed = JSON.parse(raw);
 		if (!isPlainRecord(parsed)) {
-			return {options: {}, error: "SDK options must be a JSON object."};
+			return { options: {}, error: "SDK options must be a JSON object." };
 		}
-		return {options: parsed};
+		return { options: parsed };
 	} catch (error) {
 		console.warn("Failed to parse Proton Drive SDK options.", error);
-		return {options: {}, error: "SDK options JSON is invalid."};
+		return { options: {}, error: "SDK options JSON is invalid." };
 	}
 }
 

@@ -1,6 +1,6 @@
-import type {RemoteFileSystem} from "./types";
-import type {SyncEntry, SyncJob, SyncState} from "./indexTypes";
-import {normalizePath, now} from "./utils";
+import type { RemoteFileSystem } from "./types";
+import type { SyncEntry, SyncJob, SyncState } from "./index-types";
+import { normalizePath, now } from "./utils";
 
 export type RemotePollResult = {
 	jobs: SyncJob[];
@@ -9,7 +9,7 @@ export type RemotePollResult = {
 
 export async function pollRemoteChanges(
 	remoteFs: RemoteFileSystem,
-	state: SyncState
+	state: SyncState,
 ): Promise<RemotePollResult> {
 	const remoteFiles = await remoteFs.listFiles();
 	const jobs: SyncJob[] = [];
@@ -21,7 +21,8 @@ export async function pollRemoteChanges(
 		const relPath = normalizePath(file.name);
 		seen.add(relPath);
 		const prior = state.entries[relPath];
-		const changed = !prior?.remoteRev || (file.revisionId && file.revisionId !== prior.remoteRev);
+		const changed =
+			!prior?.remoteRev || (file.revisionId && file.revisionId !== prior.remoteRev);
 
 		snapshot.push({
 			relPath,
@@ -30,7 +31,7 @@ export async function pollRemoteChanges(
 			remoteMtimeMs: file.mtimeMs,
 			remoteSize: file.size,
 			remoteRev: file.revisionId,
-			lastSyncAt: nowTs
+			lastSyncAt: nowTs,
 		});
 
 		if (changed) {
@@ -42,7 +43,7 @@ export async function pollRemoteChanges(
 				priority: 10,
 				attempt: 0,
 				nextRunAt: nowTs,
-				reason: "remote-change"
+				reason: "remote-change",
 			});
 		}
 	}
@@ -60,10 +61,10 @@ export async function pollRemoteChanges(
 				priority: 20,
 				attempt: 0,
 				nextRunAt: nowTs,
-				reason: "remote-delete"
+				reason: "remote-delete",
 			});
 		}
 	}
 
-	return {jobs, snapshot};
+	return { jobs, snapshot };
 }
