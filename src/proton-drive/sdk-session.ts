@@ -5,15 +5,16 @@ import type {
 	MetricEvent,
 } from "@protontech/drive-sdk";
 import { OpenPGPCryptoWithCryptoProxy } from "@protontech/drive-sdk";
-import type { OpenPGPCryptoProxy, SRPModule } from "@protontech/drive-sdk";
+import { createOpenPGPCryptoProxy } from "./openpgp-proxy";
+import { createSdkTelemetry } from "./telemetry";
 import {
-	createProtonHttpClient,
 	createProtonAccount,
-	createOpenPGPCrypto,
+	createProtonHttpClient,
 	createSrpModule,
-	initCrypto,
-	type Session,
-} from "./proton-auth";
+	type SRPModuleInterface,
+} from "./proton-auth/sdk-helpers";
+import type { Session } from "./proton-auth/types";
+import { createOpenPGPCrypto, initCrypto } from "./proton-auth/openpgp";
 
 export type ProtonSession = Session & {
 	onTokenRefresh?: () => Promise<void>;
@@ -23,7 +24,7 @@ export type SdkSessionBundle = {
 	httpClient: ProtonDriveHTTPClient;
 	account: ProtonDriveAccount;
 	openPGPCryptoModule: OpenPGPCryptoWithCryptoProxy;
-	srpModule: SRPModule;
+	srpModule: SRPModuleInterface;
 	telemetry?: Telemetry<MetricEvent>;
 };
 
@@ -33,16 +34,16 @@ export async function buildSdkSessionClient(
 ): Promise<SdkSessionBundle> {
 	await initCrypto();
 	const httpClient = createProtonHttpClient(session, onTokenRefresh);
-	const openPGPCrypto = createOpenPGPCrypto();
-	const cryptoProxy = openPGPCrypto as unknown as OpenPGPCryptoProxy;
-	const openPGPCryptoModule = new OpenPGPCryptoWithCryptoProxy(cryptoProxy);
-	const account = createProtonAccount(session, openPGPCrypto);
+	const openPGPCryptoModule = new OpenPGPCryptoWithCryptoProxy(createOpenPGPCryptoProxy());
+	const account = createProtonAccount(session, createOpenPGPCrypto());
 	const srpModule = createSrpModule();
+	const telemetry = createSdkTelemetry();
 
 	return {
 		httpClient,
 		account,
 		openPGPCryptoModule,
 		srpModule,
+		telemetry,
 	};
 }

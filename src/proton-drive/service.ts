@@ -35,17 +35,6 @@ export class ProtonDriveService {
 	}
 
 	disconnect() {
-		if (
-			this.client &&
-			typeof (this.client as { disconnect?: () => void }).disconnect === "function"
-		) {
-			try {
-				(this.client as { disconnect: () => void }).disconnect();
-			} catch (error) {
-				console.warn("Failed to disconnect Proton Drive client.", error);
-			}
-		}
-
 		this.client = null;
 	}
 
@@ -59,9 +48,7 @@ export class ProtonDriveService {
 			httpClient,
 			entitiesCache: new MemoryCache(),
 			cryptoCache: new MemoryCache(),
-			// @ts-expect-error openpgp type wrappers differ from SDK types.
 			account,
-			// @ts-expect-error openpgp type wrappers differ from SDK types.
 			openPGPCryptoModule,
 			srpModule,
 			telemetry,

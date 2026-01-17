@@ -1,5 +1,5 @@
-import { SyncEntry, SyncJob } from "../data/sync-schema";
-import { SyncState } from "./index-store";
+import type { SyncEntry, SyncJob } from "../data/sync-schema";
+import type { SyncState } from "./index-store";
 import type { LocalChange } from "./local-watcher";
 import { dirname, normalizePath, now } from "./utils";
 

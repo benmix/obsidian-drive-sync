@@ -1,6 +1,7 @@
 import type { LocalFileSystem, RemoteFileSystem } from "./types";
 import type { SyncEntry, SyncJob } from "../data/sync-schema";
-import { SyncIndexStore, SyncState } from "./index-store";
+import { SyncIndexStore } from "./index-store";
+import type { SyncState } from "./index-store";
 import { SyncJobQueue } from "./job-queue";
 import { reconcileSnapshot } from "./reconciler";
 import { executeJobs, type ExecuteResult } from "./executor";

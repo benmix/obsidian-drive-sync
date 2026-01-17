@@ -16,9 +16,9 @@ import { now } from "./sync/utils";
 type AutoSyncTrigger = "manual" | "interval" | "local";
 
 export default class ProtonDriveSyncPlugin extends Plugin {
-	settings: ProtonDriveSettings;
-	protonDriveService: ProtonDriveService;
-	authService: ProtonDriveAuthService;
+	settings: ProtonDriveSettings = DEFAULT_SETTINGS;
+	protonDriveService: ProtonDriveService = new ProtonDriveService();
+	authService: ProtonDriveAuthService = new ProtonDriveAuthService();
 
 	private autoSyncIntervalId: number | null = null;
 	private localWatcher: LocalFsWatcher | null = null;
@@ -33,8 +33,6 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 	async onload() {
 		const data = await loadPluginData(this);
 		this.settings = { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) };
-		this.protonDriveService = new ProtonDriveService();
-		this.authService = new ProtonDriveAuthService();
 		await this.restoreSession();
 
 		this.addSettingTab(new ProtonDriveSettingTab(this.app, this));
@@ -204,11 +202,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 					if (refreshedSession) {
 						Object.assign(activeSession, refreshedSession);
 					}
-					this.settings.protonSession =
-						this.authService.getReusableCredentials() as unknown as Record<
-							string,
-							unknown
-						>;
+					this.settings.protonSession = this.authService.getReusableCredentials();
 					this.settings.hasAuthSession = true;
 					await this.saveSettings();
 				} catch (refreshError) {

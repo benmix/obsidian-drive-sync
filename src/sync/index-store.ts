@@ -1,4 +1,4 @@
-import { SyncEntry, SyncJob } from "../data/sync-schema";
+import type { SyncEntry, SyncJob } from "../data/sync-schema";
 
 export type SyncState = {
 	entries: Record<string, SyncEntry>;

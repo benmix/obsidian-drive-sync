@@ -46,7 +46,7 @@ export class ObsidianLocalFs implements LocalFileSystem {
 
 	async writeFile(path: string, data: Uint8Array): Promise<void> {
 		await this.ensureParentFolder(path);
-		await this.app.vault.adapter.writeBinary(path, data);
+		await this.app.vault.adapter.writeBinary(path, new Uint8Array(data).buffer);
 	}
 
 	async deletePath(path: string): Promise<void> {
@@ -76,9 +76,7 @@ export class ObsidianLocalFs implements LocalFileSystem {
 		}
 	}
 
-	async stat(
-		path: string,
-	): Promise<{ mtimeMs?: number; size?: number } | null> {
+	async stat(path: string): Promise<{ mtimeMs?: number; size?: number } | null> {
 		const file = this.app.vault.getAbstractFileByPath(path);
 		if (!file) {
 			return null;

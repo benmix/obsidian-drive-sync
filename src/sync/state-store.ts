@@ -1,6 +1,6 @@
 import { syncStateDb } from "../data/sync-db";
 import type { SyncEntry, SyncLog } from "../data/sync-schema";
-import { SyncState } from "./index-store";
+import type { SyncState } from "./index-store";
 
 export type StateStore = {
 	load(): Promise<SyncState>;

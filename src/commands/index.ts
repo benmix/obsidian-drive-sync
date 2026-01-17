@@ -41,11 +41,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					if (refreshedSession) {
 						Object.assign(activeSession, refreshedSession);
 					}
-					plugin.settings.protonSession =
-						plugin.authService.getReusableCredentials() as unknown as Record<
-							string,
-							unknown
-						>;
+					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
 					plugin.settings.hasAuthSession = true;
 					await plugin.saveSettings();
 				} catch (refreshError) {
@@ -122,11 +118,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					if (refreshedSession) {
 						Object.assign(activeSession, refreshedSession);
 					}
-					plugin.settings.protonSession =
-						plugin.authService.getReusableCredentials() as unknown as Record<
-							string,
-							unknown
-						>;
+					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
 					plugin.settings.hasAuthSession = true;
 					await plugin.saveSettings();
 				} catch (refreshError) {
@@ -190,11 +182,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					if (refreshedSession) {
 						Object.assign(activeSession, refreshedSession);
 					}
-					plugin.settings.protonSession =
-						plugin.authService.getReusableCredentials() as unknown as Record<
-							string,
-							unknown
-						>;
+					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
 					plugin.settings.hasAuthSession = true;
 					await plugin.saveSettings();
 				} catch (refreshError) {
@@ -258,11 +246,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					if (refreshedSession) {
 						Object.assign(activeSession, refreshedSession);
 					}
-					plugin.settings.protonSession =
-						plugin.authService.getReusableCredentials() as unknown as Record<
-							string,
-							unknown
-						>;
+					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
 					plugin.settings.hasAuthSession = true;
 					await plugin.saveSettings();
 				} catch (refreshError) {
@@ -350,11 +334,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					if (refreshedSession) {
 						Object.assign(activeSession, refreshedSession);
 					}
-					plugin.settings.protonSession =
-						plugin.authService.getReusableCredentials() as unknown as Record<
-							string,
-							unknown
-						>;
+					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
 					plugin.settings.hasAuthSession = true;
 					await plugin.saveSettings();
 				} catch (refreshError) {
@@ -412,11 +392,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					if (refreshedSession) {
 						Object.assign(activeSession, refreshedSession);
 					}
-					plugin.settings.protonSession =
-						plugin.authService.getReusableCredentials() as unknown as Record<
-							string,
-							unknown
-						>;
+					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
 					plugin.settings.hasAuthSession = true;
 					await plugin.saveSettings();
 				} catch (refreshError) {
@@ -500,11 +476,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					if (refreshedSession) {
 						Object.assign(activeSession, refreshedSession);
 					}
-					plugin.settings.protonSession =
-						plugin.authService.getReusableCredentials() as unknown as Record<
-							string,
-							unknown
-						>;
+					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
 					plugin.settings.hasAuthSession = true;
 					await plugin.saveSettings();
 				} catch (refreshError) {

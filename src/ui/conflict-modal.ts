@@ -145,10 +145,7 @@ export class ProtonDriveConflictModal extends Modal {
 						Object.assign(activeSession, refreshedSession);
 					}
 					this.plugin.settings.protonSession =
-						this.plugin.authService.getReusableCredentials() as unknown as Record<
-							string,
-							unknown
-						>;
+						this.plugin.authService.getReusableCredentials();
 					this.plugin.settings.hasAuthSession = true;
 					await this.plugin.saveSettings();
 				} catch (refreshError) {

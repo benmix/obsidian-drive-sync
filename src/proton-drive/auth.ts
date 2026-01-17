@@ -1,5 +1,6 @@
-import type { Session, ApiError, ProtonAuth, ReusableCredentials } from "./proton-auth";
-import { ProtonAuth as ProtonAuthClient } from "./proton-auth";
+import type { Session, ApiError, ReusableCredentials } from "./proton-auth/types";
+import { ProtonAuth as ProtonAuthClient } from "./proton-auth/core";
+import type { ProtonAuth } from "./proton-auth/core";
 
 export type AuthSession = {
 	session: Session;

@@ -1,10 +1,4 @@
-import {
-	TFile,
-	TFolder,
-	type App,
-	type TAbstractFile,
-	type EventRef,
-} from "obsidian";
+import { TFile, TFolder, type App, type TAbstractFile, type EventRef } from "obsidian";
 import { normalizePath } from "./utils";
 
 export type LocalChange =
@@ -41,17 +35,42 @@ export class LocalFsWatcher {
 	}
 
 	start(): void {
-		this.registerEvent(this.app.vault.on("create", this.onCreate));
-		this.registerEvent(this.app.vault.on("modify", this.onModify));
-		this.registerEvent(this.app.vault.on("delete", this.onDelete));
-		this.registerEvent(this.app.vault.on("rename", this.onRename));
+		this.registerEvent(
+			this.app.vault.on("create", (...args: unknown[]) => {
+				const file = args[0] as TAbstractFile | undefined;
+				if (file) {
+					this.onCreate(file);
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on("modify", (...args: unknown[]) => {
+				const file = args[0] as TAbstractFile | undefined;
+				if (file) {
+					this.onModify(file);
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on("delete", (...args: unknown[]) => {
+				const file = args[0] as TAbstractFile | undefined;
+				if (file) {
+					this.onDelete(file);
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on("rename", (...args: unknown[]) => {
+				const file = args[0] as TAbstractFile | undefined;
+				const oldPath = args[1] as string | undefined;
+				if (file && oldPath) {
+					this.onRename(file, oldPath);
+				}
+			}),
+		);
 	}
 
 	stop(): void {
-		this.app.vault.off("create", this.onCreate);
-		this.app.vault.off("modify", this.onModify);
-		this.app.vault.off("delete", this.onDelete);
-		this.app.vault.off("rename", this.onRename);
 		this.clearTimer();
 		this.pending.clear();
 	}
@@ -90,10 +109,7 @@ export class LocalFsWatcher {
 	};
 
 	private queue(change: LocalChange) {
-		const key =
-			change.type === "rename"
-				? `${change.from}->${change.to}`
-				: change.path;
+		const key = change.type === "rename" ? `${change.from}->${change.to}` : change.path;
 		this.pending.set(key, change);
 		this.scheduleFlush();
 	}

@@ -4,9 +4,9 @@
 
 ### SDK client bootstrapping
 
-- [ ] Define SDK initialization requirements (httpClient/account/crypto/srp/cache/telemetry).
-- [ ] Build internal httpClient adapter with auth headers and refresh handling.
-- [ ] Refactor ProtonDriveService to construct client internally (no user SDK JSON).
+- [x] Define SDK initialization requirements (httpClient/account/crypto/srp/cache/telemetry).
+- [x] Build internal httpClient adapter with auth headers and refresh handling.
+- [x] Refactor ProtonDriveService to construct client internally (no user SDK JSON).
 
 ### Authentication and session lifecycle
 

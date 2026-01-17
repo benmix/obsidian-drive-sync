@@ -80,10 +80,7 @@ export class ProtonDriveLoginModal extends Modal {
 						mailboxPassword: mailboxPassword.trim() || undefined,
 					});
 
-					this.plugin.settings.protonSession = result.credentials as unknown as Record<
-						string,
-						unknown
-					>;
+					this.plugin.settings.protonSession = result.credentials;
 					this.plugin.settings.accountEmail = result.userEmail ?? username.trim();
 					this.plugin.settings.hasAuthSession = true;
 					await this.plugin.saveSettings();

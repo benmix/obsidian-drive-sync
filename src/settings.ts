@@ -3,11 +3,12 @@ import ProtonDriveSyncPlugin from "./main";
 import { ProtonDriveRemoteRootModal } from "./ui/remote-root-modal";
 import { compileExcludeRules, previewExcludedPaths, validateExcludePatterns } from "./sync/exclude";
 import { normalizePath } from "./sync/utils";
+import type { ReusableCredentials } from "./proton-drive/proton-auth/types";
 
 export interface ProtonDriveSettings {
 	enableProtonDrive: boolean;
 	remoteFolderId: string;
-	protonSession?: Record<string, unknown>;
+	protonSession?: ReusableCredentials;
 	accountEmail: string;
 	hasAuthSession: boolean;
 	excludePatterns: string;

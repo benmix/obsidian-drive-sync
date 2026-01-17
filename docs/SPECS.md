@@ -94,6 +94,15 @@
 - 登录形态：用户名 + 密码 +（可选）2FA
 - 插件**不保存明文密码**
 
+### 5.4 SDK Client Bootstrapping Requirements
+
+- `httpClient`: 由插件提供的 fetch 适配器，负责附加 auth headers、超时控制、401 refresh + retry。
+- `account`: 基于 Proton API 的账户接口，提供地址/公钥/私钥解密能力。
+- `crypto`: OpenPGP + crypto proxy 封装（SDK 需要的加解密模块）。
+- `srp`: SRP 模块（登录/会话相关的 SRP 计算）。
+- `cache`: `entitiesCache` + `cryptoCache`（MemoryCache）用于 SDK 内部状态。
+- `telemetry`: SDK Telemetry 适配，映射到插件日志（不记录敏感信息）。
+
 ### 5.2 Session Persistence
 
 - 持久化内容：SDK 接入层的 **会话凭据（opaque）**，由 `httpClient` 管理

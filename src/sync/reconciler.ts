@@ -1,5 +1,5 @@
-import { SyncEntry, SyncJob } from "../data/sync-schema";
-import { SyncState } from "./index-store";
+import type { SyncEntry, SyncJob } from "../data/sync-schema";
+import type { SyncState } from "./index-store";
 import type { LocalFileSystem, RemoteFileSystem } from "./types";
 import { buildConflictName, normalizePath, now } from "./utils";
 
@@ -88,6 +88,7 @@ export async function reconcileSnapshot(
 		snapshot.push(base);
 
 		const effectivePrior = prior?.tombstone ? undefined : prior;
+		void effectivePrior;
 		if (entry.type === "folder") {
 			if (!entry.local && entry.remote) {
 				jobs.push({
@@ -107,7 +108,7 @@ export async function reconcileSnapshot(
 					op: "create-remote-folder",
 					path: entry.path,
 					entryType: "folder",
-					remoteId: entry.remote?.id,
+					remoteId: undefined,
 					priority: 8,
 					attempt: 0,
 					nextRunAt: nowTs,
@@ -117,16 +118,17 @@ export async function reconcileSnapshot(
 			continue;
 		}
 
-		const localChanged =
-			entry.local && !effectivePrior?.syncedLocalHash && !effectivePrior?.localMtimeMs
+		const localChanged = entry.local
+			? !effectivePrior?.syncedLocalHash && !effectivePrior?.localMtimeMs
 				? true
-				: (entry.local?.mtimeMs ?? 0) > (effectivePrior?.localMtimeMs ?? 0);
-		const remoteChanged =
-			entry.remote &&
-			(!effectivePrior?.syncedRemoteRev ||
+				: (entry.local.mtimeMs ?? 0) > (effectivePrior?.localMtimeMs ?? 0)
+			: false;
+		const remoteChanged = entry.remote
+			? !effectivePrior?.syncedRemoteRev ||
 				(entry.remote.revisionId &&
 					entry.remote.revisionId !==
-						(effectivePrior.syncedRemoteRev ?? effectivePrior.remoteRev)));
+						(effectivePrior?.syncedRemoteRev ?? effectivePrior?.remoteRev))
+			: false;
 
 		if (entry.local && !entry.remote) {
 			jobs.push({
