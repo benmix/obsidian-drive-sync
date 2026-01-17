@@ -8,6 +8,7 @@ export type SyncEntry = {
 	localHash?: string;
 	remoteId?: string;
 	remoteRev?: string;
+	remoteParentId?: string;
 	syncedLocalHash?: string;
 	syncedRemoteRev?: string;
 	remoteMtimeMs?: number;
@@ -22,12 +23,15 @@ export type JobOp =
 	| "delete-local"
 	| "delete-remote"
 	| "move-local"
-	| "move-remote";
+	| "move-remote"
+	| "create-local-folder"
+	| "create-remote-folder";
 
 export type SyncJob = {
 	id: string;
 	op: JobOp;
 	path: string;
+	entryType?: EntryType;
 	fromPath?: string;
 	toPath?: string;
 	remoteId?: string;

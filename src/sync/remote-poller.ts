@@ -12,14 +12,17 @@ export async function pollRemoteChanges(
 	remoteFs: RemoteFileSystem,
 	state: SyncState,
 ): Promise<RemotePollResult> {
-	const remoteFiles = await remoteFs.listFiles();
+	const remoteEntries = await remoteFs.listEntries();
 	const jobs: SyncJob[] = [];
 	const snapshot: SyncEntry[] = [];
 	const removedPaths: string[] = [];
 	const nowTs = now();
 	const seen = new Set<string>();
 	const movedFromPaths = new Set<string>();
-	const priorByRemoteId = new Map<string, { path: string; entry: SyncEntry }>();
+	const priorByRemoteId = new Map<
+		string,
+		{ path: string; entry: SyncEntry }
+	>();
 
 	for (const [path, entry] of Object.entries(state.entries)) {
 		if (entry.remoteId && !entry.tombstone) {
@@ -27,11 +30,12 @@ export async function pollRemoteChanges(
 		}
 	}
 
-	for (const file of remoteFiles) {
-		const relPath = normalizePath(file.name);
+	for (const entry of remoteEntries) {
+		const relPath = normalizePath(entry.path ?? entry.name);
 		seen.add(relPath);
-		const prior = state.entries[relPath] ?? priorByRemoteId.get(file.id)?.entry;
-		const priorPath = priorByRemoteId.get(file.id)?.path;
+		const prior =
+			state.entries[relPath] ?? priorByRemoteId.get(entry.id)?.entry;
+		const priorPath = priorByRemoteId.get(entry.id)?.path;
 
 		if (priorPath && priorPath !== relPath) {
 			movedFromPaths.add(priorPath);
@@ -41,6 +45,7 @@ export async function pollRemoteChanges(
 				path: relPath,
 				fromPath: priorPath,
 				toPath: relPath,
+				entryType: entry.type,
 				priority: 5,
 				attempt: 0,
 				nextRunAt: nowTs,
@@ -48,25 +53,45 @@ export async function pollRemoteChanges(
 			});
 			removedPaths.push(priorPath);
 		}
-		const changed =
-			!prior?.remoteRev || (file.revisionId && file.revisionId !== prior.remoteRev);
 
 		snapshot.push({
 			relPath,
-			type: "file",
-			remoteId: file.id,
-			remoteMtimeMs: file.mtimeMs,
-			remoteSize: file.size,
-			remoteRev: file.revisionId,
+			type: entry.type,
+			remoteId: entry.id,
+			remoteParentId: entry.parentId,
+			remoteMtimeMs: entry.mtimeMs,
+			remoteSize: entry.size,
+			remoteRev: entry.revisionId,
 			lastSyncAt: nowTs,
 		});
 
+		if (entry.type === "folder") {
+			if (!prior && entry.path) {
+				jobs.push({
+					id: `create-local-folder:${relPath}`,
+					op: "create-local-folder",
+					path: relPath,
+					entryType: "folder",
+					priority: 2,
+					attempt: 0,
+					nextRunAt: nowTs,
+					reason: "remote-folder",
+				});
+			}
+			continue;
+		}
+
+		const changed =
+			!prior?.remoteRev ||
+			(entry.revisionId && entry.revisionId !== prior.remoteRev);
+
 		if (changed) {
 			jobs.push({
-				id: `download:${file.id}`,
+				id: `download:${entry.id}`,
 				op: "download",
 				path: relPath,
-				remoteId: file.id,
+				remoteId: entry.id,
+				entryType: "file",
 				priority: 10,
 				attempt: 0,
 				nextRunAt: nowTs,
@@ -80,11 +105,28 @@ export async function pollRemoteChanges(
 			continue;
 		}
 		const prior = state.entries[priorPath];
-		if (prior?.remoteId) {
+		if (!prior || prior.tombstone) {
+			continue;
+		}
+		if (prior.type === "folder") {
 			jobs.push({
 				id: `delete-local:${priorPath}`,
 				op: "delete-local",
 				path: priorPath,
+				entryType: "folder",
+				priority: 25,
+				attempt: 0,
+				nextRunAt: nowTs,
+				reason: "remote-folder-delete",
+			});
+			continue;
+		}
+		if (prior.remoteId) {
+			jobs.push({
+				id: `delete-local:${priorPath}`,
+				op: "delete-local",
+				path: priorPath,
+				entryType: prior.type,
 				priority: 20,
 				attempt: 0,
 				nextRunAt: nowTs,

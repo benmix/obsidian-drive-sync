@@ -19,19 +19,27 @@ export async function executeJobs(
 	for (const job of jobs) {
 		if (job.op === "upload") {
 			const data = await localFs.readFile(job.path);
-			await remoteFs.uploadFile(job.path, data);
+			const stats = await localFs.stat(job.path);
+			const uploaded = await remoteFs.uploadFile(job.path, data, {
+				mtimeMs: stats?.mtimeMs,
+				size: stats?.size ?? data.byteLength,
+			});
 			const localHash = await hashBytes(data);
 			entries.push({
 				relPath: job.path,
 				type: "file",
 				localHash,
 				syncedLocalHash: localHash,
+				remoteId: uploaded.id,
+				remoteRev: uploaded.revisionId,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
 		} else if (job.op === "download") {
 			if (!job.remoteId) {
-				throw new Error(`Missing remote ID for download job: ${job.path}`);
+				throw new Error(
+					`Missing remote ID for download job: ${job.path}`,
+				);
 			}
 			const data = await remoteFs.downloadFile(job.remoteId);
 			await localFs.writeFile(job.path, data);
@@ -41,6 +49,7 @@ export async function executeJobs(
 				type: "file",
 				localHash,
 				syncedLocalHash: localHash,
+				remoteId: job.remoteId,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
@@ -48,19 +57,21 @@ export async function executeJobs(
 			await localFs.deletePath(job.path);
 			entries.push({
 				relPath: job.path,
-				type: "file",
+				type: job.entryType ?? "file",
 				tombstone: true,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
 		} else if (job.op === "delete-remote") {
 			if (!job.remoteId || !remoteFs.deletePath) {
-				throw new Error(`Missing remote delete support for ${job.path}`);
+				throw new Error(
+					`Missing remote delete support for ${job.path}`,
+				);
 			}
 			await remoteFs.deletePath(job.remoteId);
 			entries.push({
 				relPath: job.path,
-				type: "file",
+				type: job.entryType ?? "file",
 				tombstone: true,
 				lastSyncAt: now(),
 			});
@@ -72,13 +83,13 @@ export async function executeJobs(
 			await localFs.movePath(job.fromPath, job.toPath);
 			entries.push({
 				relPath: job.fromPath,
-				type: "file",
+				type: job.entryType ?? "file",
 				tombstone: true,
 				lastSyncAt: now(),
 			});
 			entries.push({
 				relPath: job.toPath,
-				type: "file",
+				type: job.entryType ?? "file",
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
@@ -90,15 +101,35 @@ export async function executeJobs(
 			if (job.fromPath) {
 				entries.push({
 					relPath: job.fromPath,
-					type: "file",
+					type: job.entryType ?? "file",
 					tombstone: true,
 					lastSyncAt: now(),
 				});
 			}
 			entries.push({
 				relPath: job.toPath,
-				type: "file",
+				type: job.entryType ?? "file",
 				remoteId: job.remoteId,
+				lastSyncAt: now(),
+			});
+			jobsExecuted += 1;
+		} else if (job.op === "create-local-folder") {
+			await localFs.createFolder(job.path);
+			entries.push({
+				relPath: job.path,
+				type: "folder",
+				lastSyncAt: now(),
+			});
+			jobsExecuted += 1;
+		} else if (job.op === "create-remote-folder") {
+			if (!remoteFs.createFolder) {
+				throw new Error("Remote create folder is not supported.");
+			}
+			const result = await remoteFs.createFolder(job.path);
+			entries.push({
+				relPath: job.path,
+				type: "folder",
+				remoteId: result.id,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;

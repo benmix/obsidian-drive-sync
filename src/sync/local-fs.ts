@@ -1,4 +1,4 @@
-import type { App, TFile } from "obsidian";
+import { TFile, TFolder, type App, type TAbstractFile } from "obsidian";
 import type { LocalFileEntry, LocalFileSystem } from "./types";
 
 export class ObsidianLocalFs implements LocalFileSystem {
@@ -6,6 +6,28 @@ export class ObsidianLocalFs implements LocalFileSystem {
 
 	constructor(app: App) {
 		this.app = app;
+	}
+
+	async listEntries(): Promise<LocalFileEntry[]> {
+		const entries: LocalFileEntry[] = [];
+		const stack: TAbstractFile[] = [...this.app.vault.getRoot().children];
+		while (stack.length > 0) {
+			const current = stack.pop();
+			if (!current) {
+				continue;
+			}
+			if (current instanceof TFile) {
+				entries.push(this.mapFile(current));
+				continue;
+			}
+			if (current instanceof TFolder) {
+				if (current.path) {
+					entries.push(this.mapFolder(current));
+				}
+				stack.push(...current.children);
+			}
+		}
+		return entries;
 	}
 
 	async listFiles(): Promise<LocalFileEntry[]> {
@@ -44,11 +66,45 @@ export class ObsidianLocalFs implements LocalFileSystem {
 		await this.app.vault.rename(file, toPath);
 	}
 
+	async createFolder(path: string): Promise<void> {
+		if (!path) {
+			return;
+		}
+		const exists = await this.app.vault.adapter.exists(path);
+		if (!exists) {
+			await this.app.vault.adapter.mkdir(path);
+		}
+	}
+
+	async stat(
+		path: string,
+	): Promise<{ mtimeMs?: number; size?: number } | null> {
+		const file = this.app.vault.getAbstractFileByPath(path);
+		if (!file) {
+			return null;
+		}
+		if ((file as TFile).stat) {
+			return {
+				mtimeMs: (file as TFile).stat.mtime,
+				size: (file as TFile).stat.size,
+			};
+		}
+		return { mtimeMs: undefined, size: undefined };
+	}
+
 	private mapFile(file: TFile): LocalFileEntry {
 		return {
 			path: file.path,
+			type: "file",
 			mtimeMs: file.stat.mtime,
 			size: file.stat.size,
+		};
+	}
+
+	private mapFolder(folder: TFolder): LocalFileEntry {
+		return {
+			path: folder.path,
+			type: "folder",
 		};
 	}
 

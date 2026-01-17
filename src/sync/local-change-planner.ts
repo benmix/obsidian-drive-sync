@@ -1,6 +1,6 @@
 import type { LocalChange } from "./local-watcher";
 import type { SyncEntry, SyncJob, SyncState } from "./index-types";
-import { normalizePath, now } from "./utils";
+import { dirname, normalizePath, now } from "./utils";
 
 export type LocalChangePlan = {
 	jobs: SyncJob[];
@@ -8,7 +8,10 @@ export type LocalChangePlan = {
 	removedPaths: string[];
 };
 
-export function planLocalChanges(changes: LocalChange[], state: SyncState): LocalChangePlan {
+export function planLocalChanges(
+	changes: LocalChange[],
+	state: SyncState,
+): LocalChangePlan {
 	const jobs: SyncJob[] = [];
 	const entries: SyncEntry[] = [];
 	const removedPaths: string[] = [];
@@ -28,6 +31,7 @@ export function planLocalChanges(changes: LocalChange[], state: SyncState): Loca
 					fromPath,
 					toPath,
 					remoteId: prior.remoteId,
+					entryType: prior.type,
 					priority: 5,
 					attempt: 0,
 					nextRunAt: nowTs,
@@ -35,27 +39,50 @@ export function planLocalChanges(changes: LocalChange[], state: SyncState): Loca
 				});
 				entries.push({
 					relPath: toPath,
-					type: "file",
+					type: prior.type,
 					remoteId: prior.remoteId,
+					remoteParentId: prior.remoteParentId,
 					lastSyncAt: nowTs,
 				});
 				removedPaths.push(fromPath);
 			} else {
-				jobs.push({
-					id: `upload:${toPath}`,
-					op: "upload",
-					path: toPath,
-					priority: 5,
-					attempt: 0,
-					nextRunAt: nowTs,
-					reason: "rename",
-				});
+				if (change.entryType === "folder") {
+					jobs.push({
+						id: `create-remote-folder:${toPath}`,
+						op: "create-remote-folder",
+						path: toPath,
+						entryType: "folder",
+						priority: 6,
+						attempt: 0,
+						nextRunAt: nowTs,
+						reason: "rename-folder",
+					});
+				} else {
+					jobs.push({
+						id: `upload:${toPath}`,
+						op: "upload",
+						path: toPath,
+						entryType: "file",
+						priority: 5,
+						attempt: 0,
+						nextRunAt: nowTs,
+						reason: "rename",
+					});
+				}
 				removedPaths.push(fromPath);
 			}
 			continue;
 		}
 
 		const path = normalizePath(change.path);
+		const parentPath = dirname(path);
+		if (parentPath) {
+			entries.push({
+				relPath: parentPath,
+				type: "folder",
+				lastSyncAt: nowTs,
+			});
+		}
 
 		if (change.type === "delete") {
 			const prior = state.entries[path];
@@ -65,6 +92,7 @@ export function planLocalChanges(changes: LocalChange[], state: SyncState): Loca
 					op: "delete-remote",
 					path,
 					remoteId: prior.remoteId,
+					entryType: prior.type,
 					priority: 15,
 					attempt: 0,
 					nextRunAt: nowTs,
@@ -73,7 +101,7 @@ export function planLocalChanges(changes: LocalChange[], state: SyncState): Loca
 			}
 			entries.push({
 				relPath: path,
-				type: "file",
+				type: prior?.type ?? change.entryType ?? "file",
 				tombstone: true,
 				lastSyncAt: nowTs,
 			});
@@ -81,15 +109,41 @@ export function planLocalChanges(changes: LocalChange[], state: SyncState): Loca
 		}
 
 		const reason = change.type === "create" ? "create" : "modify";
-		jobs.push({
-			id: `upload:${path}`,
-			op: "upload",
-			path,
-			priority: 5,
-			attempt: 0,
-			nextRunAt: nowTs,
-			reason,
-		});
+		if (!state.entries[parentPath] && parentPath) {
+			jobs.push({
+				id: `create-remote-folder:${parentPath}`,
+				op: "create-remote-folder",
+				path: parentPath,
+				entryType: "folder",
+				priority: 6,
+				attempt: 0,
+				nextRunAt: nowTs,
+				reason: "ensure-parent",
+			});
+		}
+		if (change.entryType === "folder") {
+			jobs.push({
+				id: `create-remote-folder:${path}`,
+				op: "create-remote-folder",
+				path,
+				entryType: "folder",
+				priority: 6,
+				attempt: 0,
+				nextRunAt: nowTs,
+				reason: "create-folder",
+			});
+		} else {
+			jobs.push({
+				id: `upload:${path}`,
+				op: "upload",
+				path,
+				entryType: "file",
+				priority: 5,
+				attempt: 0,
+				nextRunAt: nowTs,
+				reason,
+			});
+		}
 	}
 
 	return { jobs, entries, removedPaths };

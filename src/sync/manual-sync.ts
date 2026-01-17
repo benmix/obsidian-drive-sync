@@ -8,8 +8,14 @@ export async function syncLocalToRemote(
 	let uploaded = 0;
 
 	for (const file of files) {
+		if (file.type !== "file") {
+			continue;
+		}
 		const data = await localFs.readFile(file.path);
-		await remoteFs.uploadFile(file.path, data);
+		await remoteFs.uploadFile(file.path, data, {
+			mtimeMs: file.mtimeMs,
+			size: file.size,
+		});
 		uploaded += 1;
 	}
 
@@ -24,8 +30,12 @@ export async function syncRemoteToLocal(
 	let downloaded = 0;
 
 	for (const remoteFile of remoteFiles) {
+		if (remoteFile.type !== "file") {
+			continue;
+		}
 		const data = await remoteFs.downloadFile(remoteFile.id);
-		await localFs.writeFile(remoteFile.name, data);
+		const path = remoteFile.path ?? remoteFile.name;
+		await localFs.writeFile(path, data);
 		downloaded += 1;
 	}
 

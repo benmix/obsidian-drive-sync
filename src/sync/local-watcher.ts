@@ -1,11 +1,22 @@
-import type { App, TAbstractFile, EventRef } from "obsidian";
+import {
+	TFile,
+	TFolder,
+	type App,
+	type TAbstractFile,
+	type EventRef,
+} from "obsidian";
 import { normalizePath } from "./utils";
 
 export type LocalChange =
-	| { type: "create"; path: string }
-	| { type: "modify"; path: string }
-	| { type: "delete"; path: string }
-	| { type: "rename"; from: string; to: string };
+	| { type: "create"; path: string; entryType: "file" | "folder" }
+	| { type: "modify"; path: string; entryType: "file" | "folder" }
+	| { type: "delete"; path: string; entryType: "file" | "folder" }
+	| {
+			type: "rename";
+			from: string;
+			to: string;
+			entryType: "file" | "folder";
+	  };
 
 export type LocalChangeHandler = (change: LocalChange) => void;
 
@@ -46,15 +57,27 @@ export class LocalFsWatcher {
 	}
 
 	private onCreate = (file: TAbstractFile) => {
-		this.queue({ type: "create", path: normalizePath(file.path) });
+		this.queue({
+			type: "create",
+			path: normalizePath(file.path),
+			entryType: file instanceof TFolder ? "folder" : "file",
+		});
 	};
 
 	private onModify = (file: TAbstractFile) => {
-		this.queue({ type: "modify", path: normalizePath(file.path) });
+		this.queue({
+			type: "modify",
+			path: normalizePath(file.path),
+			entryType: file instanceof TFile ? "file" : "folder",
+		});
 	};
 
 	private onDelete = (file: TAbstractFile) => {
-		this.queue({ type: "delete", path: normalizePath(file.path) });
+		this.queue({
+			type: "delete",
+			path: normalizePath(file.path),
+			entryType: file instanceof TFolder ? "folder" : "file",
+		});
 	};
 
 	private onRename = (file: TAbstractFile, oldPath: string) => {
@@ -62,11 +85,15 @@ export class LocalFsWatcher {
 			type: "rename",
 			from: normalizePath(oldPath),
 			to: normalizePath(file.path),
+			entryType: file instanceof TFolder ? "folder" : "file",
 		});
 	};
 
 	private queue(change: LocalChange) {
-		const key = change.type === "rename" ? `${change.from}->${change.to}` : change.path;
+		const key =
+			change.type === "rename"
+				? `${change.from}->${change.to}`
+				: change.path;
 		this.pending.set(key, change);
 		this.scheduleFlush();
 	}
