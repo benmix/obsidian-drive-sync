@@ -14,6 +14,12 @@ export type SyncEntry = {
 	remoteMtimeMs?: number;
 	remoteSize?: number;
 	tombstone?: boolean;
+	conflict?: {
+		localMtimeMs?: number;
+		remoteRev?: string;
+		remoteId?: string;
+		detectedAt: number;
+	};
 	lastSyncAt?: number;
 };
 
@@ -35,21 +41,24 @@ export type SyncJob = {
 	fromPath?: string;
 	toPath?: string;
 	remoteId?: string;
+	remoteRev?: string;
 	priority: number;
 	attempt: number;
 	nextRunAt: number;
 	reason?: string;
 };
 
-export type SyncState = {
-	entries: Record<string, SyncEntry>;
-	jobs: SyncJob[];
-	lastSyncAt?: number;
-	lastError?: string;
-	lastErrorAt?: number;
+export type SyncMeta = {
+	key: "lastSyncAt" | "lastError" | "lastErrorAt" | "remoteEventCursor";
+	value: number | string | undefined;
 };
 
-export const DEFAULT_SYNC_STATE: SyncState = {
-	entries: {},
-	jobs: [],
+export type SyncLog = {
+	id?: number;
+	at: string;
+	message: string;
+	context?: string;
 };
+
+export type SyncEntryTable = SyncEntry;
+export type SyncJobTable = SyncJob;

@@ -6,3 +6,81 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+.protondrive-folder-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.protondrive-folder-row {
+	display: grid;
+	grid-template-columns: 1fr minmax(160px, 240px) auto;
+	gap: 8px;
+	align-items: center;
+	padding: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+}
+
+.protondrive-folder-path {
+	font-weight: 600;
+}
+
+.protondrive-folder-id {
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.protondrive-folder-action button {
+	white-space: nowrap;
+}
+
+.protondrive-exclude-preview {
+	margin-top: 6px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.protondrive-conflict-row {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 10px;
+	margin-top: 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.protondrive-conflict-path {
+	font-weight: 600;
+}
+
+.protondrive-conflict-meta {
+	font-size: 12px;
+	color: var(--text-muted);
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.protondrive-sync-logs {
+	display: grid;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.protondrive-sync-log-row {
+	display: grid;
+	grid-template-columns: minmax(140px, 200px) minmax(80px, 120px) 1fr;
+	gap: 8px;
+	padding: 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	font-size: 12px;
+}

@@ -1,4 +1,4 @@
-import type { RemoteFileEntry, RemoteFileSystem } from "./types";
+import type { RemoteFileEntry, RemoteFileSystem, RemoteTreeEvent } from "./types";
 import { basename, dirname, normalizePath, splitPath } from "./utils";
 
 type ProtonDriveClient = {
@@ -91,6 +91,12 @@ type ProtonDriveClient = {
 		nodeUids: string[],
 	) => AsyncIterable<{ ok: boolean; uid: string; error?: unknown }>;
 	iterateNodes?: (nodeUids: string[]) => AsyncIterable<unknown>;
+	getNode?: (nodeUid: string) => Promise<unknown>;
+	getMyFilesRootFolder?: () => Promise<unknown>;
+	subscribeToTreeEvents?: (
+		treeEventScopeId: string,
+		callback: (event: unknown) => Promise<void>,
+	) => Promise<{ dispose: () => void }>;
 };
 
 type NodeEntity = {
@@ -108,9 +114,7 @@ type NodeEntity = {
 	treeEventScopeId?: string;
 };
 
-type MaybeNode =
-	| { ok: true; value: NodeEntity }
-	| { ok: false; error: unknown };
+type MaybeNode = { ok: true; value: NodeEntity } | { ok: false; error: unknown };
 
 export class ProtonDriveRemoteFs implements RemoteFileSystem {
 	private client: ProtonDriveClient;
@@ -125,9 +129,7 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 
 	async listEntries(): Promise<RemoteFileEntry[]> {
 		const entries: RemoteFileEntry[] = [];
-		const queue: Array<{ id: string; path: string }> = [
-			{ id: this.remoteFolderId, path: "" },
-		];
+		const queue: Array<{ id: string; path: string }> = [{ id: this.remoteFolderId, path: "" }];
 		this.folderIdCache.set("", this.remoteFolderId);
 		this.folderPathCache.set(this.remoteFolderId, "");
 
@@ -146,11 +148,9 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 					path: relPath,
 					type: node.type === "folder" ? "folder" : "file",
 					parentId: node.parentUid ?? current.id,
+					treeEventScopeId: node.treeEventScopeId,
 					mtimeMs: node.modificationTime?.getTime?.() ?? undefined,
-					size:
-						node.activeRevision?.storageSize ??
-						node.totalStorageSize ??
-						undefined,
+					size: node.activeRevision?.storageSize ?? node.totalStorageSize ?? undefined,
 					revisionId: node.activeRevision?.uid,
 				};
 				entries.push(entry);
@@ -170,15 +170,56 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 		return entries.filter((entry) => entry.type === "file");
 	}
 
+	async listFolders(): Promise<RemoteFileEntry[]> {
+		const entries = await this.listEntries();
+		return entries.filter((entry) => entry.type === "folder");
+	}
+
+	async getNode(id: string): Promise<RemoteFileEntry | null> {
+		if (!this.client.getNode) {
+			return null;
+		}
+		const result = (await this.client.getNode(id)) as MaybeNode;
+		if (!result.ok) {
+			return null;
+		}
+		return this.mapNodeToEntry(result.value);
+	}
+
+	async getRootFolder(): Promise<RemoteFileEntry | null> {
+		if (!this.client.getMyFilesRootFolder) {
+			return null;
+		}
+		const result = (await this.client.getMyFilesRootFolder()) as MaybeNode;
+		if (!result.ok) {
+			return null;
+		}
+		return this.mapNodeToEntry(result.value);
+	}
+
+	async subscribeToTreeEvents(
+		treeEventScopeId: string,
+		onEvent: (event: RemoteTreeEvent) => Promise<void>,
+	): Promise<{ dispose: () => void }> {
+		if (!this.client.subscribeToTreeEvents) {
+			throw new Error("Proton Drive SDK does not expose tree events.");
+		}
+		const subscription = await this.client.subscribeToTreeEvents(
+			treeEventScopeId,
+			async (event: unknown) => {
+				const normalized = this.normalizeRemoteEvent(event);
+				await onEvent(normalized);
+			},
+		);
+		return subscription;
+	}
+
 	async uploadFile(
 		path: string,
 		data: Uint8Array,
 		metadata?: { mtimeMs?: number; size?: number },
 	): Promise<{ id?: string; revisionId?: string }> {
-		if (
-			!this.client.getFileUploader ||
-			!this.client.getFileRevisionUploader
-		) {
+		if (!this.client.getFileUploader || !this.client.getFileRevisionUploader) {
 			throw new Error("Proton Drive SDK does not expose upload methods.");
 		}
 		const normalized = normalizePath(path);
@@ -187,43 +228,34 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 		const parentId = await this.ensureRemoteFolder(parentPath);
 		const existing = await this.findChildByName(parentId, name, "file");
 
-		const file = new File([data], name, {
-			type: "application/octet-stream",
-			lastModified: metadata?.mtimeMs ?? Date.now(),
-		});
 		const uploadMetadata = {
 			mediaType: "application/octet-stream",
 			expectedSize: metadata?.size ?? data.byteLength,
-			modificationTime: metadata?.mtimeMs
-				? new Date(metadata.mtimeMs)
-				: undefined,
+			modificationTime: metadata?.mtimeMs ? new Date(metadata.mtimeMs) : undefined,
 		};
 
 		if (existing?.id) {
-			const uploader = await this.client.getFileRevisionUploader(
-				existing.id,
-				uploadMetadata,
-			);
-			const controller = await uploader.uploadFromFile(file, []);
+			const uploader = await this.client.getFileRevisionUploader(existing.id, uploadMetadata);
+			const stream = new Blob([data.slice().buffer], {
+				type: "application/octet-stream",
+			}).stream();
+			const controller = await uploader.uploadFromStream(stream, []);
 			const result = await controller.completion();
 			return { id: result.nodeUid, revisionId: result.nodeRevisionUid };
 		}
 
-		const uploader = await this.client.getFileUploader(
-			parentId,
-			name,
-			uploadMetadata,
-		);
-		const controller = await uploader.uploadFromFile(file, []);
+		const uploader = await this.client.getFileUploader(parentId, name, uploadMetadata);
+		const stream = new Blob([data.slice().buffer], {
+			type: "application/octet-stream",
+		}).stream();
+		const controller = await uploader.uploadFromStream(stream, []);
 		const result = await controller.completion();
 		return { id: result.nodeUid, revisionId: result.nodeRevisionUid };
 	}
 
 	async downloadFile(id: string): Promise<Uint8Array> {
 		if (!this.client.getFileDownloader) {
-			throw new Error(
-				"Proton Drive SDK does not expose download methods.",
-			);
+			throw new Error("Proton Drive SDK does not expose download methods.");
 		}
 		const downloader = await this.client.getFileDownloader(id);
 		const chunks: Uint8Array[] = [];
@@ -282,9 +314,7 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 
 	private iterateFolderChildren(parentId: string): AsyncIterable<NodeEntity> {
 		if (!this.client.iterateFolderChildren) {
-			throw new Error(
-				"Proton Drive SDK does not expose iterateFolderChildren.",
-			);
+			throw new Error("Proton Drive SDK does not expose iterateFolderChildren.");
 		}
 		const iterator = this.client.iterateFolderChildren(parentId);
 		return {
@@ -319,11 +349,7 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 				parentId = cachedPart;
 				continue;
 			}
-			const existing = await this.findChildByName(
-				parentId,
-				part,
-				"folder",
-			);
+			const existing = await this.findChildByName(parentId, part, "folder");
 			if (existing?.id) {
 				this.folderIdCache.set(builtPath, existing.id);
 				this.folderPathCache.set(existing.id, builtPath);
@@ -331,14 +357,9 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 				continue;
 			}
 			if (!this.client.createFolder) {
-				throw new Error(
-					"Proton Drive SDK does not expose createFolder.",
-				);
+				throw new Error("Proton Drive SDK does not expose createFolder.");
 			}
-			const created = (await this.client.createFolder(
-				parentId,
-				part,
-			)) as MaybeNode;
+			const created = (await this.client.createFolder(parentId, part)) as MaybeNode;
 			if (!created.ok) {
 				throw new Error("Failed to create remote folder.");
 			}
@@ -360,5 +381,41 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 			}
 		}
 		return null;
+	}
+
+	private mapNodeToEntry(node: NodeEntity): RemoteFileEntry {
+		const parentPath = node.parentUid ? (this.folderPathCache.get(node.parentUid) ?? "") : "";
+		const relPath = normalizePath(parentPath ? `${parentPath}/${node.name}` : node.name);
+		return {
+			id: node.uid,
+			name: node.name,
+			path: relPath,
+			type: node.type === "folder" ? "folder" : "file",
+			parentId: node.parentUid,
+			treeEventScopeId: node.treeEventScopeId,
+			mtimeMs: node.modificationTime?.getTime?.() ?? undefined,
+			size: node.activeRevision?.storageSize ?? node.totalStorageSize ?? undefined,
+			revisionId: node.activeRevision?.uid,
+		};
+	}
+
+	private normalizeRemoteEvent(event: unknown): RemoteTreeEvent {
+		if (!event || typeof event !== "object") {
+			return { type: "tree_refresh" };
+		}
+		const record = event as Record<string, unknown>;
+		const type = record.type;
+		if (typeof type !== "string") {
+			return { type: "tree_refresh" };
+		}
+		return {
+			type: type as RemoteTreeEvent["type"],
+			nodeUid: typeof record.nodeUid === "string" ? record.nodeUid : undefined,
+			parentNodeUid:
+				typeof record.parentNodeUid === "string" ? record.parentNodeUid : undefined,
+			treeEventScopeId:
+				typeof record.treeEventScopeId === "string" ? record.treeEventScopeId : undefined,
+			eventId: typeof record.eventId === "string" ? record.eventId : undefined,
+		};
 	}
 }

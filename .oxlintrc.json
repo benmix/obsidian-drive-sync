@@ -1,8 +1,6 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
-	"env": {
-		"browser": true
-	},
+	"plugins": ["typescript", "unicorn"],
 	"ignorePatterns": [
 		"example_repo",
 		"node_modules",
@@ -13,6 +11,9 @@
 		"versions.json",
 		"main.js"
 	],
+	"env": {
+		"browser": true
+	},
 	"rules": {
 		"unicorn/no-useless-fallback-in-spread": "off"
 	}

@@ -1,4 +1,4 @@
-import type { SyncJob } from "./index-types";
+import type { SyncJob } from "../data/sync-schema";
 
 export class SyncJobQueue {
 	private jobs: SyncJob[];
@@ -43,6 +43,14 @@ export class SyncJobQueue {
 	}
 
 	private sort(): void {
-		this.jobs.sort((a, b) => a.priority - b.priority || a.nextRunAt - b.nextRunAt);
+		this.jobs.sort((a, b) => {
+			if (a.priority !== b.priority) {
+				return b.priority - a.priority;
+			}
+			if (a.nextRunAt !== b.nextRunAt) {
+				return a.nextRunAt - b.nextRunAt;
+			}
+			return a.id.localeCompare(b.id);
+		});
 	}
 }

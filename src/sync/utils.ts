@@ -23,6 +23,28 @@ export function basename(path: string): string {
 	return parts[parts.length - 1] ?? "";
 }
 
+export function buildConflictName(path: string, timestampMs: number): string {
+	const parts = splitPath(path);
+	if (parts.length === 0) {
+		return "conflicted";
+	}
+	const name = parts.pop() ?? "";
+	const dotIndex = name.lastIndexOf(".");
+	const base = dotIndex === -1 ? name : name.slice(0, dotIndex);
+	const ext = dotIndex === -1 ? "" : name.slice(dotIndex);
+	const dt = new Date(timestampMs);
+	const formatted = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(
+		2,
+		"0",
+	)}-${String(dt.getDate()).padStart(2, "0")} ${String(dt.getHours()).padStart(
+		2,
+		"0",
+	)}${String(dt.getMinutes()).padStart(2, "0")}`;
+	const conflictName = `${base} (Proton conflicted ${formatted})${ext}`;
+	const parent = parts.join("/");
+	return parent ? `${parent}/${conflictName}` : conflictName;
+}
+
 export function now(): number {
 	return Date.now();
 }

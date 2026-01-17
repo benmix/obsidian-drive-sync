@@ -1,26 +1,37 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import ProtonDriveSyncPlugin from "./main";
+import { ProtonDriveRemoteRootModal } from "./ui/remote-root-modal";
+import { compileExcludeRules, previewExcludedPaths, validateExcludePatterns } from "./sync/exclude";
+import { normalizePath } from "./sync/utils";
 
 export interface ProtonDriveSettings {
 	enableProtonDrive: boolean;
-	sdkOptionsJson: string;
 	remoteFolderId: string;
-	sessionToken: string;
+	protonSession?: Record<string, unknown>;
 	accountEmail: string;
+	hasAuthSession: boolean;
+	excludePatterns: string;
+	conflictStrategy: "local-wins" | "remote-wins" | "manual";
 	autoSyncEnabled: boolean;
 	autoSyncIntervalMs: number;
 	localChangeDebounceMs: number;
+	maxConcurrentJobs: number;
+	maxRetryAttempts: number;
 }
 
 export const DEFAULT_SETTINGS: ProtonDriveSettings = {
 	enableProtonDrive: false,
-	sdkOptionsJson: "",
 	remoteFolderId: "",
-	sessionToken: "",
+	protonSession: undefined,
 	accountEmail: "",
+	hasAuthSession: false,
+	excludePatterns: "",
+	conflictStrategy: "local-wins",
 	autoSyncEnabled: false,
 	autoSyncIntervalMs: 300000,
 	localChangeDebounceMs: 800,
+	maxConcurrentJobs: 2,
+	maxRetryAttempts: 5,
 };
 
 export class ProtonDriveSettingTab extends PluginSettingTab {
@@ -47,33 +58,18 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Proton Drive SDK options (JSON)")
-			.setDesc(
-				"Paste the SDK options JSON required by @protontech/drive-sdk. Session tokens are merged automatically.",
-			)
-			.addTextArea((text) =>
-				text
-					.setPlaceholder('{\n  "sessionToken": "..."\n}')
-					.setValue(this.plugin.settings.sdkOptionsJson)
-					.onChange(async (value) => {
-						this.plugin.settings.sdkOptionsJson = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
 			.setName("Proton Drive session")
-			.setDesc(
-				this.plugin.settings.accountEmail
-					? `Signed in as ${this.plugin.settings.accountEmail}.`
-					: "Sign in from the command palette to store a session token locally.",
-			)
+			.setDesc(this.getAuthStatusText())
 			.addButton((button) => {
 				button.setButtonText("Clear session");
 				button.onClick(async () => {
-					this.plugin.settings.sessionToken = "";
+					this.plugin.settings.protonSession = undefined;
 					this.plugin.settings.accountEmail = "";
+					this.plugin.settings.hasAuthSession = false;
+					await this.plugin.authService.logout();
+					this.plugin.protonDriveService.disconnect();
 					await this.plugin.saveSettings();
+					this.display();
 				});
 			});
 
@@ -89,6 +85,85 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+		new Setting(containerEl)
+			.setName("Browse remote folders")
+			.setDesc("Select a folder from Proton Drive instead of pasting an ID.")
+			.addButton((button) => {
+				button.setButtonText("Choose folder");
+				button.onClick(() => {
+					new ProtonDriveRemoteRootModal(this.app, this.plugin).open();
+				});
+			});
+
+		new Setting(containerEl)
+			.setName("Exclude paths")
+			.setDesc(
+				"One pattern per line. Supports '*' and '**' wildcards. Exact paths also exclude descendants.",
+			)
+			.addTextArea((text) =>
+				text
+					.setPlaceholder(".obsidian/\n*.tmp\nattachments/private/")
+					.setValue(this.plugin.settings.excludePatterns)
+					.onChange(async (value) => {
+						this.plugin.settings.excludePatterns = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+		const excludeValidation = validateExcludePatterns(this.plugin.settings.excludePatterns);
+		if (excludeValidation.invalid.length > 0) {
+			const invalidSetting = new Setting(containerEl)
+				.setName("Exclude pattern errors")
+				.setDesc("Fix these patterns to avoid unexpected sync behavior.");
+			const list = invalidSetting.descEl.createEl("ul");
+			for (const item of excludeValidation.invalid) {
+				list.createEl("li", { text: item });
+			}
+		}
+
+		const previewSetting = new Setting(containerEl)
+			.setName("Exclude preview")
+			.setDesc("Preview which paths are excluded (comma-separated list).");
+		let previewInput = "";
+		const previewOutput = previewSetting.descEl.createDiv({
+			cls: "protondrive-exclude-preview",
+		});
+		previewOutput.setText("No paths to preview.");
+		previewSetting.addText((text) =>
+			text.setPlaceholder("notes/draft.md, .obsidian/config").onChange((value) => {
+				previewInput = value;
+				const entries = previewInput
+					.split(",")
+					.map((item) => normalizePath(item.trim()))
+					.filter((item) => item.length > 0);
+				if (entries.length === 0) {
+					previewOutput.setText("No paths to preview.");
+					return;
+				}
+				const rules = compileExcludeRules(this.plugin.settings.excludePatterns);
+				const excluded = previewExcludedPaths(entries, rules);
+				if (excluded.length === 0) {
+					previewOutput.setText("No paths are excluded.");
+					return;
+				}
+				previewOutput.setText(`Excluded: ${excluded.join(", ")}`);
+			}),
+		);
+
+		new Setting(containerEl)
+			.setName("Conflict strategy")
+			.setDesc("Choose how to resolve changes when both sides changed.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("local-wins", "Local wins (default)")
+					.addOption("remote-wins", "Remote wins")
+					.addOption("manual", "Manual (pause and notify)")
+					.setValue(this.plugin.settings.conflictStrategy)
+					.onChange(async (value) => {
+						this.plugin.settings.conflictStrategy =
+							value as ProtonDriveSettings["conflictStrategy"];
+						await this.plugin.saveSettings();
+					}),
+			);
 
 		new Setting(containerEl)
 			.setName("Enable auto sync")
@@ -99,6 +174,43 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 					this.plugin.refreshAutoSync();
 				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Max concurrent jobs")
+			.setDesc("Limits parallel sync operations (1-4 recommended).")
+			.addText((text) =>
+				text
+					.setPlaceholder("2")
+					.setValue(String(this.plugin.settings.maxConcurrentJobs))
+					.onChange(async (value) => {
+						const parsed = Number.parseInt(value, 10);
+						if (!Number.isNaN(parsed)) {
+							this.plugin.settings.maxConcurrentJobs = Math.min(
+								4,
+								Math.max(1, parsed),
+							);
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+		new Setting(containerEl)
+			.setName("Max retry attempts")
+			.setDesc("How many times to retry failed jobs before giving up.")
+			.addText((text) =>
+				text
+					.setPlaceholder("5")
+					.setValue(String(this.plugin.settings.maxRetryAttempts))
+					.onChange(async (value) => {
+						const parsed = Number.parseInt(value, 10);
+						if (!Number.isNaN(parsed)) {
+							this.plugin.settings.maxRetryAttempts = Math.min(
+								10,
+								Math.max(1, parsed),
+							);
+							await this.plugin.saveSettings();
+						}
+					}),
 			);
 
 		new Setting(containerEl)
@@ -134,5 +246,23 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 						}
 					}),
 			);
+	}
+
+	private getAuthStatusText(): string {
+		if (this.plugin.settings.hasAuthSession) {
+			return this.plugin.settings.accountEmail
+				? `Signed in as ${this.plugin.settings.accountEmail}.`
+				: "Signed in to Proton Drive.";
+		}
+		if (this.plugin.settings.protonSession) {
+			return "Session needs attention. Sign in again to restore access.";
+		}
+		if (this.plugin.isAuthPaused()) {
+			return (
+				this.plugin.getLastAuthError() ??
+				"Session needs attention. Sign in again from the command palette."
+			);
+		}
+		return "Sign in from the command palette to store a session locally.";
 	}
 }

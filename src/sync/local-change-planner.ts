@@ -1,20 +1,20 @@
+import { SyncEntry, SyncJob } from "../data/sync-schema";
+import { SyncState } from "./index-store";
 import type { LocalChange } from "./local-watcher";
-import type { SyncEntry, SyncJob, SyncState } from "./index-types";
 import { dirname, normalizePath, now } from "./utils";
 
 export type LocalChangePlan = {
 	jobs: SyncJob[];
 	entries: SyncEntry[];
 	removedPaths: string[];
+	rewritePrefixes: Array<{ from: string; to: string }>;
 };
 
-export function planLocalChanges(
-	changes: LocalChange[],
-	state: SyncState,
-): LocalChangePlan {
+export function planLocalChanges(changes: LocalChange[], state: SyncState): LocalChangePlan {
 	const jobs: SyncJob[] = [];
 	const entries: SyncEntry[] = [];
 	const removedPaths: string[] = [];
+	const rewritePrefixes: Array<{ from: string; to: string }> = [];
 	const nowTs = now();
 
 	for (const change of changes) {
@@ -45,6 +45,9 @@ export function planLocalChanges(
 					lastSyncAt: nowTs,
 				});
 				removedPaths.push(fromPath);
+				if (prior.type === "folder") {
+					rewritePrefixes.push({ from: fromPath, to: toPath });
+				}
 			} else {
 				if (change.entryType === "folder") {
 					jobs.push({
@@ -70,6 +73,9 @@ export function planLocalChanges(
 					});
 				}
 				removedPaths.push(fromPath);
+				if (change.entryType === "folder") {
+					rewritePrefixes.push({ from: fromPath, to: toPath });
+				}
 			}
 			continue;
 		}
@@ -146,5 +152,5 @@ export function planLocalChanges(
 		}
 	}
 
-	return { jobs, entries, removedPaths };
+	return { jobs, entries, removedPaths, rewritePrefixes };
 }

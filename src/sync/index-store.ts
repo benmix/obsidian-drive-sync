@@ -1,10 +1,26 @@
-import type { SyncEntry, SyncJob, SyncState } from "./index-types";
+import { SyncEntry, SyncJob } from "../data/sync-schema";
+
+export type SyncState = {
+	entries: Record<string, SyncEntry>;
+	jobs: SyncJob[];
+	lastSyncAt?: number;
+	lastError?: string;
+	lastErrorAt?: number;
+	remoteEventCursor?: string;
+	logs?: Array<{ at: string; message: string; context?: string }>;
+};
+
+export const DEFAULT_SYNC_STATE: SyncState = {
+	entries: {},
+	jobs: [],
+	logs: [],
+};
 
 export class SyncIndexStore {
 	private state: SyncState;
 
 	constructor(initial?: SyncState) {
-		this.state = initial ?? { entries: {}, jobs: [] };
+		this.state = initial ?? { entries: {}, jobs: [], logs: [] };
 	}
 
 	getEntry(path: string): SyncEntry | undefined {
@@ -46,6 +62,8 @@ export class SyncIndexStore {
 			lastSyncAt: this.state.lastSyncAt,
 			lastError: this.state.lastError,
 			lastErrorAt: this.state.lastErrorAt,
+			remoteEventCursor: this.state.remoteEventCursor,
+			logs: [...(this.state.logs ?? [])],
 		};
 	}
 
@@ -56,5 +74,18 @@ export class SyncIndexStore {
 	setLastError(lastError?: string, lastErrorAt?: number): void {
 		this.state.lastError = lastError;
 		this.state.lastErrorAt = lastErrorAt;
+	}
+
+	setRemoteEventCursor(cursor?: string): void {
+		this.state.remoteEventCursor = cursor;
+	}
+
+	addLog(message: string, context?: string): void {
+		const entry = {
+			at: new Date().toISOString(),
+			message,
+			context,
+		};
+		this.state.logs = [...(this.state.logs ?? []), entry].slice(-200);
 	}
 }

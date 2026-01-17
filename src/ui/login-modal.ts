@@ -18,6 +18,7 @@ export class ProtonDriveLoginModal extends Modal {
 		let username = this.plugin.settings.accountEmail;
 		let password = "";
 		let twoFactorCode = "";
+		let mailboxPassword = "";
 
 		new Setting(contentEl).setName("Email").addText((text) =>
 			text
@@ -49,6 +50,18 @@ export class ProtonDriveLoginModal extends Modal {
 					}),
 			);
 
+		new Setting(contentEl)
+			.setName("Mailbox password")
+			.setDesc("Only required for two-password Proton accounts.")
+			.addText((text) => {
+				text.inputEl.type = "password";
+				text.setPlaceholder("Enter mailbox password");
+				text.setValue(mailboxPassword);
+				text.onChange((value) => {
+					mailboxPassword = value;
+				});
+			});
+
 		const actionRow = new Setting(contentEl);
 		actionRow.addButton((button) => {
 			button.setButtonText("Sign in");
@@ -60,20 +73,26 @@ export class ProtonDriveLoginModal extends Modal {
 				}
 
 				try {
-					const session = await this.plugin.authService.login({
+					const result = await this.plugin.authService.login({
 						username: username.trim(),
 						password,
 						twoFactorCode: twoFactorCode.trim() || undefined,
+						mailboxPassword: mailboxPassword.trim() || undefined,
 					});
 
-					this.plugin.settings.sessionToken = session.sessionToken;
-					this.plugin.settings.accountEmail = session.userEmail ?? username.trim();
+					this.plugin.settings.protonSession = result.credentials as unknown as Record<
+						string,
+						unknown
+					>;
+					this.plugin.settings.accountEmail = result.userEmail ?? username.trim();
+					this.plugin.settings.hasAuthSession = true;
 					await this.plugin.saveSettings();
 
 					new Notice("Signed in to Proton Drive.");
 					this.close();
 				} catch (error) {
 					const message = error instanceof Error ? error.message : "Unable to sign in.";
+					this.plugin.settings.hasAuthSession = false;
 					new Notice(message);
 				}
 			});

@@ -3,23 +3,28 @@
 	"version": "1.0.0",
 	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
 	"keywords": [],
-	"license": "0-BSD",
+	"license": "MIT",
 	"type": "module",
 	"main": "main.js",
 	"scripts": {
 		"dev": "vite build --watch --mode development",
 		"build": "tsc -noEmit -skipLibCheck && vite build --mode production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
-		"lint": "oxlint .",
+		"lint": "oxlint --config .oxlintrc.json .",
+		"lint-fix": "oxlint --config .oxlintrc.json . --fix",
 		"lint-staged": "lint-staged",
-		"format": "oxfmt .",
+		"format": "oxfmt --config .oxfmtrc.json .",
 		"prepare": "husky install"
 	},
 	"dependencies": {
 		"@protontech/drive-sdk": "latest",
-		"obsidian": "latest"
+		"bcryptjs": "^2.4.3",
+		"dexie": "^4.0.7",
+		"obsidian": "latest",
+		"openpgp": "^5.11.2"
 	},
 	"devDependencies": {
+		"@types/bcryptjs": "^3.0.0",
 		"@types/node": "^20.19.0",
 		"husky": "^9.0.11",
 		"lint-staged": "^15.2.0",
@@ -31,7 +36,7 @@
 	},
 	"lint-staged": {
 		"*.{js,jsx,ts,tsx,mjs,cjs,json,md}": [
-			"oxlint --fix",
+			"oxlint --config .oxlintrc.json --fix",
 			"oxfmt"
 		]
 	},

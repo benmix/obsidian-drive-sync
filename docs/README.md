@@ -4,7 +4,17 @@ Sync an Obsidian vault with a Proton Drive folder. This plugin is a work in prog
 
 ## Status
 
-WIP. See `SPECS.md` and `PLAN.md` for scope, milestones, and design notes.
+WIP. See `SPECS.md` and `TASKS.md` for scope, milestones, and design notes.
+
+Recent updates:
+
+- Remote change cursor/feed support with snapshot fallback.
+- Remote root folder selector UI.
+- Improved exclude patterns (validation + preview).
+- Manual conflict resolution workflow + conflict list in status view.
+- Priority-aware scheduling with differentiated retry backoff + max retries.
+- Diagnostics redaction and in-app log viewer.
+- Expanded hardening plan (pre-sync checks, queue visibility, cursor reuse).
 
 ## Goals
 
@@ -62,4 +72,9 @@ src/
 ## Docs
 
 - `SPECS.md` — technical specification
-- `PLAN.md` — implementation milestones
+- `TASKS.md` — development tasks
+- `AGENTS.md` — agents rules
+
+## Storage
+
+- Sync index stored in IndexedDB via Dexie (settings remain in plugin data).

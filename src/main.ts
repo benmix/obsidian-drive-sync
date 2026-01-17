@@ -2,7 +2,6 @@ import { Notice, Plugin } from "obsidian";
 import { registerCommands } from "./commands";
 import { ProtonDriveAuthService } from "./proton-drive/auth";
 import { ProtonDriveService } from "./proton-drive/service";
-import { buildSdkOptions } from "./proton-drive/sdk-options";
 import { ProtonDriveSettingTab, type ProtonDriveSettings, DEFAULT_SETTINGS } from "./settings";
 import { loadPluginData, mergePluginData, savePluginData } from "./data/plugin-data";
 import { LocalFsWatcher, type LocalChange } from "./sync/local-watcher";
@@ -28,12 +27,15 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 	private autoSyncRunning = false;
 	private autoSyncPending = false;
 	private autoSyncPaused = false;
+	private authPaused = false;
+	private lastAuthError: string | undefined;
 
 	async onload() {
-		const data = loadPluginData(this.app);
+		const data = await loadPluginData(this);
 		this.settings = { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) };
 		this.protonDriveService = new ProtonDriveService();
 		this.authService = new ProtonDriveAuthService();
+		await this.restoreSession();
 
 		this.addSettingTab(new ProtonDriveSettingTab(this.app, this));
 		registerCommands(this);
@@ -45,9 +47,32 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 	}
 
 	async saveSettings(): Promise<void> {
-		const data = mergePluginData(loadPluginData(this.app));
+		const data = mergePluginData(await loadPluginData(this));
 		data.settings = { ...this.settings };
-		savePluginData(this.app, data);
+		await savePluginData(this, data);
+	}
+
+	private async restoreSession(): Promise<void> {
+		const credentials = this.settings.protonSession;
+		if (!credentials) {
+			this.settings.hasAuthSession = false;
+			return;
+		}
+
+		try {
+			await this.authService.restore(credentials);
+			this.settings.hasAuthSession = true;
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Failed to restore Proton session.";
+			console.warn("Failed to restore Proton session.", error);
+			this.settings.protonSession = undefined;
+			this.settings.hasAuthSession = false;
+			this.settings.accountEmail = "";
+			await this.saveSettings();
+			this.authPaused = true;
+			this.lastAuthError = message;
+		}
 	}
 
 	refreshAutoSync(): void {
@@ -66,11 +91,20 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 
 	resumeAutoSync(): void {
 		this.autoSyncPaused = false;
+		this.authPaused = false;
 		this.scheduleAutoSync(0, "manual");
 	}
 
 	isAutoSyncPaused(): boolean {
 		return this.autoSyncPaused;
+	}
+
+	isAuthPaused(): boolean {
+		return this.authPaused;
+	}
+
+	getLastAuthError(): string | undefined {
+		return this.lastAuthError;
 	}
 
 	async runAutoSync(force = false): Promise<void> {
@@ -119,7 +153,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 	}
 
 	private scheduleAutoSync(delayMs: number, trigger: AutoSyncTrigger): void {
-		if (!this.settings.autoSyncEnabled || this.autoSyncPaused) {
+		if (!this.settings.autoSyncEnabled || this.autoSyncPaused || this.authPaused) {
 			return;
 		}
 		if (this.localRunTimeout !== null) {
@@ -144,7 +178,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 		if (!this.settings.remoteFolderId.trim()) {
 			return;
 		}
-		if (this.autoSyncPaused && !force) {
+		if ((this.autoSyncPaused || this.authPaused) && !force) {
 			return;
 		}
 		if (this.autoSyncRunning) {
@@ -155,24 +189,58 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 		this.autoSyncRunning = true;
 
 		try {
-			const { options, error } = buildSdkOptions(
-				this.settings.sdkOptionsJson,
-				this.settings.sessionToken,
-			);
-			if (error) {
-				throw new Error(error);
+			const session = this.settings.protonSession;
+			if (!session || !this.settings.hasAuthSession) {
+				throw new Error("Sign in to Proton Drive first.");
 			}
 
-			const client = await this.protonDriveService.connect(options);
+			const activeSession = {
+				...(this.authService.getSession() ?? session),
+			} as unknown as import("./proton-drive/sdk-session").ProtonSession;
+			activeSession.onTokenRefresh = async () => {
+				try {
+					await this.authService.refreshToken();
+					const refreshedSession = this.authService.getSession();
+					if (refreshedSession) {
+						Object.assign(activeSession, refreshedSession);
+					}
+					this.settings.protonSession =
+						this.authService.getReusableCredentials() as unknown as Record<
+							string,
+							unknown
+						>;
+					this.settings.hasAuthSession = true;
+					await this.saveSettings();
+				} catch (refreshError) {
+					console.warn("Failed to refresh Proton session.", refreshError);
+					this.settings.hasAuthSession = false;
+					this.authPaused = true;
+					this.lastAuthError =
+						refreshError instanceof Error
+							? refreshError.message
+							: "Failed to refresh Proton session.";
+					await this.saveSettings();
+				}
+			};
+			const client = await this.protonDriveService.connect(activeSession);
 			if (!client) {
 				throw new Error("Unable to connect to Proton Drive.");
 			}
 
 			const localFs = new ObsidianLocalFs(this.app);
 			const remoteFs = new ProtonDriveRemoteFs(client, this.settings.remoteFolderId);
-			const stateStore = new PluginDataStateStore(this.app);
+			const stateStore = new PluginDataStateStore();
 			const state = await stateStore.load();
-			const engine = new SyncEngine(localFs, remoteFs, stateStore);
+			const engine = new SyncEngine(localFs, remoteFs, stateStore, {
+				maxConcurrentJobs: this.settings.maxConcurrentJobs,
+				maxRetryAttempts: this.settings.maxRetryAttempts,
+				excludePatterns: this.settings.excludePatterns,
+				conflictStrategy: this.settings.conflictStrategy,
+				onAuthError: (message) => {
+					this.authPaused = true;
+					this.lastAuthError = message;
+				},
+			});
 			await engine.load();
 
 			const localChanges = this.drainLocalChanges();
@@ -180,6 +248,9 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 				const plan = planLocalChanges(localChanges, state);
 				engine.applyEntries(plan.entries);
 				engine.removeEntries(plan.removedPaths);
+				if (plan.rewritePrefixes.length > 0) {
+					engine.rewritePaths(plan.rewritePrefixes);
+				}
 				for (const job of plan.jobs) {
 					engine.enqueue(job);
 				}
@@ -192,14 +263,25 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 				for (const job of remotePlan.jobs) {
 					engine.enqueue(job);
 				}
+				if (remotePlan.remoteEventCursor) {
+					await engine.save({
+						remoteEventCursor: remotePlan.remoteEventCursor,
+					});
+				}
 			}
 
 			if (engine.listJobs().length === 0) {
-				await engine.save({ lastError: undefined, lastErrorAt: undefined });
+				await engine.save({
+					lastError: undefined,
+					lastErrorAt: undefined,
+				});
 				return;
 			}
 
 			await engine.runOnce();
+			if (this.authPaused && trigger === "manual") {
+				new Notice("Authentication required. Sync paused.");
+			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Auto sync failed.";
 			console.warn("Auto sync failed.", error);
@@ -217,7 +299,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 	}
 
 	private async recordSyncError(message: string): Promise<void> {
-		const stateStore = new PluginDataStateStore(this.app);
+		const stateStore = new PluginDataStateStore();
 		const state = await stateStore.load();
 		await stateStore.save({
 			...state,

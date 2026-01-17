@@ -1,101 +1,98 @@
-import { Notice } from "obsidian";
-
-type ProtonDriveAuthClient = {
-	loginWithPassword?: (options: {
-		username: string;
-		password: string;
-		twoFactorCode?: string;
-	}) => Promise<AuthResponse>;
-	login?: (options: {
-		username: string;
-		password: string;
-		twoFactorCode?: string;
-	}) => Promise<AuthResponse>;
-	logout?: () => Promise<void>;
-};
-
-type ProtonDriveSdk = {
-	createAuthClient?: () => Promise<ProtonDriveAuthClient>;
-	default?: {
-		createAuthClient?: () => Promise<ProtonDriveAuthClient>;
-	};
-};
-
-type AuthResponse = {
-	sessionToken?: string;
-	userId?: string;
-	userEmail?: string;
-	twoFactorRequired?: boolean;
-	status?: string;
-	message?: string;
-};
+import type { Session, ApiError, ProtonAuth, ReusableCredentials } from "./proton-auth";
+import { ProtonAuth as ProtonAuthClient } from "./proton-auth";
 
 export type AuthSession = {
-	sessionToken: string;
-	userId?: string;
+	session: Session;
+	credentials: ReusableCredentials;
 	userEmail?: string;
 };
 
 export class ProtonDriveAuthService {
-	private authClient: ProtonDriveAuthClient | null = null;
+	private authClient: ProtonAuth | null = null;
 
 	async login(credentials: {
 		username: string;
 		password: string;
 		twoFactorCode?: string;
+		mailboxPassword?: string;
 	}): Promise<AuthSession> {
-		const client = await this.getAuthClient();
-		const loginMethod = client.loginWithPassword ?? client.login;
-
-		if (!loginMethod) {
-			throw new Error("Proton Drive SDK is missing a login method.");
-		}
-
-		const response = await loginMethod(credentials);
-
-		if (response.sessionToken) {
-			return {
-				sessionToken: response.sessionToken,
-				userId: response.userId,
-				userEmail: response.userEmail ?? credentials.username,
-			};
-		}
-
-		if (response.twoFactorRequired || response.status === "TWO_FACTOR_REQUIRED") {
-			throw new Error(
-				"Two-factor authentication is required. Provide a 2FA code and try again.",
+		const client = this.getAuthClient();
+		try {
+			await client.login(
+				credentials.username,
+				credentials.password,
+				credentials.twoFactorCode ?? null,
 			);
+		} catch (error) {
+			const apiError = error as ApiError;
+			if (apiError.requires2FA) {
+				throw new Error("Two-factor authentication is required.");
+			}
+			if (apiError.requiresMailboxPassword) {
+				if (!credentials.mailboxPassword) {
+					throw new Error("Mailbox password is required for this account.");
+				}
+				await client.submitMailboxPassword(credentials.mailboxPassword);
+			} else {
+				throw error;
+			}
 		}
 
-		throw new Error(response.message ?? "Unable to authenticate with Proton Drive.");
+		const session = client.getSession();
+		if (!session) {
+			throw new Error("Login failed. No session returned.");
+		}
+		const credentialsPayload = client.getReusableCredentials();
+		return {
+			session,
+			credentials: credentialsPayload,
+			userEmail: session.user?.Name ?? credentials.username,
+		};
+	}
+
+	async submitTwoFactor(code: string): Promise<AuthSession> {
+		const client = this.getAuthClient();
+		await client.submit2FA(code);
+		const session = client.getSession();
+		if (!session) {
+			throw new Error("2FA failed. No session returned.");
+		}
+		const credentials = client.getReusableCredentials();
+		return { session, credentials, userEmail: session.user?.Name };
+	}
+
+	async restore(credentials: ReusableCredentials): Promise<Session> {
+		const client = this.getAuthClient();
+		return await client.restoreSession(credentials);
+	}
+
+	getSession(): Session | null {
+		return this.authClient?.getSession() ?? null;
+	}
+
+	async refreshToken(): Promise<Session> {
+		const client = this.getAuthClient();
+		return await client.refreshTokenWithForkRecovery();
+	}
+
+	getReusableCredentials(): ReusableCredentials {
+		const client = this.getAuthClient();
+		return client.getReusableCredentials();
 	}
 
 	async logout(): Promise<void> {
-		if (!this.authClient?.logout) {
+		if (!this.authClient) {
 			return;
 		}
-
-		try {
-			await this.authClient.logout();
-		} catch (error) {
-			console.warn("Failed to logout from Proton Drive.", error);
-			new Notice("Failed to logout from Proton Drive.");
-		}
+		await this.authClient.logout();
+		this.authClient = null;
 	}
 
-	private async getAuthClient(): Promise<ProtonDriveAuthClient> {
+	private getAuthClient(): ProtonAuth {
 		if (this.authClient) {
 			return this.authClient;
 		}
-
-		const sdk = (await import("@protontech/drive-sdk")) as ProtonDriveSdk;
-		const createAuthClient = sdk.createAuthClient ?? sdk.default?.createAuthClient;
-
-		if (!createAuthClient) {
-			throw new Error("Proton Drive SDK is missing createAuthClient.");
-		}
-
-		this.authClient = await createAuthClient();
+		this.authClient = new ProtonAuthClient();
 		return this.authClient;
 	}
 }

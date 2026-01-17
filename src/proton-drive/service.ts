@@ -1,19 +1,12 @@
 import { Notice } from "obsidian";
-
-type ProtonDriveClient = unknown;
-
-type ProtonDriveSdk = {
-	createDriveClient?: (options: Record<string, unknown>) => Promise<ProtonDriveClient>;
-	default?: {
-		createDriveClient?: (options: Record<string, unknown>) => Promise<ProtonDriveClient>;
-	};
-};
+import { ProtonDriveClient, MemoryCache } from "@protontech/drive-sdk";
+import { buildSdkSessionClient, type ProtonSession } from "./sdk-session";
 
 export class ProtonDriveService {
 	private client: ProtonDriveClient | null = null;
 	private connecting: Promise<ProtonDriveClient | null> | null = null;
 
-	async connect(options: Record<string, unknown>): Promise<ProtonDriveClient | null> {
+	async connect(session: ProtonSession): Promise<ProtonDriveClient | null> {
 		if (this.client) {
 			return this.client;
 		}
@@ -22,7 +15,7 @@ export class ProtonDriveService {
 			return this.connecting;
 		}
 
-		this.connecting = this.createClient(options).finally(() => {
+		this.connecting = this.createClient(session).finally(() => {
 			this.connecting = null;
 		});
 
@@ -56,16 +49,22 @@ export class ProtonDriveService {
 		this.client = null;
 	}
 
-	private async createClient(
-		options: Record<string, unknown>,
-	): Promise<ProtonDriveClient | null> {
-		const sdk = (await import("@protontech/drive-sdk")) as ProtonDriveSdk;
+	private async createClient(session: ProtonSession): Promise<ProtonDriveClient | null> {
+		const { httpClient, account, openPGPCryptoModule, srpModule, telemetry } =
+			await buildSdkSessionClient(session, async () => {
+				await session.onTokenRefresh?.();
+			});
 
-		const createDriveClient = sdk.createDriveClient ?? sdk.default?.createDriveClient;
-		if (!createDriveClient) {
-			throw new Error("Proton Drive SDK is missing createDriveClient.");
-		}
-
-		return await createDriveClient(options);
+		return new ProtonDriveClient({
+			httpClient,
+			entitiesCache: new MemoryCache(),
+			cryptoCache: new MemoryCache(),
+			// @ts-expect-error openpgp type wrappers differ from SDK types.
+			account,
+			// @ts-expect-error openpgp type wrappers differ from SDK types.
+			openPGPCryptoModule,
+			srpModule,
+			telemetry,
+		});
 	}
 }
