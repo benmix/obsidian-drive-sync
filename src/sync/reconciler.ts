@@ -119,9 +119,12 @@ export async function reconcileSnapshot(
 		}
 
 		const localChanged = entry.local
-			? !effectivePrior?.syncedLocalHash && !effectivePrior?.localMtimeMs
+			? !effectivePrior?.syncedLocalHash &&
+				!effectivePrior?.localMtimeMs &&
+				!effectivePrior?.localSize
 				? true
-				: (entry.local.mtimeMs ?? 0) > (effectivePrior?.localMtimeMs ?? 0)
+				: (entry.local.mtimeMs ?? 0) > (effectivePrior?.localMtimeMs ?? 0) ||
+					(entry.local.size ?? 0) !== (effectivePrior?.localSize ?? 0)
 			: false;
 		const remoteChanged = entry.remote
 			? !effectivePrior?.syncedRemoteRev ||

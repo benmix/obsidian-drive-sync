@@ -15,8 +15,98 @@ import { PluginDataStateStore } from "../sync/state-store";
 import { ProtonDriveStatusModal } from "../ui/status-modal";
 import { ProtonDriveLoginModal } from "../ui/login-modal";
 import { ProtonDriveConflictModal } from "../ui/conflict-modal";
+import type { ProtonSession } from "../proton-drive/sdk-session";
+import { validateRemoteOperations } from "../proton-drive/remote-validation";
 
 export function registerCommands(plugin: ProtonDriveSyncPlugin) {
+	const buildActiveSession = async (): Promise<ProtonSession | null> => {
+		const saved = plugin.settings.protonSession;
+		let session = plugin.authService.getSession();
+		if (!session && saved) {
+			try {
+				session = await plugin.authService.restore(saved);
+				plugin.settings.hasAuthSession = true;
+				await plugin.saveSettings();
+			} catch (error) {
+				console.warn("Failed to restore Proton session.", error);
+				plugin.settings.protonSession = undefined;
+				plugin.settings.accountEmail = "";
+				plugin.settings.hasAuthSession = false;
+				await plugin.saveSettings();
+				return null;
+			}
+		}
+		if (!session) {
+			return null;
+		}
+		const activeSession = {
+			...session,
+		} as ProtonSession;
+		activeSession.onTokenRefresh = async () => {
+			try {
+				await plugin.authService.refreshToken();
+				const refreshedSession = plugin.authService.getSession();
+				if (refreshedSession) {
+					Object.assign(activeSession, refreshedSession);
+				}
+				plugin.settings.protonSession = plugin.authService.getReusableCredentials();
+				plugin.settings.hasAuthSession = true;
+				await plugin.saveSettings();
+			} catch (refreshError) {
+				console.warn("Failed to refresh Proton session.", refreshError);
+				plugin.settings.hasAuthSession = false;
+				await plugin.saveSettings();
+			}
+		};
+		return activeSession;
+	};
+
+	plugin.addCommand({
+		id: "protondrive-validate-remote-ops",
+		name: "Validate Proton Drive remote operations",
+		callback: async () => {
+			if (!plugin.settings.enableProtonDrive) {
+				new Notice("Enable Proton Drive integration in settings first.");
+				return;
+			}
+			if (!plugin.settings.remoteFolderId.trim()) {
+				new Notice("Set a remote folder ID in settings first.");
+				return;
+			}
+			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
+
+			const activeSession = await buildActiveSession();
+			if (!activeSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
+			const client = await plugin.protonDriveService.connect(activeSession);
+			if (!client) {
+				new Notice("Unable to connect to Proton Drive.");
+				return;
+			}
+
+			try {
+				const report = await validateRemoteOperations(
+					client,
+					plugin.settings.remoteFolderId,
+				);
+				const failed = report.steps.filter((step) => !step.ok);
+				if (failed.length === 0) {
+					new Notice("Remote operations validated successfully.");
+				} else {
+					new Notice(`Remote validation failed: ${failed[0]?.name ?? "unknown step"}`);
+				}
+			} catch (error) {
+				console.warn("Remote validation failed.", error);
+				new Notice("Remote validation failed. Check the console for details.");
+			}
+		},
+	});
+
 	plugin.addCommand({
 		id: "protondrive-connect",
 		name: "Connect to Proton Drive",
@@ -31,25 +121,11 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const activeSession = {
-				...(plugin.authService.getSession() ?? plugin.settings.protonSession),
-			} as unknown as import("../proton-drive/sdk-session").ProtonSession;
-			activeSession.onTokenRefresh = async () => {
-				try {
-					await plugin.authService.refreshToken();
-					const refreshedSession = plugin.authService.getSession();
-					if (refreshedSession) {
-						Object.assign(activeSession, refreshedSession);
-					}
-					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
-					plugin.settings.hasAuthSession = true;
-					await plugin.saveSettings();
-				} catch (refreshError) {
-					console.warn("Failed to refresh Proton session.", refreshError);
-					plugin.settings.hasAuthSession = false;
-					await plugin.saveSettings();
-				}
-			};
+			const activeSession = await buildActiveSession();
+			if (!activeSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
 			const client = await plugin.protonDriveService.connect(activeSession);
 			if (client) {
 				new Notice("Connected to Proton Drive.");
@@ -108,25 +184,11 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const activeSession = {
-				...(plugin.authService.getSession() ?? plugin.settings.protonSession),
-			} as unknown as import("../proton-drive/sdk-session").ProtonSession;
-			activeSession.onTokenRefresh = async () => {
-				try {
-					await plugin.authService.refreshToken();
-					const refreshedSession = plugin.authService.getSession();
-					if (refreshedSession) {
-						Object.assign(activeSession, refreshedSession);
-					}
-					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
-					plugin.settings.hasAuthSession = true;
-					await plugin.saveSettings();
-				} catch (refreshError) {
-					console.warn("Failed to refresh Proton session.", refreshError);
-					plugin.settings.hasAuthSession = false;
-					await plugin.saveSettings();
-				}
-			};
+			const activeSession = await buildActiveSession();
+			if (!activeSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
 			const client = await plugin.protonDriveService.connect(activeSession);
 			if (!client) {
 				new Notice("Unable to connect to Proton Drive.");
@@ -172,25 +234,11 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const activeSession = {
-				...(plugin.authService.getSession() ?? plugin.settings.protonSession),
-			} as unknown as import("../proton-drive/sdk-session").ProtonSession;
-			activeSession.onTokenRefresh = async () => {
-				try {
-					await plugin.authService.refreshToken();
-					const refreshedSession = plugin.authService.getSession();
-					if (refreshedSession) {
-						Object.assign(activeSession, refreshedSession);
-					}
-					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
-					plugin.settings.hasAuthSession = true;
-					await plugin.saveSettings();
-				} catch (refreshError) {
-					console.warn("Failed to refresh Proton session.", refreshError);
-					plugin.settings.hasAuthSession = false;
-					await plugin.saveSettings();
-				}
-			};
+			const activeSession = await buildActiveSession();
+			if (!activeSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
 			const client = await plugin.protonDriveService.connect(activeSession);
 			if (!client) {
 				new Notice("Unable to connect to Proton Drive.");
@@ -236,25 +284,11 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const activeSession = {
-				...(plugin.authService.getSession() ?? plugin.settings.protonSession),
-			} as unknown as import("../proton-drive/sdk-session").ProtonSession;
-			activeSession.onTokenRefresh = async () => {
-				try {
-					await plugin.authService.refreshToken();
-					const refreshedSession = plugin.authService.getSession();
-					if (refreshedSession) {
-						Object.assign(activeSession, refreshedSession);
-					}
-					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
-					plugin.settings.hasAuthSession = true;
-					await plugin.saveSettings();
-				} catch (refreshError) {
-					console.warn("Failed to refresh Proton session.", refreshError);
-					plugin.settings.hasAuthSession = false;
-					await plugin.saveSettings();
-				}
-			};
+			const activeSession = await buildActiveSession();
+			if (!activeSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
 			const client = await plugin.protonDriveService.connect(activeSession);
 			if (!client) {
 				new Notice("Unable to connect to Proton Drive.");
@@ -324,25 +358,11 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const activeSession = {
-				...(plugin.authService.getSession() ?? plugin.settings.protonSession),
-			} as unknown as import("../proton-drive/sdk-session").ProtonSession;
-			activeSession.onTokenRefresh = async () => {
-				try {
-					await plugin.authService.refreshToken();
-					const refreshedSession = plugin.authService.getSession();
-					if (refreshedSession) {
-						Object.assign(activeSession, refreshedSession);
-					}
-					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
-					plugin.settings.hasAuthSession = true;
-					await plugin.saveSettings();
-				} catch (refreshError) {
-					console.warn("Failed to refresh Proton session.", refreshError);
-					plugin.settings.hasAuthSession = false;
-					await plugin.saveSettings();
-				}
-			};
+			const activeSession = await buildActiveSession();
+			if (!activeSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
 			const client = await plugin.protonDriveService.connect(activeSession);
 			if (!client) {
 				new Notice("Unable to connect to Proton Drive.");
@@ -382,25 +402,11 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const activeSession = {
-				...(plugin.authService.getSession() ?? plugin.settings.protonSession),
-			} as unknown as import("../proton-drive/sdk-session").ProtonSession;
-			activeSession.onTokenRefresh = async () => {
-				try {
-					await plugin.authService.refreshToken();
-					const refreshedSession = plugin.authService.getSession();
-					if (refreshedSession) {
-						Object.assign(activeSession, refreshedSession);
-					}
-					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
-					plugin.settings.hasAuthSession = true;
-					await plugin.saveSettings();
-				} catch (refreshError) {
-					console.warn("Failed to refresh Proton session.", refreshError);
-					plugin.settings.hasAuthSession = false;
-					await plugin.saveSettings();
-				}
-			};
+			const activeSession = await buildActiveSession();
+			if (!activeSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
 			const client = await plugin.protonDriveService.connect(activeSession);
 			if (!client) {
 				new Notice("Unable to connect to Proton Drive.");
@@ -466,25 +472,11 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				return;
 			}
 
-			const activeSession = {
-				...(plugin.authService.getSession() ?? plugin.settings.protonSession),
-			} as unknown as import("../proton-drive/sdk-session").ProtonSession;
-			activeSession.onTokenRefresh = async () => {
-				try {
-					await plugin.authService.refreshToken();
-					const refreshedSession = plugin.authService.getSession();
-					if (refreshedSession) {
-						Object.assign(activeSession, refreshedSession);
-					}
-					plugin.settings.protonSession = plugin.authService.getReusableCredentials();
-					plugin.settings.hasAuthSession = true;
-					await plugin.saveSettings();
-				} catch (refreshError) {
-					console.warn("Failed to refresh Proton session.", refreshError);
-					plugin.settings.hasAuthSession = false;
-					await plugin.saveSettings();
-				}
-			};
+			const activeSession = await buildActiveSession();
+			if (!activeSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
 			const client = await plugin.protonDriveService.connect(activeSession);
 			if (!client) {
 				new Notice("Unable to connect to Proton Drive.");

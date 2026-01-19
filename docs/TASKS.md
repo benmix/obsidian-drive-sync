@@ -10,21 +10,21 @@
 
 ### Authentication and session lifecycle
 
-- [ ] Implement session lifecycle (login, persist, restore, refresh, logout).
-- [ ] Validate login flow with injected `httpClient`.
-- [ ] Add auth flow UX (login modal -> ready state -> logout).
-- [ ] Update settings UI to remove SDK JSON input and show auth status.
-- [ ] Update auth diagnostics and logging (redacted).
+- [x] Implement session lifecycle (login, persist, restore, refresh, logout).
+- [x] Validate login flow with injected `httpClient`.
+- [x] Add auth flow UX (login modal -> ready state -> logout).
+- [x] Update settings UI to remove SDK JSON input and show auth status.
+- [x] Update auth diagnostics and logging (redacted).
 
 ### Remote operations validation
 
-- [ ] Verify `list`, `create`, `upload`, `download`, `delete`, `move` on a scoped Remote Root.
-- [ ] Confirm node `uid` stability across rename/move and new revision uploads.
+- [x] Verify `list`, `create`, `upload`, `download`, `delete`, `move` on a scoped Remote Root.
+- [x] Confirm node `uid` stability across rename/move and new revision uploads.
 - [x] Collect remote metadata for change detection (`activeRevision.uid`, `modificationTime`, `storageSize`).
 
 ### Documentation
 
-- [ ] Document verification steps for login/CRUD/uid stability.
+- [x] Document verification steps for login/CRUD/uid stability.
 
 ## Core sync
 
@@ -37,25 +37,27 @@
 - [x] Remote polling snapshot diff (no official cursor).
 - [x] Remote change cursor/feed support with snapshot fallback.
 - [x] Conflict detection and default resolution (local wins + conflicted copy).
-- [ ] Health & status view (queue size, last error, pause/resume, logs).
+- [x] Health & status view (queue size, last error, pause/resume, logs).
 
 ## Reliability and recovery
 
 - [x] Retry policy with backoff and auth pause.
 - [x] Priority-aware scheduling and max retry caps.
 - [x] Auth error pause and status reporting.
-- [ ] Crash recovery and resume (tombstones, pending jobs).
-- [ ] Queue state machine with retry scheduling (pending/processing/blocked).
-- [ ] Persist and reuse remote event cursors (avoid short polling sleep).
-- [ ] Background reconciliation pass with throttled scanning and skip-on-busy.
-- [ ] Rename/parent-change edge cases (conflicts, ordering).
-- [ ] Startup cleanup for stale processing jobs and orphaned state.
-- [ ] Refine retry policy by error class (auth/rate/network/404).
+- [x] Crash recovery and resume (tombstones, pending jobs).
+- [x] Queue state machine with retry scheduling (pending/processing/blocked).
+- [x] Persist and reuse remote event cursors (avoid short polling sleep).
+- [x] Background reconciliation pass with throttled scanning and skip-on-busy.
+- [x] Rename/parent-change edge cases (conflicts, ordering).
+- [x] Startup cleanup for stale processing jobs and orphaned state.
+- [x] Refine retry policy by error class (auth/rate/network/404).
+- [x] Add background reconciliation pass with throttled scanning and skip-on-busy (15m cadence in auto sync).
+- [x] Surface job state counts in status view (pending/processing/blocked).
 
 ## Performance
 
-- [ ] Optimize large-vault performance (hash laziness, batching, throttling).
-- [ ] Introduce mtime+size change tokens to reduce hash cost.
+- [x] Optimize large-vault performance (hash laziness, batching, throttling).
+- [x] Introduce mtime+size change tokens to reduce hash cost.
 
 ## UX and UI
 

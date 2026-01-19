@@ -1,4 +1,5 @@
-import { App, Modal, Setting } from "obsidian";
+import type { App } from "obsidian";
+import { Modal, Setting } from "obsidian";
 import type ProtonDriveSyncPlugin from "../main";
 import { loadPluginData } from "../data/plugin-data";
 import { PluginDataStateStore } from "../sync/state-store";
@@ -27,7 +28,24 @@ export class ProtonDriveStatusModal extends Modal {
 			: "Disabled";
 		const authStatus = this.plugin.isAuthPaused()
 			? (this.plugin.getLastAuthError() ?? "Auth paused")
-			: "OK";
+			: this.plugin.authService.isSessionValidated()
+				? "OK"
+				: "Session stored (validation pending)";
+
+		const jobCounts = {
+			pending: 0,
+			processing: 0,
+			blocked: 0,
+		};
+		for (const job of state.jobs ?? []) {
+			if (job.status === "processing") {
+				jobCounts.processing += 1;
+			} else if (job.status === "blocked") {
+				jobCounts.blocked += 1;
+			} else {
+				jobCounts.pending += 1;
+			}
+		}
 
 		const rows: Array<[string, string]> = [
 			["Last sync", state.lastSyncAt ? new Date(state.lastSyncAt).toLocaleString() : "Never"],
@@ -35,6 +53,10 @@ export class ProtonDriveStatusModal extends Modal {
 			["Auth status", authStatus],
 			["Last error", state.lastError ?? "None"],
 			["Jobs queued", String(state.jobs?.length ?? 0)],
+			[
+				"Jobs by state",
+				`pending ${jobCounts.pending}, processing ${jobCounts.processing}, blocked ${jobCounts.blocked}`,
+			],
 			["Entries tracked", String(Object.keys(state.entries ?? {}).length)],
 			["Conflicts", String(conflicts.length)],
 		];

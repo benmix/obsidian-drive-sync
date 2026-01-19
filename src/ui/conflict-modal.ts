@@ -1,4 +1,5 @@
-import { App, Modal, Notice, Setting } from "obsidian";
+import type { App } from "obsidian";
+import { Modal, Notice, Setting } from "obsidian";
 import type ProtonDriveSyncPlugin from "../main";
 import { loadPluginData } from "../data/plugin-data";
 import { PluginDataStateStore } from "../sync/state-store";
@@ -6,6 +7,7 @@ import { ObsidianLocalFs } from "../sync/local-fs";
 import { ProtonDriveRemoteFs } from "../sync/remote-fs";
 import { SyncEngine } from "../sync/sync-engine";
 import { now } from "../sync/utils";
+import type { ProtonSession } from "../proton-drive/sdk-session";
 
 type ConflictItem = {
 	path: string;
@@ -133,10 +135,12 @@ export class ProtonDriveConflictModal extends Modal {
 				return;
 			}
 
-			const activeSession = {
-				...(this.plugin.authService.getSession() ??
-					(data.settings.protonSession as object)),
-			} as unknown as import("../proton-drive/sdk-session").ProtonSession;
+			const session = this.plugin.authService.getSession();
+			if (!session) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
+			const activeSession: ProtonSession = { ...session };
 			activeSession.onTokenRefresh = async () => {
 				try {
 					await this.plugin.authService.refreshToken();

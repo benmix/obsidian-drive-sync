@@ -47,7 +47,8 @@ export class SyncEngine {
 	async load(): Promise<void> {
 		const state = await this.stateStore.load();
 		this.index = new SyncIndexStore(state);
-		this.queue = new SyncJobQueue(state.jobs);
+		const cleaned = this.cleanupJobs(state.jobs, state.entries);
+		this.queue = new SyncJobQueue(this.recoverJobs(cleaned));
 	}
 
 	async save(overrides?: Partial<SyncState>): Promise<void> {
@@ -77,7 +78,7 @@ export class SyncEngine {
 		for (const entry of result.snapshot) {
 			this.index.setEntry(entry);
 		}
-		this.queue.enqueueMany(this.filterJobs(result.jobs));
+		this.queue.enqueueMany(this.mergeMoveJobs(this.filterJobs(result.jobs)));
 		await this.save();
 		return {
 			jobsPlanned: this.queue.list().length,
@@ -90,8 +91,11 @@ export class SyncEngine {
 			return { jobsExecuted: 0, entriesUpdated: 0 };
 		}
 		const jobs = this.queue.list();
+		if (!this.authPaused) {
+			this.unblockAuthJobs(jobs);
+		}
 		const nowTs = now();
-		const dueJobs = jobs.filter((job) => job.nextRunAt <= nowTs);
+		const dueJobs = jobs.filter((job) => job.status !== "blocked" && job.nextRunAt <= nowTs);
 		const pendingJobs = jobs.filter((job) => job.nextRunAt > nowTs);
 		if (dueJobs.length === 0) {
 			return { jobsExecuted: 0, entriesUpdated: 0 };
@@ -122,6 +126,9 @@ export class SyncEngine {
 					attempt: job.attempt + 1,
 					nextRunAt: now() + backoffMs(job.attempt + 1),
 					reason: "path-queue",
+					status: "pending",
+					lockedAt: undefined,
+					lastError: undefined,
 				});
 			}
 		}
@@ -217,6 +224,43 @@ export class SyncEngine {
 		return jobs.filter((job) => !this.isExcluded(job.path));
 	}
 
+	private mergeMoveJobs(jobs: SyncJob[]): SyncJob[] {
+		const byRemoteId = new Map<string, { move: SyncJob; uploads: SyncJob[] }>();
+		const remaining: SyncJob[] = [];
+
+		for (const job of jobs) {
+			if (job.op === "move-remote" && job.remoteId) {
+				byRemoteId.set(job.remoteId, { move: job, uploads: [] });
+				continue;
+			}
+			if (job.op === "upload" && job.remoteId) {
+				const existing = byRemoteId.get(job.remoteId);
+				if (existing) {
+					existing.uploads.push(job);
+					continue;
+				}
+			}
+			remaining.push(job);
+		}
+
+		for (const { move, uploads } of byRemoteId.values()) {
+			if (uploads.length === 0) {
+				remaining.push(move);
+				continue;
+			}
+			const bestUpload = uploads.sort(
+				(a, b) => b.priority - a.priority || a.nextRunAt - b.nextRunAt,
+			)[0];
+			if (bestUpload) {
+				remaining.push(move, bestUpload);
+			} else {
+				remaining.push(move);
+			}
+		}
+
+		return remaining;
+	}
+
 	private bucketByPath(jobs: SyncJob[]): SyncJob[][] {
 		const buckets = new Map<string, SyncJob[]>();
 		for (const job of jobs) {
@@ -230,13 +274,36 @@ export class SyncEngine {
 
 	private async executeJob(job: SyncJob, retryJobs: SyncJob[]): Promise<ExecuteResult | null> {
 		try {
-			return await executeJobs(this.localFs, this.remoteFs, [job]);
+			const activeJob: SyncJob = {
+				...job,
+				status: "processing",
+				lockedAt: now(),
+				lastError: undefined,
+			};
+			const result = await executeJobs(this.localFs, this.remoteFs, [activeJob]);
+			return result;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "retry";
+			if (isNotFoundError(message)) {
+				this.index.addLog(`Job blocked: ${job.id} (${message})`, "retry");
+				retryJobs.push({
+					...job,
+					status: "blocked",
+					lockedAt: undefined,
+					lastError: message,
+				});
+				return null;
+			}
 			if (isAuthError(message)) {
 				this.authPaused = true;
 				this.options.onAuthError?.(message);
 				this.index.addLog(message, "auth");
+				retryJobs.push({
+					...job,
+					status: "blocked",
+					lockedAt: undefined,
+					lastError: message,
+				});
 				return null;
 			}
 			if (job.attempt + 1 >= this.maxRetryAttempts) {
@@ -244,6 +311,12 @@ export class SyncEngine {
 					`Job failed after ${this.maxRetryAttempts} attempts: ${job.id}`,
 					"retry",
 				);
+				retryJobs.push({
+					...job,
+					status: "blocked",
+					lockedAt: undefined,
+					lastError: message,
+				});
 				return null;
 			}
 			const nextAttempt = job.attempt + 1;
@@ -253,9 +326,76 @@ export class SyncEngine {
 				attempt: nextAttempt,
 				nextRunAt: now() + delay,
 				reason: message,
+				status: "pending",
+				lockedAt: undefined,
+				lastError: message,
 			});
 			return null;
 		}
+	}
+
+	private recoverJobs(jobs: SyncJob[]): SyncJob[] {
+		const nowTs = now();
+		return jobs.map((job) => {
+			if (job.status === "processing") {
+				return {
+					...job,
+					status: "pending",
+					lockedAt: undefined,
+					nextRunAt: Math.min(job.nextRunAt, nowTs),
+				};
+			}
+			return {
+				...job,
+				status: job.status ?? "pending",
+				lockedAt: undefined,
+			};
+		});
+	}
+
+	private unblockAuthJobs(jobs: SyncJob[]): void {
+		for (const job of jobs) {
+			if (job.status !== "blocked" || !job.lastError) {
+				continue;
+			}
+			if (isAuthError(job.lastError)) {
+				job.status = "pending";
+				job.lockedAt = undefined;
+			}
+		}
+	}
+
+	private cleanupJobs(jobs: SyncJob[], entries: Record<string, SyncEntry>): SyncJob[] {
+		const cleaned: SyncJob[] = [];
+		for (const job of jobs) {
+			if (!this.isJobValid(job)) {
+				this.index.addLog(`Dropped invalid job: ${job.id}`, "cleanup");
+				continue;
+			}
+			const entry = entries[job.path];
+			if (entry?.tombstone && job.op === "upload") {
+				this.index.addLog(`Dropped upload for tombstone: ${job.id}`, "cleanup");
+				continue;
+			}
+			cleaned.push(job);
+		}
+		return cleaned;
+	}
+
+	private isJobValid(job: SyncJob): boolean {
+		if (job.op === "download" && !job.remoteId) {
+			return false;
+		}
+		if (job.op === "delete-remote" && !job.remoteId) {
+			return false;
+		}
+		if (job.op === "move-local" && (!job.fromPath || !job.toPath)) {
+			return false;
+		}
+		if (job.op === "move-remote" && (!job.remoteId || !job.toPath)) {
+			return false;
+		}
+		return true;
 	}
 }
 
@@ -270,8 +410,16 @@ function isAuthError(message: string): boolean {
 	);
 }
 
+function isNotFoundError(message: string): boolean {
+	const normalized = message.toLowerCase();
+	return normalized.includes("not found") || normalized.includes("404");
+}
+
 function backoffForError(message: string, attempt: number): number {
 	const normalized = message.toLowerCase();
+	if (isNotFoundError(normalized)) {
+		return Math.min(10000 * attempt, 60000);
+	}
 	if (
 		normalized.includes("rate") ||
 		normalized.includes("throttle") ||

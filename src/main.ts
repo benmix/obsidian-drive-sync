@@ -29,6 +29,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 	private autoSyncPaused = false;
 	private authPaused = false;
 	private lastAuthError: string | undefined;
+	private lastBackgroundReconcileAt = 0;
 
 	async onload() {
 		const data = await loadPluginData(this);
@@ -187,14 +188,17 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 		this.autoSyncRunning = true;
 
 		try {
-			const session = this.settings.protonSession;
-			if (!session || !this.settings.hasAuthSession) {
+			const nowTs = now();
+			const shouldReconcile =
+				force || nowTs - this.lastBackgroundReconcileAt > 15 * 60 * 1000;
+			const session = this.authService.getSession();
+			if (!session) {
 				throw new Error("Sign in to Proton Drive first.");
 			}
 
-			const activeSession = {
-				...(this.authService.getSession() ?? session),
-			} as unknown as import("./proton-drive/sdk-session").ProtonSession;
+			const activeSession: import("./proton-drive/sdk-session").ProtonSession = {
+				...session,
+			};
 			activeSession.onTokenRefresh = async () => {
 				try {
 					await this.authService.refreshToken();
@@ -250,7 +254,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 				}
 			}
 
-			if (trigger !== "local" || localChanges.length === 0) {
+			if (trigger !== "local" || localChanges.length === 0 || shouldReconcile) {
 				const remotePlan = await pollRemoteChanges(remoteFs, state);
 				engine.applyEntries(remotePlan.snapshot);
 				engine.removeEntries(remotePlan.removedPaths);
@@ -264,6 +268,13 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 				}
 			}
 
+			if (shouldReconcile) {
+				const reconcile = await engine.plan();
+				if (reconcile.jobsPlanned > 0) {
+					this.lastBackgroundReconcileAt = nowTs;
+				}
+			}
+
 			if (engine.listJobs().length === 0) {
 				await engine.save({
 					lastError: undefined,
@@ -271,8 +282,10 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 				});
 				return;
 			}
-
 			await engine.runOnce();
+			if (shouldReconcile) {
+				this.lastBackgroundReconcileAt = nowTs;
+			}
 			if (this.authPaused && trigger === "manual") {
 				new Notice("Authentication required. Sync paused.");
 			}

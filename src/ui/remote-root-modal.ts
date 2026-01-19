@@ -1,6 +1,8 @@
-import { App, Modal, Notice, Setting } from "obsidian";
+import type { App } from "obsidian";
+import { Modal, Notice, Setting } from "obsidian";
 import type ProtonDriveSyncPlugin from "../main";
 import { ProtonDriveRemoteFs } from "../sync/remote-fs";
+import type { ProtonSession } from "../proton-drive/sdk-session";
 import type { RemoteFileEntry } from "../sync/types";
 
 export class ProtonDriveRemoteRootModal extends Modal {
@@ -38,9 +40,13 @@ export class ProtonDriveRemoteRootModal extends Modal {
 			return;
 		}
 
-		const activeSession = {
-			...(this.plugin.authService.getSession() ?? this.plugin.settings.protonSession),
-		} as unknown as import("../proton-drive/sdk-session").ProtonSession;
+		const session = this.plugin.authService.getSession();
+		if (!session) {
+			this.error = "Sign in to Proton Drive first.";
+			this.loading = false;
+			return;
+		}
+		const activeSession: ProtonSession = { ...session };
 		activeSession.onTokenRefresh = async () => {
 			try {
 				await this.plugin.authService.refreshToken();

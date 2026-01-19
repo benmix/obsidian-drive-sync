@@ -11,7 +11,11 @@ export class SyncJobQueue {
 		if (this.jobs.some((existing) => existing.id === job.id)) {
 			return;
 		}
-		this.jobs.push(job);
+		const nextJob: SyncJob = {
+			...job,
+			status: job.status ?? "pending",
+		};
+		this.jobs.push(nextJob);
 		this.sort();
 	}
 
@@ -21,7 +25,10 @@ export class SyncJobQueue {
 			if (existing.has(job.id)) {
 				continue;
 			}
-			this.jobs.push(job);
+			this.jobs.push({
+				...job,
+				status: job.status ?? "pending",
+			});
 		}
 		this.sort();
 	}

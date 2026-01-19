@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => ({
 				exports: "default",
 			},
 		},
-		outDir: ".",
+		outDir: "dist",
 		emptyOutDir: false,
 		sourcemap: mode !== "production",
 		minify: mode === "production",

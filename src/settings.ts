@@ -1,4 +1,5 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import type { App } from "obsidian";
+import { PluginSettingTab, Setting } from "obsidian";
 import ProtonDriveSyncPlugin from "./main";
 import { ProtonDriveRemoteRootModal } from "./ui/remote-root-modal";
 import { compileExcludeRules, previewExcludedPaths, validateExcludePatterns } from "./sync/exclude";
@@ -250,6 +251,9 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 	}
 
 	private getAuthStatusText(): string {
+		if (this.plugin.settings.hasAuthSession && !this.plugin.authService.isSessionValidated()) {
+			return "Session stored. Validation pending.";
+		}
 		if (this.plugin.settings.hasAuthSession) {
 			return this.plugin.settings.accountEmail
 				? `Signed in as ${this.plugin.settings.accountEmail}.`

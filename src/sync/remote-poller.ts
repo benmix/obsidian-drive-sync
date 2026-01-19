@@ -26,6 +26,7 @@ export async function pollRemoteChanges(
 	const nowTs = now();
 	const seen = new Set<string>();
 	const movedFromPaths = new Set<string>();
+	const movedToPaths = new Set<string>();
 	const priorByRemoteId = new Map<string, { path: string; entry: SyncEntry }>();
 
 	for (const [path, entry] of Object.entries(state.entries)) {
@@ -42,6 +43,7 @@ export async function pollRemoteChanges(
 
 		if (priorPath && priorPath !== relPath) {
 			movedFromPaths.add(priorPath);
+			movedToPaths.add(relPath);
 			jobs.push({
 				id: `move-local:${priorPath}:${relPath}`,
 				op: "move-local",
@@ -107,7 +109,7 @@ export async function pollRemoteChanges(
 	}
 
 	for (const priorPath of Object.keys(state.entries)) {
-		if (seen.has(priorPath) || movedFromPaths.has(priorPath)) {
+		if (seen.has(priorPath) || movedFromPaths.has(priorPath) || movedToPaths.has(priorPath)) {
 			continue;
 		}
 		const prior = state.entries[priorPath];
@@ -149,6 +151,10 @@ async function pollRemoteCursor(
 	state: SyncState,
 ): Promise<RemotePollResult | null> {
 	if (!remoteFs.getRootFolder || !remoteFs.subscribeToTreeEvents) {
+		return null;
+	}
+
+	if (!state.remoteEventCursor) {
 		return null;
 	}
 

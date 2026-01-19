@@ -46,6 +46,9 @@ export type SyncJob = {
 	attempt: number;
 	nextRunAt: number;
 	reason?: string;
+	status?: "pending" | "processing" | "blocked";
+	lockedAt?: number;
+	lastError?: string;
 };
 
 export type SyncMeta = {
