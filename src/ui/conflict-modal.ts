@@ -65,6 +65,7 @@ export class ProtonDriveConflictModal extends Modal {
 
 		if (this.conflicts.length === 0) {
 			contentEl.createEl("p", { text: "No conflicts to resolve." });
+			this.renderAutoSyncControls();
 			return;
 		}
 
@@ -110,6 +111,39 @@ export class ProtonDriveConflictModal extends Modal {
 				});
 			});
 		}
+
+		this.renderAutoSyncControls();
+	}
+
+	private renderAutoSyncControls(): void {
+		if (!this.plugin.settings.autoSyncEnabled) {
+			return;
+		}
+		const { contentEl } = this;
+		const control = new Setting(contentEl).setName("Auto sync");
+		control.setDesc(
+			this.plugin.isAutoSyncPaused()
+				? "Auto sync is paused while conflicts are resolved."
+				: "Auto sync is running.",
+		);
+		control.addButton((button) => {
+			if (this.plugin.isAutoSyncPaused()) {
+				button.setButtonText("Resume auto sync");
+				button.setCta();
+				button.onClick(() => {
+					this.plugin.resumeAutoSync();
+					new Notice("Auto sync resumed.");
+					this.render();
+				});
+			} else {
+				button.setButtonText("Pause auto sync");
+				button.onClick(() => {
+					this.plugin.pauseAutoSync();
+					new Notice("Auto sync paused.");
+					this.render();
+				});
+			}
+		});
 	}
 
 	private async resolveConflict(
@@ -205,6 +239,10 @@ export class ProtonDriveConflictModal extends Modal {
 
 			await engine.runOnce();
 			await this.clearConflict(item.path, false);
+			if (this.plugin.settings.autoSyncEnabled && this.plugin.isAutoSyncPaused()) {
+				this.plugin.resumeAutoSync();
+				new Notice("Auto sync resumed.");
+			}
 			new Notice("Conflict resolved.");
 			await this.loadConflicts();
 			this.render();

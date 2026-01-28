@@ -52,7 +52,7 @@ export type SyncJob = {
 };
 
 export type SyncMeta = {
-	key: "lastSyncAt" | "lastError" | "lastErrorAt" | "remoteEventCursor";
+	key: "lastSyncAt" | "lastError" | "lastErrorAt" | "remoteEventCursor" | "runtimeMetrics";
 	value: number | string | undefined;
 };
 

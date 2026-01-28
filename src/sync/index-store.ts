@@ -1,5 +1,23 @@
 import type { SyncEntry, SyncJob } from "../data/sync-schema";
 
+export type SyncRuntimeMetrics = {
+	lastRunAt?: number;
+	lastRunDurationMs?: number;
+	lastRunJobsExecuted?: number;
+	lastRunEntriesUpdated?: number;
+	lastRunFailures?: number;
+	lastRunUploadBytes?: number;
+	lastRunDownloadBytes?: number;
+	lastRunThroughputBytesPerSec?: number;
+	totalRuns?: number;
+	totalFailures?: number;
+	totalUploadBytes?: number;
+	totalDownloadBytes?: number;
+	peakQueueDepth?: number;
+	peakPendingJobs?: number;
+	peakBlockedJobs?: number;
+};
+
 export type SyncState = {
 	entries: Record<string, SyncEntry>;
 	jobs: SyncJob[];
@@ -8,19 +26,26 @@ export type SyncState = {
 	lastErrorAt?: number;
 	remoteEventCursor?: string;
 	logs?: Array<{ at: string; message: string; context?: string }>;
+	runtimeMetrics?: SyncRuntimeMetrics;
 };
 
 export const DEFAULT_SYNC_STATE: SyncState = {
 	entries: {},
 	jobs: [],
 	logs: [],
+	runtimeMetrics: {},
 };
 
 export class SyncIndexStore {
 	private state: SyncState;
 
 	constructor(initial?: SyncState) {
-		this.state = initial ?? { entries: {}, jobs: [], logs: [] };
+		this.state = initial ?? {
+			entries: {},
+			jobs: [],
+			logs: [],
+			runtimeMetrics: {},
+		};
 	}
 
 	getEntry(path: string): SyncEntry | undefined {
@@ -64,6 +89,9 @@ export class SyncIndexStore {
 			lastErrorAt: this.state.lastErrorAt,
 			remoteEventCursor: this.state.remoteEventCursor,
 			logs: [...(this.state.logs ?? [])],
+			runtimeMetrics: this.state.runtimeMetrics
+				? { ...this.state.runtimeMetrics }
+				: undefined,
 		};
 	}
 
@@ -78,6 +106,43 @@ export class SyncIndexStore {
 
 	setRemoteEventCursor(cursor?: string): void {
 		this.state.remoteEventCursor = cursor;
+	}
+
+	updateRuntimeMetrics(
+		update: Omit<
+			SyncRuntimeMetrics,
+			| "totalRuns"
+			| "totalFailures"
+			| "totalUploadBytes"
+			| "totalDownloadBytes"
+			| "peakQueueDepth"
+			| "peakPendingJobs"
+			| "peakBlockedJobs"
+		> & {
+			peakQueueDepth?: number;
+			peakPendingJobs?: number;
+			peakBlockedJobs?: number;
+		},
+	): void {
+		const current = this.state.runtimeMetrics ?? {};
+		const lastRunBytes = (update.lastRunUploadBytes ?? 0) + (update.lastRunDownloadBytes ?? 0);
+		const throughput =
+			update.lastRunDurationMs && update.lastRunDurationMs > 0
+				? Math.round((lastRunBytes * 1000) / update.lastRunDurationMs)
+				: 0;
+		this.state.runtimeMetrics = {
+			...current,
+			...update,
+			lastRunThroughputBytesPerSec: throughput,
+			totalRuns: (current.totalRuns ?? 0) + 1,
+			totalFailures: (current.totalFailures ?? 0) + (update.lastRunFailures ?? 0),
+			totalUploadBytes: (current.totalUploadBytes ?? 0) + (update.lastRunUploadBytes ?? 0),
+			totalDownloadBytes:
+				(current.totalDownloadBytes ?? 0) + (update.lastRunDownloadBytes ?? 0),
+			peakQueueDepth: Math.max(current.peakQueueDepth ?? 0, update.peakQueueDepth ?? 0),
+			peakPendingJobs: Math.max(current.peakPendingJobs ?? 0, update.peakPendingJobs ?? 0),
+			peakBlockedJobs: Math.max(current.peakBlockedJobs ?? 0, update.peakBlockedJobs ?? 0),
+		};
 	}
 
 	addLog(message: string, context?: string): void {

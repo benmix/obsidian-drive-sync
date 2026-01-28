@@ -110,6 +110,10 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 		await this.performAutoSync("manual", force || this.autoSyncPaused);
 	}
 
+	isSyncRunning(): boolean {
+		return this.autoSyncRunning;
+	}
+
 	private startAutoSync(): void {
 		this.autoSyncPaused = false;
 		this.localWatcher = new LocalFsWatcher(

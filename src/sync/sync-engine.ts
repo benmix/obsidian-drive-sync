@@ -91,9 +91,12 @@ export class SyncEngine {
 			return { jobsExecuted: 0, entriesUpdated: 0 };
 		}
 		const jobs = this.queue.list();
+		const queueDepth = jobs.length;
+		const jobCounts = countJobStates(jobs);
 		if (!this.authPaused) {
 			this.unblockAuthJobs(jobs);
 		}
+		const startedAt = now();
 		const nowTs = now();
 		const dueJobs = jobs.filter((job) => job.status !== "blocked" && job.nextRunAt <= nowTs);
 		const pendingJobs = jobs.filter((job) => job.nextRunAt > nowTs);
@@ -102,6 +105,8 @@ export class SyncEngine {
 		}
 		let jobsExecuted = 0;
 		const entries: SyncEntry[] = [];
+		let uploadBytes = 0;
+		let downloadBytes = 0;
 		const retryJobs: SyncJob[] = [];
 
 		const concurrency = Math.max(1, Math.min(this.options.maxConcurrentJobs ?? 2, 4));
@@ -115,6 +120,8 @@ export class SyncEngine {
 				}
 				entries.push(...result.entries);
 				jobsExecuted += result.jobsExecuted;
+				uploadBytes += result.uploadBytes;
+				downloadBytes += result.downloadBytes;
 			}
 			if (this.authPaused) {
 				this.index.addLog("Authentication required. Sync paused.", "auth");
@@ -146,6 +153,21 @@ export class SyncEngine {
 		}
 
 		this.index.setLastSyncAt(now());
+
+		const durationMs = Math.max(0, now() - startedAt);
+		const failures = retryJobs.length;
+		this.index.updateRuntimeMetrics({
+			lastRunAt: now(),
+			lastRunDurationMs: durationMs,
+			lastRunJobsExecuted: jobsExecuted,
+			lastRunEntriesUpdated: entries.length,
+			lastRunFailures: failures,
+			lastRunUploadBytes: uploadBytes,
+			lastRunDownloadBytes: downloadBytes,
+			peakQueueDepth: queueDepth,
+			peakPendingJobs: jobCounts.pending,
+			peakBlockedJobs: jobCounts.blocked,
+		});
 
 		if (retryJobs.length > 0) {
 			await this.save({
@@ -399,6 +421,23 @@ export class SyncEngine {
 	}
 }
 
+function countJobStates(jobs: SyncJob[]): {
+	pending: number;
+	processing: number;
+	blocked: number;
+} {
+	const counts = { pending: 0, processing: 0, blocked: 0 };
+	for (const job of jobs) {
+		if (job.status === "processing") {
+			counts.processing += 1;
+		} else if (job.status === "blocked") {
+			counts.blocked += 1;
+		} else {
+			counts.pending += 1;
+		}
+	}
+	return counts;
+}
 function isAuthError(message: string): boolean {
 	const normalized = message.toLowerCase();
 	return (

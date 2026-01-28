@@ -1,10 +1,17 @@
 import type { App } from "obsidian";
-import { PluginSettingTab, Setting } from "obsidian";
+import { Notice, PluginSettingTab, Setting } from "obsidian";
 import ProtonDriveSyncPlugin from "./main";
 import { ProtonDriveRemoteRootModal } from "./ui/remote-root-modal";
-import { compileExcludeRules, previewExcludedPaths, validateExcludePatterns } from "./sync/exclude";
+import {
+	compileExcludeRules,
+	isExcluded,
+	previewExcludedPaths,
+	validateExcludePatterns,
+} from "./sync/exclude";
 import { normalizePath } from "./sync/utils";
 import type { ReusableCredentials } from "./proton-drive/proton-auth/types";
+import { ProtonDriveRemoteFs } from "./sync/remote-fs";
+import type { ProtonSession } from "./proton-drive/sdk-session";
 
 export interface ProtonDriveSettings {
 	enableProtonDrive: boolean;
@@ -88,6 +95,15 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 					}),
 			);
 		new Setting(containerEl)
+			.setName("Validate remote folder")
+			.setDesc("Verify the selected folder ID exists and is accessible.")
+			.addButton((button) => {
+				button.setButtonText("Validate");
+				button.onClick(() => {
+					void this.validateRemoteFolder();
+				});
+			});
+		new Setting(containerEl)
 			.setName("Browse remote folders")
 			.setDesc("Select a folder from Proton Drive instead of pasting an ID.")
 			.addButton((button) => {
@@ -126,6 +142,7 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 			.setName("Exclude preview")
 			.setDesc("Preview which paths are excluded (comma-separated list).");
 		let previewInput = "";
+		let lastPreviewInput = "";
 		const previewOutput = previewSetting.descEl.createDiv({
 			cls: "protondrive-exclude-preview",
 		});
@@ -133,6 +150,7 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 		previewSetting.addText((text) =>
 			text.setPlaceholder("notes/draft.md, .obsidian/config").onChange((value) => {
 				previewInput = value;
+				lastPreviewInput = value;
 				const entries = previewInput
 					.split(",")
 					.map((item) => normalizePath(item.trim()))
@@ -150,6 +168,26 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 				previewOutput.setText(`Excluded: ${excluded.join(", ")}`);
 			}),
 		);
+		const normalizePreviewInput = (input: string): string[] =>
+			input
+				.split(",")
+				.map((item) => normalizePath(item.trim()))
+				.filter((item) => item.length > 0);
+		previewSetting.addButton((button) => {
+			button.setButtonText("Validate");
+			button.onClick(() => {
+				const entries = normalizePreviewInput(previewInput || lastPreviewInput);
+				if (entries.length === 0) {
+					previewOutput.setText("Enter one or more paths to validate.");
+					return;
+				}
+				const rules = compileExcludeRules(this.plugin.settings.excludePatterns);
+				const messages = entries.map((entry) =>
+					isExcluded(entry, rules) ? `${entry} → excluded` : `${entry} → included`,
+				);
+				previewOutput.setText(messages.join(", "));
+			});
+		});
 
 		new Setting(containerEl)
 			.setName("Conflict strategy")
@@ -269,5 +307,66 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 			);
 		}
 		return "Sign in from the command palette to store a session locally.";
+	}
+
+	private async validateRemoteFolder(): Promise<void> {
+		if (!this.plugin.settings.enableProtonDrive) {
+			new Notice("Enable Proton Drive integration in settings first.");
+			return;
+		}
+		if (!this.plugin.settings.remoteFolderId.trim()) {
+			new Notice("Select a remote folder first.");
+			return;
+		}
+		if (!this.plugin.settings.protonSession || !this.plugin.settings.hasAuthSession) {
+			new Notice("Sign in to Proton Drive first.");
+			return;
+		}
+
+		const session = this.plugin.authService.getSession();
+		if (!session) {
+			new Notice("Sign in to Proton Drive first.");
+			return;
+		}
+		const activeSession: ProtonSession = { ...session };
+		activeSession.onTokenRefresh = async () => {
+			try {
+				await this.plugin.authService.refreshToken();
+				const refreshedSession = this.plugin.authService.getSession();
+				if (refreshedSession) {
+					Object.assign(activeSession, refreshedSession);
+				}
+				this.plugin.settings.protonSession =
+					this.plugin.authService.getReusableCredentials();
+				this.plugin.settings.hasAuthSession = true;
+				await this.plugin.saveSettings();
+			} catch (refreshError) {
+				console.warn("Failed to refresh Proton session.", refreshError);
+				this.plugin.settings.hasAuthSession = false;
+				await this.plugin.saveSettings();
+			}
+		};
+		const client = await this.plugin.protonDriveService.connect(activeSession);
+		if (!client) {
+			new Notice("Unable to connect to Proton Drive.");
+			return;
+		}
+
+		try {
+			const remoteFs = new ProtonDriveRemoteFs(client, this.plugin.settings.remoteFolderId);
+			const node = await remoteFs.getNode?.(this.plugin.settings.remoteFolderId);
+			if (!node) {
+				new Notice("Remote folder not found.");
+				return;
+			}
+			if (node.type !== "folder") {
+				new Notice("Remote ID is not a folder.");
+				return;
+			}
+			new Notice("Remote folder validated.");
+		} catch (error) {
+			console.warn("Remote folder validation failed.", error);
+			new Notice("Failed to validate remote folder.");
+		}
 	}
 }

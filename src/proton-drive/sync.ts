@@ -1,4 +1,4 @@
-import type { App, Plugin } from "obsidian";
+import type { App } from "obsidian";
 import { ObsidianLocalFs } from "../sync/local-fs";
 import { syncLocalToRemote, syncRemoteToLocal } from "../sync/manual-sync";
 import { ProtonDriveRemoteFs } from "../sync/remote-fs";
@@ -33,7 +33,6 @@ export async function planSync(
 	app: App,
 	client: ProtonDriveClient,
 	remoteFolderId: string,
-	plugin: Plugin,
 	settings?: {
 		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
@@ -58,7 +57,6 @@ export async function runPlannedSync(
 	app: App,
 	client: ProtonDriveClient,
 	remoteFolderId: string,
-	plugin: Plugin,
 	settings?: {
 		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
@@ -83,7 +81,6 @@ export async function pollRemoteSync(
 	app: App,
 	client: ProtonDriveClient,
 	remoteFolderId: string,
-	plugin: Plugin,
 	settings?: {
 		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
@@ -109,4 +106,67 @@ export async function pollRemoteSync(
 	}
 	await engine.save({ remoteEventCursor: result.remoteEventCursor });
 	return { jobsPlanned: result.jobs.length, entries: result.snapshot.length };
+}
+
+export async function estimateSyncPlan(
+	app: App,
+	client: ProtonDriveClient,
+	remoteFolderId: string,
+	settings?: {
+		excludePatterns?: string;
+		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
+		maxConcurrentJobs?: number;
+		maxRetryAttempts?: number;
+	},
+): Promise<{
+	jobsPlanned: number;
+	entries: number;
+	uploadBytes: number;
+	downloadBytes: number;
+}> {
+	const localFs = new ObsidianLocalFs(app);
+	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
+	const stateStore = new PluginDataStateStore();
+	const originalState = await stateStore.load();
+	const engine = new SyncEngine(localFs, remoteFs, stateStore, {
+		excludePatterns: settings?.excludePatterns,
+		conflictStrategy: settings?.conflictStrategy,
+		maxConcurrentJobs: settings?.maxConcurrentJobs,
+		maxRetryAttempts: settings?.maxRetryAttempts,
+	});
+	try {
+		await engine.load();
+		const plan = await engine.plan();
+		const jobs = engine.listJobs();
+
+		let uploadBytes = 0;
+		let downloadBytes = 0;
+		const localEntries = await localFs.listEntries();
+		const localByPath = new Map(localEntries.map((entry) => [entry.path, entry]));
+		for (const job of jobs) {
+			if (job.op === "upload") {
+				const entry = localByPath.get(job.path);
+				if (entry?.size) {
+					uploadBytes += entry.size;
+				}
+			}
+			if (job.op === "download") {
+				if (job.remoteId) {
+					const node = await remoteFs.getNode?.(job.remoteId);
+					if (node?.size) {
+						downloadBytes += node.size;
+					}
+				}
+			}
+		}
+
+		return {
+			jobsPlanned: plan.jobsPlanned,
+			entries: plan.entries,
+			uploadBytes,
+			downloadBytes,
+		};
+	} finally {
+		await stateStore.save(originalState);
+	}
 }

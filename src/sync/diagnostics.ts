@@ -1,6 +1,7 @@
 import type { App, Plugin } from "obsidian";
 import { loadPluginData } from "../data/plugin-data";
 import { PluginDataStateStore } from "./state-store";
+import { formatBytes } from "./utils";
 
 type DiagnosticsReport = {
 	generatedAt: string;
@@ -27,6 +28,31 @@ type DiagnosticsReport = {
 		remoteEventCursor?: string;
 		conflicts: number;
 	};
+	runtimeMetrics?: {
+		lastRunAt?: number;
+		lastRunDurationMs?: number;
+		lastRunJobsExecuted?: number;
+		lastRunEntriesUpdated?: number;
+		lastRunFailures?: number;
+		lastRunUploadBytes?: number;
+		lastRunDownloadBytes?: number;
+		lastRunThroughputBytesPerSec?: number;
+		totalRuns?: number;
+		totalFailures?: number;
+		totalUploadBytes?: number;
+		totalDownloadBytes?: number;
+		peakQueueDepth?: number;
+		peakPendingJobs?: number;
+		peakBlockedJobs?: number;
+		formatted?: {
+			lastRunDuration?: string;
+			lastRunUpload?: string;
+			lastRunDownload?: string;
+			lastRunThroughput?: string;
+			totalUpload?: string;
+			totalDownload?: string;
+		};
+	};
 	logs: Array<{ at: string; message: string; context?: string }>;
 };
 
@@ -40,6 +66,7 @@ export async function exportDiagnostics(
 	const conflicts = Object.values(syncState.entries ?? {}).filter(
 		(entry) => entry.conflict,
 	).length;
+	const runtimeMetrics = syncState.runtimeMetrics;
 	const report: DiagnosticsReport = {
 		generatedAt: new Date().toISOString(),
 		settings: {
@@ -67,6 +94,23 @@ export async function exportDiagnostics(
 				: undefined,
 			conflicts,
 		},
+		runtimeMetrics: runtimeMetrics
+			? {
+					...runtimeMetrics,
+					formatted: {
+						lastRunDuration: runtimeMetrics.lastRunDurationMs
+							? `${Math.round(runtimeMetrics.lastRunDurationMs)} ms`
+							: "0 ms",
+						lastRunUpload: formatBytes(runtimeMetrics.lastRunUploadBytes),
+						lastRunDownload: formatBytes(runtimeMetrics.lastRunDownloadBytes),
+						lastRunThroughput: runtimeMetrics.lastRunThroughputBytesPerSec
+							? `${formatBytes(runtimeMetrics.lastRunThroughputBytesPerSec)}/s`
+							: "0 B/s",
+						totalUpload: formatBytes(runtimeMetrics.totalUploadBytes),
+						totalDownload: formatBytes(runtimeMetrics.totalDownloadBytes),
+					},
+				}
+			: undefined,
 		logs: redactLogs(syncState.logs ?? []),
 	};
 

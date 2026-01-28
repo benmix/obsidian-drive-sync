@@ -84,3 +84,28 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 6px;
 	font-size: 12px;
 }
+
+.protondrive-queue {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.protondrive-queue-row {
+	display: grid;
+	grid-template-columns: minmax(90px, 130px) 1fr minmax(80px, 120px) minmax(
+			180px,
+			260px
+		);
+	gap: 8px;
+	padding: 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	font-size: 12px;
+}
+
+.protondrive-queue-row.is-processing {
+	border-color: var(--interactive-accent);
+	box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}

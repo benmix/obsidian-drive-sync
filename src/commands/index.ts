@@ -6,6 +6,7 @@ import {
 	restoreVaultFromProtonDrive,
 	runPlannedSync,
 	syncVaultToProtonDrive,
+	estimateSyncPlan,
 } from "../proton-drive/sync";
 import { exportDiagnostics } from "../sync/diagnostics";
 import { ObsidianLocalFs } from "../sync/local-fs";
@@ -15,6 +16,7 @@ import { PluginDataStateStore } from "../sync/state-store";
 import { ProtonDriveStatusModal } from "../ui/status-modal";
 import { ProtonDriveLoginModal } from "../ui/login-modal";
 import { ProtonDriveConflictModal } from "../ui/conflict-modal";
+import { ProtonDrivePreSyncModal } from "../ui/pre-sync-modal";
 import type { ProtonSession } from "../proton-drive/sdk-session";
 import { validateRemoteOperations } from "../proton-drive/remote-validation";
 
@@ -60,6 +62,75 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		};
 		return activeSession;
 	};
+
+	plugin.addCommand({
+		id: "protondrive-pre-sync-check",
+		name: "Pre-sync check (job counts + size estimate)",
+		callback: async () => {
+			if (!plugin.settings.enableProtonDrive) {
+				new Notice("Enable Proton Drive integration in settings first.");
+				return;
+			}
+			if (!plugin.settings.remoteFolderId.trim()) {
+				new Notice("Set a remote folder ID in settings first.");
+				return;
+			}
+			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
+
+			const activeSession = await buildActiveSession();
+			if (!activeSession) {
+				new Notice("Sign in to Proton Drive first.");
+				return;
+			}
+			const client = await plugin.protonDriveService.connect(activeSession);
+			if (!client) {
+				new Notice("Unable to connect to Proton Drive.");
+				return;
+			}
+
+			try {
+				const estimate = await estimateSyncPlan(
+					plugin.app,
+					client,
+					plugin.settings.remoteFolderId,
+					{
+						excludePatterns: plugin.settings.excludePatterns,
+						conflictStrategy: plugin.settings.conflictStrategy,
+						maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
+						maxRetryAttempts: plugin.settings.maxRetryAttempts,
+					},
+				);
+				new ProtonDrivePreSyncModal(plugin.app, estimate, async () => {
+					await planSync(plugin.app, client, plugin.settings.remoteFolderId, {
+						excludePatterns: plugin.settings.excludePatterns,
+						conflictStrategy: plugin.settings.conflictStrategy,
+						maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
+						maxRetryAttempts: plugin.settings.maxRetryAttempts,
+					});
+					const result = await runPlannedSync(
+						plugin.app,
+						client,
+						plugin.settings.remoteFolderId,
+						{
+							excludePatterns: plugin.settings.excludePatterns,
+							conflictStrategy: plugin.settings.conflictStrategy,
+							maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
+							maxRetryAttempts: plugin.settings.maxRetryAttempts,
+						},
+					);
+					new Notice(
+						`Executed ${result.jobsExecuted} jobs, updated ${result.entriesUpdated} entries.`,
+					);
+				}).open();
+			} catch (error) {
+				console.warn("Pre-sync check failed.", error);
+				new Notice("Pre-sync check failed. Check the console for details.");
+			}
+		},
+	});
 
 	plugin.addCommand({
 		id: "protondrive-validate-remote-ops",
@@ -196,18 +267,12 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 			}
 
 			try {
-				const result = await planSync(
-					plugin.app,
-					client,
-					plugin.settings.remoteFolderId,
-					plugin,
-					{
-						excludePatterns: plugin.settings.excludePatterns,
-						conflictStrategy: plugin.settings.conflictStrategy,
-						maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
-						maxRetryAttempts: plugin.settings.maxRetryAttempts,
-					},
-				);
+				const result = await planSync(plugin.app, client, plugin.settings.remoteFolderId, {
+					excludePatterns: plugin.settings.excludePatterns,
+					conflictStrategy: plugin.settings.conflictStrategy,
+					maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
+					maxRetryAttempts: plugin.settings.maxRetryAttempts,
+				});
 				new Notice(`Planned ${result.jobsPlanned} jobs across ${result.entries} entries.`);
 			} catch (error) {
 				console.warn("Sync planning failed.", error);
@@ -250,7 +315,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					plugin.app,
 					client,
 					plugin.settings.remoteFolderId,
-					plugin,
 					{
 						excludePatterns: plugin.settings.excludePatterns,
 						conflictStrategy: plugin.settings.conflictStrategy,
@@ -300,7 +364,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					plugin.app,
 					client,
 					plugin.settings.remoteFolderId,
-					plugin,
 					{
 						excludePatterns: plugin.settings.excludePatterns,
 						conflictStrategy: plugin.settings.conflictStrategy,

@@ -205,6 +205,22 @@ RemoteFS Adapter 必须提供：
 
 - IndexedDB via Dexie (browser-safe, Obsidian-compatible).
 - Settings remain in Obsidian plugin data; sync state lives in IndexedDB.
+- Schema migrations are handled via Dexie versioning (see 8.4).
+
+### 8.4 IndexedDB schema migrations
+
+Migration rules:
+
+- Every schema change increments `SYNC_STATE_DB_VERSION` and adds a new Dexie `.version(n).stores(...)`.
+- Use `modify`/`add`/`delete` in Dexie to transform data when required.
+- Keep at least one backward-compatible reader for one release (N-1) to allow safe upgrades.
+- For breaking changes, implement a reindex path (clear + rebuild) with a user-visible warning.
+- Avoid dropping tables silently; log and preserve critical records when possible.
+
+Planned changes (placeholders to keep versioning consistent):
+
+- v3: Add `status` index to jobs (already in schema) and migration guard to backfill missing fields.
+- v4: Add `runtimeMetrics` extended fields (if needed) without changing entry/job keys.
 
 ---
 

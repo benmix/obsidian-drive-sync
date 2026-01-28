@@ -63,24 +63,24 @@
 
 - [x] Build a remote root selector UI instead of manual folder ID input.
 - [x] Implement a manual conflict resolution UI/flow.
-- [ ] Expand manual conflict resolution UI (keep local/remote, resume).
-- [ ] Add pre-sync checks (job counts, size estimates, confirm/abort).
-- [ ] Improve sync visibility (queue details, in-flight job, retry schedule).
-- [ ] Validate settings inputs (remote folder selection, exclude preview).
+- [x] Expand manual conflict resolution UI (keep local/remote, resume).
+- [x] Add pre-sync checks (job counts, size estimates, confirm/abort).
+- [x] Improve sync visibility (queue details, in-flight job, retry schedule).
+- [x] Validate settings inputs (remote folder selection, exclude preview).
 
 ## Observability
 
 - [x] Add structured logs and a log viewer in UI.
 - [x] Diagnostics export with state and settings summary.
 - [x] Define diagnostics redaction rules and privacy review.
-- [ ] Add runtime diagnostics (duration, throughput, failures, queue peaks).
+- [x] Add runtime diagnostics (duration, throughput, failures, queue peaks).
 
 ## Data and storage
 
 - [x] Data persistence via `loadData/saveData`.
 - [x] IndexedDB via Dexie for sync state (no migration needed pre-release).
 - [x] Replace localStorage sync state with IndexedDB via Dexie.
-- [ ] Plan IndexedDB schema migrations for future changes.
+- [x] Plan IndexedDB schema migrations for future changes.
 
 ## Testing and compatibility
 

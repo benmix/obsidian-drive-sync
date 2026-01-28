@@ -1,6 +1,6 @@
 import { syncStateDb } from "../data/sync-db";
 import type { SyncEntry, SyncLog } from "../data/sync-schema";
-import type { SyncState } from "./index-store";
+import type { SyncRuntimeMetrics, SyncState } from "./index-store";
 
 export type StateStore = {
 	load(): Promise<SyncState>;
@@ -27,6 +27,7 @@ export class PluginDataStateStore implements StateStore {
 			lastError: metaMap.get("lastError") as string | undefined,
 			lastErrorAt: metaMap.get("lastErrorAt") as number | undefined,
 			remoteEventCursor: metaMap.get("remoteEventCursor") as string | undefined,
+			runtimeMetrics: parseRuntimeMetrics(metaMap.get("runtimeMetrics")),
 			logs: logs.map(mapLog),
 		};
 	}
@@ -64,6 +65,10 @@ export class PluginDataStateStore implements StateStore {
 						key: "remoteEventCursor",
 						value: state.remoteEventCursor,
 					},
+					{
+						key: "runtimeMetrics",
+						value: serializeRuntimeMetrics(state.runtimeMetrics),
+					},
 				]);
 			},
 		);
@@ -80,4 +85,22 @@ function mapLog(log: SyncLog): {
 
 function toLog(log: { at: string; message: string; context?: string }): SyncLog {
 	return { at: log.at, message: log.message, context: log.context };
+}
+
+function parseRuntimeMetrics(value?: string | number): SyncRuntimeMetrics | undefined {
+	if (!value || typeof value !== "string") {
+		return undefined;
+	}
+	try {
+		return JSON.parse(value) as SyncRuntimeMetrics;
+	} catch {
+		return undefined;
+	}
+}
+
+function serializeRuntimeMetrics(value?: SyncRuntimeMetrics): string | undefined {
+	if (!value || Object.keys(value).length === 0) {
+		return undefined;
+	}
+	return JSON.stringify(value);
 }

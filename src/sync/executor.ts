@@ -6,6 +6,8 @@ import { now } from "./utils";
 export type ExecuteResult = {
 	entries: SyncEntry[];
 	jobsExecuted: number;
+	uploadBytes: number;
+	downloadBytes: number;
 };
 
 export async function executeJobs(
@@ -15,14 +17,17 @@ export async function executeJobs(
 ): Promise<ExecuteResult> {
 	const entries: SyncEntry[] = [];
 	let jobsExecuted = 0;
+	let uploadBytes = 0;
+	let downloadBytes = 0;
 
 	for (const job of jobs) {
 		if (job.op === "upload") {
 			const data = await localFs.readFile(job.path);
 			const stats = await localFs.stat(job.path);
+			const size = stats?.size ?? data.byteLength;
 			const uploaded = await remoteFs.uploadFile(job.path, data, {
 				mtimeMs: stats?.mtimeMs,
-				size: stats?.size ?? data.byteLength,
+				size,
 			});
 			const localHash = await hashBytes(data);
 			entries.push({
@@ -40,6 +45,7 @@ export async function executeJobs(
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
+			uploadBytes += size;
 		} else if (job.op === "download") {
 			if (!job.remoteId) {
 				throw new Error(`Missing remote ID for download job: ${job.path}`);
@@ -63,6 +69,7 @@ export async function executeJobs(
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
+			downloadBytes += data.byteLength;
 		} else if (job.op === "delete-local") {
 			await localFs.deletePath(job.path);
 			entries.push({
@@ -200,5 +207,5 @@ export async function executeJobs(
 		}
 	}
 
-	return { entries, jobsExecuted };
+	return { entries, jobsExecuted, uploadBytes, downloadBytes };
 }
