@@ -4,6 +4,7 @@ import type { ProtonDriveAccount, ProtonDriveAccountAddress } from "@protontech/
 import type { PublicKey as DrivePublicKey } from "@protontech/drive-sdk/dist/crypto/interface";
 import { API_BASE_URL, APP_VERSION, AUTH_VERSION, SRP_LEN } from "./types";
 import { apiRequest } from "./api";
+import { requestHttp } from "./http";
 import type { OpenPGPCryptoInterface } from "./openpgp";
 import { getSrp, verifyAndGetModulus } from "./srp";
 import {
@@ -90,6 +91,13 @@ export function createProtonHttpClient(
 		headers.set("x-pm-appversion", APP_VERSION);
 	};
 
+	const normalizeBody = (body: BodyInit | undefined): BodyInit | undefined => {
+		if (typeof body === "string" || body instanceof ArrayBuffer || body instanceof Blob) {
+			return body;
+		}
+		return undefined;
+	};
+
 	return {
 		async fetchJson(request: HttpClientRequest): Promise<Response> {
 			const { url, method, headers, json, timeoutMs, signal } = request;
@@ -102,12 +110,16 @@ export function createProtonHttpClient(
 			const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
 			try {
-				let response = await fetch(fullUrl, {
-					method,
-					headers,
-					body: json ? JSON.stringify(json) : undefined,
-					signal: signal || controller.signal,
-				});
+				let response = await requestHttp(
+					fullUrl,
+					{
+						method,
+						headers,
+						body: normalizeBody(json ? JSON.stringify(json) : undefined),
+						signal: signal || controller.signal,
+					},
+					"json",
+				);
 
 				// Handle expired access token (401) - try to refresh and retry
 				if (response.status === 401 && session.RefreshToken && onTokenRefresh) {
@@ -115,12 +127,16 @@ export function createProtonHttpClient(
 						await onTokenRefresh();
 						// Update headers with new token and retry
 						setAuthHeaders(headers);
-						response = await fetch(fullUrl, {
-							method,
-							headers,
-							body: json ? JSON.stringify(json) : undefined,
-							signal: signal || controller.signal,
-						});
+						response = await requestHttp(
+							fullUrl,
+							{
+								method,
+								headers,
+								body: normalizeBody(json ? JSON.stringify(json) : undefined),
+								signal: signal || controller.signal,
+							},
+							"json",
+						);
 					} catch {
 						// Refresh failed, return original 401 response
 					}
@@ -143,12 +159,16 @@ export function createProtonHttpClient(
 			const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
 			try {
-				let response = await fetch(fullUrl, {
-					method,
-					headers,
-					body,
-					signal: signal || controller.signal,
-				});
+				let response = await requestHttp(
+					fullUrl,
+					{
+						method,
+						headers,
+						body: normalizeBody(body),
+						signal: signal || controller.signal,
+					},
+					"arrayBuffer",
+				);
 
 				// Handle expired access token (401) - try to refresh and retry
 				if (response.status === 401 && session.RefreshToken && onTokenRefresh) {
@@ -156,12 +176,16 @@ export function createProtonHttpClient(
 						await onTokenRefresh();
 						// Update headers with new token and retry
 						setAuthHeaders(headers);
-						response = await fetch(fullUrl, {
-							method,
-							headers,
-							body,
-							signal: signal || controller.signal,
-						});
+						response = await requestHttp(
+							fullUrl,
+							{
+								method,
+								headers,
+								body: normalizeBody(body),
+								signal: signal || controller.signal,
+							},
+							"arrayBuffer",
+						);
 					} catch {
 						// Refresh failed, return original 401 response
 					}

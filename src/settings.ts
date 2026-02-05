@@ -2,6 +2,7 @@ import type { App } from "obsidian";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
 import ProtonDriveSyncPlugin from "./main";
 import { ProtonDriveRemoteRootModal } from "./ui/remote-root-modal";
+import { ProtonDriveLoginModal } from "./ui/login-modal";
 import {
 	compileExcludeRules,
 	isExcluded,
@@ -66,11 +67,12 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 				}),
 			);
 
-		new Setting(containerEl)
-			.setName("Proton Drive session")
-			.setDesc(this.getAuthStatusText())
-			.addButton((button) => {
-				button.setButtonText("Clear session");
+		const accountSetting = new Setting(containerEl)
+			.setName("Proton Drive account")
+			.setDesc(this.getAuthStatusText());
+		if (this.plugin.settings.hasAuthSession) {
+			accountSetting.addButton((button) => {
+				button.setButtonText("Sign out");
 				button.onClick(async () => {
 					this.plugin.settings.protonSession = undefined;
 					this.plugin.settings.accountEmail = "";
@@ -81,6 +83,19 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 					this.display();
 				});
 			});
+		} else {
+			accountSetting.addButton((button) => {
+				button.setButtonText("Sign in");
+				button.setCta();
+				button.onClick(() => {
+					const modal = new ProtonDriveLoginModal(this.app, this.plugin);
+					modal.onClose = () => {
+						this.display();
+					};
+					modal.open();
+				});
+			});
+		}
 
 		new Setting(containerEl)
 			.setName("Remote folder ID")
@@ -306,7 +321,7 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 				"Session needs attention. Sign in again from the command palette."
 			);
 		}
-		return "Sign in from the command palette to store a session locally.";
+		return "Sign in here to store a session locally.";
 	}
 
 	private async validateRemoteFolder(): Promise<void> {

@@ -23,6 +23,7 @@ import {
 	createForkEncryptedBlob,
 	decryptForkEncryptedBlob,
 } from "./crypto-utils";
+import { requestHttp } from "./http";
 
 // ============================================================================
 // ProtonAuth Class
@@ -573,20 +574,24 @@ export class ProtonAuth {
 		uid: string,
 		refreshToken: string,
 	): Promise<{ accessToken: string; refreshToken: string }> {
-		const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"x-pm-appversion": APP_VERSION,
-				"x-pm-uid": uid,
+		const response = await requestHttp(
+			`${API_BASE_URL}/auth/refresh`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"x-pm-appversion": APP_VERSION,
+					"x-pm-uid": uid,
+				},
+				body: JSON.stringify({
+					ResponseType: "token",
+					GrantType: "refresh_token",
+					RefreshToken: refreshToken,
+					RedirectURI: "https://protonmail.com",
+				}),
 			},
-			body: JSON.stringify({
-				ResponseType: "token",
-				GrantType: "refresh_token",
-				RefreshToken: refreshToken,
-				RedirectURI: "https://protonmail.com",
-			}),
-		});
+			"json",
+		);
 
 		const json = (await response.json()) as ApiResponse & {
 			AccessToken?: string;
@@ -724,20 +729,24 @@ export class ProtonAuth {
 			parentSession.keyPassword,
 		);
 
-		const response = await fetch(`${API_BASE_URL}/auth/v4/sessions/forks`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"x-pm-appversion": APP_VERSION,
-				"x-pm-uid": parentSession.UID,
-				Authorization: `Bearer ${parentSession.AccessToken}`,
+		const response = await requestHttp(
+			`${API_BASE_URL}/auth/v4/sessions/forks`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"x-pm-appversion": APP_VERSION,
+					"x-pm-uid": parentSession.UID,
+					Authorization: `Bearer ${parentSession.AccessToken}`,
+				},
+				body: JSON.stringify({
+					Payload: encryptedPayload,
+					ChildClientID: CHILD_CLIENT_ID,
+					Independent: 0, // Dependent child session (matches macOS client)
+				}),
 			},
-			body: JSON.stringify({
-				Payload: encryptedPayload,
-				ChildClientID: CHILD_CLIENT_ID,
-				Independent: 0, // Dependent child session (matches macOS client)
-			}),
-		});
+			"json",
+		);
 
 		const json = (await response.json()) as ApiResponse & PushForkResponse;
 
@@ -766,14 +775,18 @@ export class ProtonAuth {
 		UserID: string;
 		keyPassword: string;
 	}> {
-		const response = await fetch(`${API_BASE_URL}/auth/v4/sessions/forks/${selector}`, {
-			method: "GET",
-			headers: {
-				"x-pm-appversion": APP_VERSION,
-				"x-pm-uid": parentSession.UID,
-				Authorization: `Bearer ${parentSession.AccessToken}`,
+		const response = await requestHttp(
+			`${API_BASE_URL}/auth/v4/sessions/forks/${selector}`,
+			{
+				method: "GET",
+				headers: {
+					"x-pm-appversion": APP_VERSION,
+					"x-pm-uid": parentSession.UID,
+					Authorization: `Bearer ${parentSession.AccessToken}`,
+				},
 			},
-		});
+			"json",
+		);
 
 		const json = (await response.json()) as ApiResponse & PullForkResponse;
 
@@ -899,10 +912,14 @@ export class ProtonAuth {
 		}
 
 		try {
-			await fetch(`${API_BASE_URL}/core/v4/auth`, {
-				method: "DELETE",
-				headers: createHeaders(this.session),
-			});
+			await requestHttp(
+				`${API_BASE_URL}/core/v4/auth`,
+				{
+					method: "DELETE",
+					headers: createHeaders(this.session),
+				},
+				"json",
+			);
 		} catch {
 			// Ignore logout errors
 		}

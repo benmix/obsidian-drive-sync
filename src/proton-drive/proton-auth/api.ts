@@ -1,5 +1,6 @@
 import type { Session, ApiResponse, ApiError } from "./types";
 import { API_BASE_URL, APP_VERSION } from "./types";
+import { requestHttp } from "./http";
 
 // ============================================================================
 // HTTP Client
@@ -40,7 +41,15 @@ export async function apiRequest<T extends ApiResponse>(
 		options.body = JSON.stringify(data);
 	}
 
-	const response = await fetch(url, options);
+	const response = await requestHttp(
+		url,
+		{
+			method,
+			headers: options.headers,
+			body: options.body ?? undefined,
+		},
+		"json",
+	);
 	const json = (await response.json()) as T;
 
 	if (!response.ok || json.Code !== 1000) {
