@@ -3,13 +3,7 @@ import { PluginSettingTab, Setting } from "obsidian";
 import ProtonDriveSyncPlugin from "./main";
 import { ProtonDriveRemoteRootModal } from "./ui/remote-root-modal";
 import { ProtonDriveLoginModal } from "./ui/login-modal";
-import {
-	compileExcludeRules,
-	isExcluded,
-	previewExcludedPaths,
-	validateExcludePatterns,
-} from "./sync/exclude";
-import { normalizePath } from "./sync/utils";
+import { getBuiltInExcludePatterns } from "./sync/exclude";
 import type { ReusableCredentials } from "./proton-drive/proton-auth/types";
 import { ProtonDriveRemoteFs } from "./sync/remote-fs";
 import type { ProtonSession } from "./proton-drive/sdk-session";
@@ -20,7 +14,6 @@ export interface ProtonDriveSettings {
 	protonSession?: ReusableCredentials;
 	accountEmail: string;
 	hasAuthSession: boolean;
-	excludePatterns: string;
 	conflictStrategy: "local-wins" | "remote-wins" | "manual";
 	autoSyncEnabled: boolean;
 }
@@ -31,7 +24,6 @@ export const DEFAULT_SETTINGS: ProtonDriveSettings = {
 	protonSession: undefined,
 	accountEmail: "",
 	hasAuthSession: false,
-	excludePatterns: "",
 	conflictStrategy: "local-wins",
 	autoSyncEnabled: false,
 };
@@ -106,81 +98,14 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 		});
 		void this.autoValidateRemoteFolder(remoteValidationStatus);
 
+		const builtInExcludePatterns = getBuiltInExcludePatterns();
 		new Setting(containerEl)
-			.setName("Exclude paths")
+			.setName("Excluded paths")
 			.setDesc(
-				"One pattern per line. Supports '*' and '**' wildcards. Exact paths also exclude descendants.",
-			)
-			.addTextArea((text) =>
-				text
-					.setPlaceholder(".obsidian/\n*.tmp\nattachments/private/")
-					.setValue(this.plugin.settings.excludePatterns)
-					.onChange(async (value) => {
-						this.plugin.settings.excludePatterns = value;
-						await this.plugin.saveSettings();
-					}),
+				builtInExcludePatterns.length > 0
+					? `Built-in rules: ${builtInExcludePatterns.join(", ")}`
+					: "No built-in exclude rules.",
 			);
-		const excludeValidation = validateExcludePatterns(this.plugin.settings.excludePatterns);
-		if (excludeValidation.invalid.length > 0) {
-			const invalidSetting = new Setting(containerEl)
-				.setName("Exclude pattern errors")
-				.setDesc("Fix these patterns to avoid unexpected sync behavior.");
-			const list = invalidSetting.descEl.createEl("ul");
-			for (const item of excludeValidation.invalid) {
-				list.createEl("li", { text: item });
-			}
-		}
-
-		const previewSetting = new Setting(containerEl)
-			.setName("Exclude preview")
-			.setDesc("Preview which paths are excluded (comma-separated list).");
-		let previewInput = "";
-		let lastPreviewInput = "";
-		const previewOutput = previewSetting.descEl.createDiv({
-			cls: "protondrive-exclude-preview",
-		});
-		previewOutput.setText("No paths to preview.");
-		previewSetting.addText((text) =>
-			text.setPlaceholder("notes/draft.md, .obsidian/config").onChange((value) => {
-				previewInput = value;
-				lastPreviewInput = value;
-				const entries = previewInput
-					.split(",")
-					.map((item) => normalizePath(item.trim()))
-					.filter((item) => item.length > 0);
-				if (entries.length === 0) {
-					previewOutput.setText("No paths to preview.");
-					return;
-				}
-				const rules = compileExcludeRules(this.plugin.settings.excludePatterns);
-				const excluded = previewExcludedPaths(entries, rules);
-				if (excluded.length === 0) {
-					previewOutput.setText("No paths are excluded.");
-					return;
-				}
-				previewOutput.setText(`Excluded: ${excluded.join(", ")}`);
-			}),
-		);
-		const normalizePreviewInput = (input: string): string[] =>
-			input
-				.split(",")
-				.map((item) => normalizePath(item.trim()))
-				.filter((item) => item.length > 0);
-		previewSetting.addButton((button) => {
-			button.setButtonText("Validate");
-			button.onClick(() => {
-				const entries = normalizePreviewInput(previewInput || lastPreviewInput);
-				if (entries.length === 0) {
-					previewOutput.setText("Enter one or more paths to validate.");
-					return;
-				}
-				const rules = compileExcludeRules(this.plugin.settings.excludePatterns);
-				const messages = entries.map((entry) =>
-					isExcluded(entry, rules) ? `${entry} → excluded` : `${entry} → included`,
-				);
-				previewOutput.setText(messages.join(", "));
-			});
-		});
 
 		new Setting(containerEl)
 			.setName("Conflict strategy")

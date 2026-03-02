@@ -53,12 +53,6 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-muted);
 }
 
-.protondrive-exclude-preview {
-	margin-top: 6px;
-	font-size: 12px;
-	color: var(--text-muted);
-}
-
 .protondrive-conflict-row {
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;

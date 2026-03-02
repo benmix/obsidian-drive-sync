@@ -7,11 +7,10 @@ import { reconcileSnapshot } from "./reconciler";
 import { executeJobs, type ExecuteResult } from "./executor";
 import type { StateStore } from "./state-store";
 import { backoffMs, normalizePath, now } from "./utils";
-import { compileExcludeRules, type ExcludeRule } from "./exclude";
+import { getBuiltInExcludeRules, type ExcludeRule } from "./exclude";
 import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../internal-config";
 
 type SyncEngineOptions = {
-	excludePatterns?: string;
 	conflictStrategy?: "local-wins" | "remote-wins" | "manual";
 	onAuthError?: (message: string) => void;
 };
@@ -39,7 +38,7 @@ export class SyncEngine {
 		this.remoteFs = remoteFs;
 		this.stateStore = stateStore;
 		this.options = options;
-		this.excludeRules = compileExcludeRules(options.excludePatterns ?? "");
+		this.excludeRules = getBuiltInExcludeRules();
 		this.index = new SyncIndexStore();
 		this.queue = new SyncJobQueue();
 		this.maxRetryAttempts = INTERNAL_MAX_RETRY_ATTEMPTS;

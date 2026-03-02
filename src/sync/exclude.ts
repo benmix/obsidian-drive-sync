@@ -5,10 +5,16 @@ export type ExcludeRule = {
 	regex: RegExp;
 };
 
-export type ExcludeValidation = {
-	invalid: string[];
-	valid: string[];
-};
+const BUILTIN_EXCLUDE_PATTERNS = [".obsidian/cache/", ".obsidian/workspace*.json"];
+const BUILTIN_EXCLUDE_RULES = compileExcludeRules(BUILTIN_EXCLUDE_PATTERNS.join("\n"));
+
+export function getBuiltInExcludePatterns(): string[] {
+	return [...BUILTIN_EXCLUDE_PATTERNS];
+}
+
+export function getBuiltInExcludeRules(): ExcludeRule[] {
+	return BUILTIN_EXCLUDE_RULES;
+}
 
 export function compileExcludeRules(patterns: string): ExcludeRule[] {
 	const lines = splitPatterns(patterns);
@@ -19,31 +25,6 @@ export function compileExcludeRules(patterns: string): ExcludeRule[] {
 			pattern,
 			regex: toRegExp(pattern),
 		}));
-}
-
-export function validateExcludePatterns(patterns: string): ExcludeValidation {
-	const lines = splitPatterns(patterns);
-	const invalid: string[] = [];
-	const valid: string[] = [];
-	for (const line of lines) {
-		const normalized = normalizePath(line);
-		if (!normalized) {
-			continue;
-		}
-		try {
-			toRegExp(normalized);
-			valid.push(line);
-		} catch {
-			invalid.push(line);
-		}
-	}
-	return { invalid, valid };
-}
-
-export function previewExcludedPaths(paths: string[], rules: ExcludeRule[]): string[] {
-	return paths
-		.map((path) => normalizePath(path))
-		.filter((path) => rules.some((rule) => rule.regex.test(path)));
 }
 
 export function isExcluded(path: string, rules: ExcludeRule[]): boolean {

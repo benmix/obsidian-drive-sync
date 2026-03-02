@@ -11,22 +11,20 @@ export async function syncVaultToProtonDrive(
 	app: App,
 	client: ProtonDriveClient,
 	remoteFolderId: string,
-	options?: { excludePatterns?: string },
 ): Promise<{ uploaded: number }> {
 	const localFs = new ObsidianLocalFs(app);
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
-	return await syncLocalToRemote(localFs, remoteFs, options?.excludePatterns);
+	return await syncLocalToRemote(localFs, remoteFs);
 }
 
 export async function restoreVaultFromProtonDrive(
 	app: App,
 	client: ProtonDriveClient,
 	remoteFolderId: string,
-	options?: { excludePatterns?: string },
 ): Promise<{ downloaded: number }> {
 	const localFs = new ObsidianLocalFs(app);
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
-	return await syncRemoteToLocal(localFs, remoteFs, options?.excludePatterns);
+	return await syncRemoteToLocal(localFs, remoteFs);
 }
 
 export async function planSync(
@@ -34,7 +32,6 @@ export async function planSync(
 	client: ProtonDriveClient,
 	remoteFolderId: string,
 	settings?: {
-		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
 	},
 ): Promise<{ jobsPlanned: number; entries: number }> {
@@ -42,7 +39,6 @@ export async function planSync(
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
 	const stateStore = new PluginDataStateStore();
 	const engine = new SyncEngine(localFs, remoteFs, stateStore, {
-		excludePatterns: settings?.excludePatterns,
 		conflictStrategy: settings?.conflictStrategy,
 	});
 	await engine.load();
@@ -54,7 +50,6 @@ export async function runPlannedSync(
 	client: ProtonDriveClient,
 	remoteFolderId: string,
 	settings?: {
-		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
 	},
 ): Promise<{ jobsExecuted: number; entriesUpdated: number }> {
@@ -62,7 +57,6 @@ export async function runPlannedSync(
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
 	const stateStore = new PluginDataStateStore();
 	const engine = new SyncEngine(localFs, remoteFs, stateStore, {
-		excludePatterns: settings?.excludePatterns,
 		conflictStrategy: settings?.conflictStrategy,
 	});
 	await engine.load();
@@ -74,7 +68,6 @@ export async function pollRemoteSync(
 	client: ProtonDriveClient,
 	remoteFolderId: string,
 	settings?: {
-		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
 	},
 ): Promise<{ jobsPlanned: number; entries: number }> {
@@ -83,7 +76,6 @@ export async function pollRemoteSync(
 	const state = await stateStore.load();
 	const result = await pollRemoteChanges(remoteFs, state);
 	const engine = new SyncEngine(new ObsidianLocalFs(app), remoteFs, stateStore, {
-		excludePatterns: settings?.excludePatterns,
 		conflictStrategy: settings?.conflictStrategy,
 	});
 	await engine.load();
@@ -101,7 +93,6 @@ export async function estimateSyncPlan(
 	client: ProtonDriveClient,
 	remoteFolderId: string,
 	settings?: {
-		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
 	},
 ): Promise<{
@@ -115,7 +106,6 @@ export async function estimateSyncPlan(
 	const stateStore = new PluginDataStateStore();
 	const originalState = await stateStore.load();
 	const engine = new SyncEngine(localFs, remoteFs, stateStore, {
-		excludePatterns: settings?.excludePatterns,
 		conflictStrategy: settings?.conflictStrategy,
 	});
 	try {

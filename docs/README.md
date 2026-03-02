@@ -10,7 +10,7 @@ Recent updates:
 
 - Remote change cursor/feed support with snapshot fallback.
 - Remote root folder selector UI.
-- Improved exclude patterns (validation + preview).
+- Built-in exclude rules for cache/workspace files.
 - Manual conflict resolution workflow + conflict list in status view.
 - Priority-aware scheduling with differentiated retry backoff + max retries.
 - Diagnostics redaction and in-app log viewer.

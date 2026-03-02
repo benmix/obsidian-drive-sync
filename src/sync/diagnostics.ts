@@ -8,6 +8,7 @@ import {
 	INTERNAL_MAX_RETRY_ATTEMPTS,
 } from "../internal-config";
 import { formatBytes } from "./utils";
+import { getBuiltInExcludePatterns } from "./exclude";
 
 type DiagnosticsReport = {
 	generatedAt: string;
@@ -16,7 +17,7 @@ type DiagnosticsReport = {
 		accountEmail: string;
 		hasSession: boolean;
 		hasAuthSession: boolean;
-		excludePatterns: string;
+		builtInExcludePatterns: string[];
 		conflictStrategy: string;
 		maxConcurrentJobs: number;
 		maxRetryAttempts: number;
@@ -79,7 +80,7 @@ export async function exportDiagnostics(
 			accountEmail: data.settings.accountEmail,
 			hasSession: Boolean(data.settings.protonSession),
 			hasAuthSession: data.settings.hasAuthSession,
-			excludePatterns: data.settings.excludePatterns,
+			builtInExcludePatterns: getBuiltInExcludePatterns(),
 			conflictStrategy: data.settings.conflictStrategy,
 			maxConcurrentJobs: INTERNAL_MAX_CONCURRENT_JOBS,
 			maxRetryAttempts: INTERNAL_MAX_RETRY_ATTEMPTS,

@@ -93,13 +93,11 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					client,
 					plugin.settings.remoteFolderId,
 					{
-						excludePatterns: plugin.settings.excludePatterns,
 						conflictStrategy: plugin.settings.conflictStrategy,
 					},
 				);
 				new ProtonDrivePreSyncModal(plugin.app, estimate, async () => {
 					await planSync(plugin.app, client, plugin.settings.remoteFolderId, {
-						excludePatterns: plugin.settings.excludePatterns,
 						conflictStrategy: plugin.settings.conflictStrategy,
 					});
 					const result = await runPlannedSync(
@@ -107,7 +105,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 						client,
 						plugin.settings.remoteFolderId,
 						{
-							excludePatterns: plugin.settings.excludePatterns,
 							conflictStrategy: plugin.settings.conflictStrategy,
 						},
 					);
@@ -244,7 +241,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 
 			try {
 				const result = await planSync(plugin.app, client, plugin.settings.remoteFolderId, {
-					excludePatterns: plugin.settings.excludePatterns,
 					conflictStrategy: plugin.settings.conflictStrategy,
 				});
 				new Notice(`Planned ${result.jobsPlanned} jobs across ${result.entries} entries.`);
@@ -285,7 +281,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					client,
 					plugin.settings.remoteFolderId,
 					{
-						excludePatterns: plugin.settings.excludePatterns,
 						conflictStrategy: plugin.settings.conflictStrategy,
 					},
 				);
@@ -327,7 +322,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					client,
 					plugin.settings.remoteFolderId,
 					{
-						excludePatterns: plugin.settings.excludePatterns,
 						conflictStrategy: plugin.settings.conflictStrategy,
 					},
 				);
@@ -388,7 +382,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					plugin.app,
 					client,
 					plugin.settings.remoteFolderId,
-					{ excludePatterns: plugin.settings.excludePatterns },
 				);
 				new Notice(`Uploaded ${result.uploaded} files to Proton Drive.`);
 			} catch (error) {
@@ -427,7 +420,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					plugin.app,
 					client,
 					plugin.settings.remoteFolderId,
-					{ excludePatterns: plugin.settings.excludePatterns },
 				);
 				new Notice(`Downloaded ${result.downloaded} files from Proton Drive.`);
 			} catch (error) {
@@ -492,7 +484,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				const remoteFs = new ProtonDriveRemoteFs(client, plugin.settings.remoteFolderId);
 				const stateStore = new PluginDataStateStore();
 				const engine = new SyncEngine(localFs, remoteFs, stateStore, {
-					excludePatterns: plugin.settings.excludePatterns,
 					conflictStrategy: plugin.settings.conflictStrategy,
 				});
 				await engine.load();

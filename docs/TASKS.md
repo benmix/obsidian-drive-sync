@@ -66,7 +66,7 @@
 - [x] Expand manual conflict resolution UI (keep local/remote, resume).
 - [x] Add pre-sync checks (job counts, size estimates, confirm/abort).
 - [x] Improve sync visibility (queue details, in-flight job, retry schedule).
-- [x] Validate settings inputs (remote folder selection, exclude preview).
+- [x] Validate settings inputs (remote folder selection).
 
 ## Observability
 

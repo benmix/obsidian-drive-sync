@@ -37,7 +37,17 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 
 	async onload() {
 		const data = await loadPluginData(this);
-		this.settings = { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) };
+		const loaded = data.settings;
+		this.settings = {
+			...DEFAULT_SETTINGS,
+			remoteFolderId: loaded.remoteFolderId,
+			remoteFolderPath: loaded.remoteFolderPath,
+			protonSession: loaded.protonSession,
+			accountEmail: loaded.accountEmail,
+			hasAuthSession: loaded.hasAuthSession,
+			conflictStrategy: loaded.conflictStrategy,
+			autoSyncEnabled: loaded.autoSyncEnabled,
+		};
 		await this.restoreSession();
 
 		this.addSettingTab(new ProtonDriveSettingTab(this.app, this));
@@ -51,7 +61,15 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		const data = mergePluginData(await loadPluginData(this));
-		data.settings = { ...this.settings };
+		data.settings = {
+			remoteFolderId: this.settings.remoteFolderId,
+			remoteFolderPath: this.settings.remoteFolderPath,
+			protonSession: this.settings.protonSession,
+			accountEmail: this.settings.accountEmail,
+			hasAuthSession: this.settings.hasAuthSession,
+			conflictStrategy: this.settings.conflictStrategy,
+			autoSyncEnabled: this.settings.autoSyncEnabled,
+		};
 		await savePluginData(this, data);
 	}
 
@@ -235,7 +253,6 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 			const stateStore = new PluginDataStateStore();
 			const state = await stateStore.load();
 			const engine = new SyncEngine(localFs, remoteFs, stateStore, {
-				excludePatterns: this.settings.excludePatterns,
 				conflictStrategy: this.settings.conflictStrategy,
 				onAuthError: (message) => {
 					this.authPaused = true;
