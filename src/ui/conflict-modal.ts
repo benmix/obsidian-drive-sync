@@ -198,7 +198,6 @@ export class ProtonDriveConflictModal extends Modal {
 			const remoteFs = new ProtonDriveRemoteFs(client, data.settings.remoteFolderId);
 			const stateStore = new PluginDataStateStore();
 			const engine = new SyncEngine(localFs, remoteFs, stateStore, {
-				maxConcurrentJobs: data.settings.maxConcurrentJobs,
 				excludePatterns: data.settings.excludePatterns,
 				conflictStrategy: data.settings.conflictStrategy,
 			});

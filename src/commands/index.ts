@@ -95,16 +95,12 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					{
 						excludePatterns: plugin.settings.excludePatterns,
 						conflictStrategy: plugin.settings.conflictStrategy,
-						maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
-						maxRetryAttempts: plugin.settings.maxRetryAttempts,
 					},
 				);
 				new ProtonDrivePreSyncModal(plugin.app, estimate, async () => {
 					await planSync(plugin.app, client, plugin.settings.remoteFolderId, {
 						excludePatterns: plugin.settings.excludePatterns,
 						conflictStrategy: plugin.settings.conflictStrategy,
-						maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
-						maxRetryAttempts: plugin.settings.maxRetryAttempts,
 					});
 					const result = await runPlannedSync(
 						plugin.app,
@@ -113,8 +109,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 						{
 							excludePatterns: plugin.settings.excludePatterns,
 							conflictStrategy: plugin.settings.conflictStrategy,
-							maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
-							maxRetryAttempts: plugin.settings.maxRetryAttempts,
 						},
 					);
 					new Notice(
@@ -252,8 +246,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				const result = await planSync(plugin.app, client, plugin.settings.remoteFolderId, {
 					excludePatterns: plugin.settings.excludePatterns,
 					conflictStrategy: plugin.settings.conflictStrategy,
-					maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
-					maxRetryAttempts: plugin.settings.maxRetryAttempts,
 				});
 				new Notice(`Planned ${result.jobsPlanned} jobs across ${result.entries} entries.`);
 			} catch (error) {
@@ -295,8 +287,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					{
 						excludePatterns: plugin.settings.excludePatterns,
 						conflictStrategy: plugin.settings.conflictStrategy,
-						maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
-						maxRetryAttempts: plugin.settings.maxRetryAttempts,
 					},
 				);
 				new Notice(`Remote poll queued ${result.jobsPlanned} jobs.`);
@@ -339,8 +329,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 					{
 						excludePatterns: plugin.settings.excludePatterns,
 						conflictStrategy: plugin.settings.conflictStrategy,
-						maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
-						maxRetryAttempts: plugin.settings.maxRetryAttempts,
 					},
 				);
 				new Notice(
@@ -504,10 +492,8 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 				const remoteFs = new ProtonDriveRemoteFs(client, plugin.settings.remoteFolderId);
 				const stateStore = new PluginDataStateStore();
 				const engine = new SyncEngine(localFs, remoteFs, stateStore, {
-					maxConcurrentJobs: plugin.settings.maxConcurrentJobs,
 					excludePatterns: plugin.settings.excludePatterns,
 					conflictStrategy: plugin.settings.conflictStrategy,
-					maxRetryAttempts: plugin.settings.maxRetryAttempts,
 				});
 				await engine.load();
 				await engine.rebuildIndex();

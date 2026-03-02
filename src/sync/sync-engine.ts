@@ -8,14 +8,15 @@ import { executeJobs, type ExecuteResult } from "./executor";
 import type { StateStore } from "./state-store";
 import { backoffMs, normalizePath, now } from "./utils";
 import { compileExcludeRules, type ExcludeRule } from "./exclude";
+import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../internal-config";
 
 type SyncEngineOptions = {
-	maxConcurrentJobs?: number;
 	excludePatterns?: string;
 	conflictStrategy?: "local-wins" | "remote-wins" | "manual";
 	onAuthError?: (message: string) => void;
-	maxRetryAttempts?: number;
 };
+
+const MAX_CONCURRENT_JOBS_CAP = 4;
 
 export class SyncEngine {
 	private localFs: LocalFileSystem;
@@ -41,7 +42,7 @@ export class SyncEngine {
 		this.excludeRules = compileExcludeRules(options.excludePatterns ?? "");
 		this.index = new SyncIndexStore();
 		this.queue = new SyncJobQueue();
-		this.maxRetryAttempts = options.maxRetryAttempts ?? 5;
+		this.maxRetryAttempts = INTERNAL_MAX_RETRY_ATTEMPTS;
 	}
 
 	async load(): Promise<void> {
@@ -109,7 +110,10 @@ export class SyncEngine {
 		let downloadBytes = 0;
 		const retryJobs: SyncJob[] = [];
 
-		const concurrency = Math.max(1, Math.min(this.options.maxConcurrentJobs ?? 2, 4));
+		const concurrency = Math.max(
+			1,
+			Math.min(INTERNAL_MAX_CONCURRENT_JOBS, MAX_CONCURRENT_JOBS_CAP),
+		);
 		const buckets = this.bucketByPath(dueJobs);
 		for (const batch of buckets) {
 			const active = batch.slice(0, concurrency);

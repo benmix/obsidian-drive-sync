@@ -1,6 +1,12 @@
 import type { App, Plugin } from "obsidian";
 import { loadPluginData } from "../data/plugin-data";
 import { PluginDataStateStore } from "./state-store";
+import {
+	INTERNAL_AUTO_SYNC_INTERVAL_MS,
+	INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
+	INTERNAL_MAX_CONCURRENT_JOBS,
+	INTERNAL_MAX_RETRY_ATTEMPTS,
+} from "../internal-config";
 import { formatBytes } from "./utils";
 
 type DiagnosticsReport = {
@@ -75,11 +81,11 @@ export async function exportDiagnostics(
 			hasAuthSession: data.settings.hasAuthSession,
 			excludePatterns: data.settings.excludePatterns,
 			conflictStrategy: data.settings.conflictStrategy,
-			maxConcurrentJobs: data.settings.maxConcurrentJobs,
-			maxRetryAttempts: data.settings.maxRetryAttempts,
+			maxConcurrentJobs: INTERNAL_MAX_CONCURRENT_JOBS,
+			maxRetryAttempts: INTERNAL_MAX_RETRY_ATTEMPTS,
 			autoSyncEnabled: data.settings.autoSyncEnabled,
-			autoSyncIntervalMs: data.settings.autoSyncIntervalMs,
-			localChangeDebounceMs: data.settings.localChangeDebounceMs,
+			autoSyncIntervalMs: INTERNAL_AUTO_SYNC_INTERVAL_MS,
+			localChangeDebounceMs: INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
 		},
 		syncState: {
 			entries: Object.keys(syncState.entries ?? {}).length,

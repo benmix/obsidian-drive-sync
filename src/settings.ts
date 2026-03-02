@@ -22,10 +22,6 @@ export interface ProtonDriveSettings {
 	excludePatterns: string;
 	conflictStrategy: "local-wins" | "remote-wins" | "manual";
 	autoSyncEnabled: boolean;
-	autoSyncIntervalMs: number;
-	localChangeDebounceMs: number;
-	maxConcurrentJobs: number;
-	maxRetryAttempts: number;
 }
 
 export const DEFAULT_SETTINGS: ProtonDriveSettings = {
@@ -36,10 +32,6 @@ export const DEFAULT_SETTINGS: ProtonDriveSettings = {
 	excludePatterns: "",
 	conflictStrategy: "local-wins",
 	autoSyncEnabled: false,
-	autoSyncIntervalMs: 300000,
-	localChangeDebounceMs: 800,
-	maxConcurrentJobs: 2,
-	maxRetryAttempts: 5,
 };
 
 export class ProtonDriveSettingTab extends PluginSettingTab {
@@ -217,77 +209,6 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 					this.plugin.refreshAutoSync();
 				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Max concurrent jobs")
-			.setDesc("Limits parallel sync operations (1-4 recommended).")
-			.addText((text) =>
-				text
-					.setPlaceholder("2")
-					.setValue(String(this.plugin.settings.maxConcurrentJobs))
-					.onChange(async (value) => {
-						const parsed = Number.parseInt(value, 10);
-						if (!Number.isNaN(parsed)) {
-							this.plugin.settings.maxConcurrentJobs = Math.min(
-								4,
-								Math.max(1, parsed),
-							);
-							await this.plugin.saveSettings();
-						}
-					}),
-			);
-		new Setting(containerEl)
-			.setName("Max retry attempts")
-			.setDesc("How many times to retry failed jobs before giving up.")
-			.addText((text) =>
-				text
-					.setPlaceholder("5")
-					.setValue(String(this.plugin.settings.maxRetryAttempts))
-					.onChange(async (value) => {
-						const parsed = Number.parseInt(value, 10);
-						if (!Number.isNaN(parsed)) {
-							this.plugin.settings.maxRetryAttempts = Math.min(
-								10,
-								Math.max(1, parsed),
-							);
-							await this.plugin.saveSettings();
-						}
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Auto sync interval (ms)")
-			.setDesc("How often to poll Proton Drive when auto sync is enabled.")
-			.addText((text) =>
-				text
-					.setPlaceholder("300000")
-					.setValue(String(this.plugin.settings.autoSyncIntervalMs))
-					.onChange(async (value) => {
-						const parsed = Number.parseInt(value, 10);
-						if (!Number.isNaN(parsed)) {
-							this.plugin.settings.autoSyncIntervalMs = Math.max(60000, parsed);
-							await this.plugin.saveSettings();
-							this.plugin.refreshAutoSync();
-						}
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Local change debounce (ms)")
-			.setDesc("Delay before reacting to local file changes.")
-			.addText((text) =>
-				text
-					.setPlaceholder("800")
-					.setValue(String(this.plugin.settings.localChangeDebounceMs))
-					.onChange(async (value) => {
-						const parsed = Number.parseInt(value, 10);
-						if (!Number.isNaN(parsed)) {
-							this.plugin.settings.localChangeDebounceMs = Math.max(100, parsed);
-							await this.plugin.saveSettings();
-							this.plugin.refreshAutoSync();
-						}
-					}),
 			);
 	}
 

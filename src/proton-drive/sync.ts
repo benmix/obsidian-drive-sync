@@ -36,8 +36,6 @@ export async function planSync(
 	settings?: {
 		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
-		maxConcurrentJobs?: number;
-		maxRetryAttempts?: number;
 	},
 ): Promise<{ jobsPlanned: number; entries: number }> {
 	const localFs = new ObsidianLocalFs(app);
@@ -46,8 +44,6 @@ export async function planSync(
 	const engine = new SyncEngine(localFs, remoteFs, stateStore, {
 		excludePatterns: settings?.excludePatterns,
 		conflictStrategy: settings?.conflictStrategy,
-		maxConcurrentJobs: settings?.maxConcurrentJobs,
-		maxRetryAttempts: settings?.maxRetryAttempts,
 	});
 	await engine.load();
 	return await engine.plan();
@@ -60,8 +56,6 @@ export async function runPlannedSync(
 	settings?: {
 		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
-		maxConcurrentJobs?: number;
-		maxRetryAttempts?: number;
 	},
 ): Promise<{ jobsExecuted: number; entriesUpdated: number }> {
 	const localFs = new ObsidianLocalFs(app);
@@ -70,8 +64,6 @@ export async function runPlannedSync(
 	const engine = new SyncEngine(localFs, remoteFs, stateStore, {
 		excludePatterns: settings?.excludePatterns,
 		conflictStrategy: settings?.conflictStrategy,
-		maxConcurrentJobs: settings?.maxConcurrentJobs,
-		maxRetryAttempts: settings?.maxRetryAttempts,
 	});
 	await engine.load();
 	return await engine.runOnce();
@@ -84,8 +76,6 @@ export async function pollRemoteSync(
 	settings?: {
 		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
-		maxConcurrentJobs?: number;
-		maxRetryAttempts?: number;
 	},
 ): Promise<{ jobsPlanned: number; entries: number }> {
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
@@ -95,8 +85,6 @@ export async function pollRemoteSync(
 	const engine = new SyncEngine(new ObsidianLocalFs(app), remoteFs, stateStore, {
 		excludePatterns: settings?.excludePatterns,
 		conflictStrategy: settings?.conflictStrategy,
-		maxConcurrentJobs: settings?.maxConcurrentJobs,
-		maxRetryAttempts: settings?.maxRetryAttempts,
 	});
 	await engine.load();
 	engine.applyEntries(result.snapshot);
@@ -115,8 +103,6 @@ export async function estimateSyncPlan(
 	settings?: {
 		excludePatterns?: string;
 		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
-		maxConcurrentJobs?: number;
-		maxRetryAttempts?: number;
 	},
 ): Promise<{
 	jobsPlanned: number;
@@ -131,8 +117,6 @@ export async function estimateSyncPlan(
 	const engine = new SyncEngine(localFs, remoteFs, stateStore, {
 		excludePatterns: settings?.excludePatterns,
 		conflictStrategy: settings?.conflictStrategy,
-		maxConcurrentJobs: settings?.maxConcurrentJobs,
-		maxRetryAttempts: settings?.maxRetryAttempts,
 	});
 	try {
 		await engine.load();

@@ -12,6 +12,10 @@ import { SyncEngine } from "./sync/sync-engine";
 import { PluginDataStateStore } from "./sync/state-store";
 import { pollRemoteChanges } from "./sync/remote-poller";
 import { now } from "./sync/utils";
+import {
+	INTERNAL_AUTO_SYNC_INTERVAL_MS,
+	INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
+} from "./internal-config";
 
 type AutoSyncTrigger = "manual" | "interval" | "local";
 
@@ -120,13 +124,13 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 			this.app,
 			(change) => this.handleLocalChange(change),
 			this.registerEvent.bind(this),
-			this.settings.localChangeDebounceMs,
+			INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
 		);
 		this.localWatcher.start();
 
 		this.autoSyncIntervalId = window.setInterval(() => {
 			void this.performAutoSync("interval");
-		}, this.settings.autoSyncIntervalMs);
+		}, INTERNAL_AUTO_SYNC_INTERVAL_MS);
 		this.registerInterval(this.autoSyncIntervalId);
 
 		this.scheduleAutoSync(0, "interval");
@@ -152,7 +156,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 
 	private handleLocalChange(change: LocalChange): void {
 		this.localChangeQueue.push(change);
-		this.scheduleAutoSync(Math.max(500, this.settings.localChangeDebounceMs), "local");
+		this.scheduleAutoSync(Math.max(500, INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS), "local");
 	}
 
 	private scheduleAutoSync(delayMs: number, trigger: AutoSyncTrigger): void {
@@ -231,8 +235,6 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 			const stateStore = new PluginDataStateStore();
 			const state = await stateStore.load();
 			const engine = new SyncEngine(localFs, remoteFs, stateStore, {
-				maxConcurrentJobs: this.settings.maxConcurrentJobs,
-				maxRetryAttempts: this.settings.maxRetryAttempts,
 				excludePatterns: this.settings.excludePatterns,
 				conflictStrategy: this.settings.conflictStrategy,
 				onAuthError: (message) => {

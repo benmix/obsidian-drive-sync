@@ -296,7 +296,7 @@ if localChanged && remoteChanged → Conflict
 - 同一路径串行
 - move/delete 优先于 content
 - priority-aware scheduling（高优先级先执行）
-- 并发上限：2–4（配置项）
+- 并发上限：2（内置，不可配置）
 - 所有 job 必须 **幂等**
 - Queue 状态机：pending / processing / blocked
 - retryAt 调度与可视化
@@ -306,7 +306,7 @@ if localChanged && remoteChanged → Conflict
 - 网络 / 5xx：指数退避
 - Auth error：暂停并要求重新登录
 - 按错误类别区分退避（rate/network/404 等）
-- 超过最大重试 → Error 状态（可配置）
+- 超过最大重试（内置 5 次）→ Error 状态
 
 ---
 
@@ -339,7 +339,6 @@ if localChanged && remoteChanged → Conflict
 - Exclude rules（支持 `*`/`**`，包含校验与预览）
 - Conflict strategy
 - Auto sync on/off
-- Max retry attempts
 
 ### 13.2 Status View
 
