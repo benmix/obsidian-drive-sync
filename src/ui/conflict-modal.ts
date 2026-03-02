@@ -157,7 +157,7 @@ export class ProtonDriveConflictModal extends Modal {
 			}
 			const data = await loadPluginData(this.plugin);
 			if (!data.settings.remoteFolderId.trim()) {
-				new Notice("Set a remote folder ID in settings first.");
+				new Notice("Select a remote folder in settings first.");
 				return;
 			}
 			if (!data.settings.protonSession || !data.settings.hasAuthSession) {

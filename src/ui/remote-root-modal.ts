@@ -4,14 +4,21 @@ import type ProtonDriveSyncPlugin from "../main";
 import { ProtonDriveRemoteFs } from "../sync/remote-fs";
 import type { ProtonSession } from "../proton-drive/sdk-session";
 import type { RemoteFileEntry } from "../sync/types";
+import { normalizePath } from "../sync/utils";
 
 export class ProtonDriveRemoteRootModal extends Modal {
 	private plugin: ProtonDriveSyncPlugin;
 	private folders: RemoteFileEntry[] = [];
-	private filter = "";
+	private createPath = "";
+	private selectedFolderId = "";
 	private loading = false;
+	private refreshing = false;
+	private creating = false;
 	private error: string | null = null;
+	private createError: string | null = null;
 	private rootLabel = "My files";
+	private rootFolderId = "";
+	private remoteFs: ProtonDriveRemoteFs | null = null;
 
 	constructor(app: App, plugin: ProtonDriveSyncPlugin) {
 		super(app);
@@ -25,8 +32,14 @@ export class ProtonDriveRemoteRootModal extends Modal {
 
 	private async loadFolders(): Promise<void> {
 		this.loading = true;
+		this.refreshing = false;
+		this.creating = false;
 		this.error = null;
+		this.createError = null;
 		this.folders = [];
+		this.rootFolderId = "";
+		this.remoteFs = null;
+		this.selectedFolderId = this.plugin.settings.remoteFolderId.trim();
 
 		if (!this.plugin.settings.protonSession || !this.plugin.settings.hasAuthSession) {
 			this.error = "Sign in to Proton Drive first.";
@@ -82,19 +95,11 @@ export class ProtonDriveRemoteRootModal extends Modal {
 
 		const rootNode = (rootResult as { value: { uid: string; name: string } }).value;
 		this.rootLabel = rootNode.name || "My files";
-		const remoteFs = new ProtonDriveRemoteFs(client, rootNode.uid);
+		this.rootFolderId = rootNode.uid;
+		this.remoteFs = new ProtonDriveRemoteFs(client, rootNode.uid);
 
 		try {
-			const folders = await remoteFs.listFolders();
-			this.folders = [
-				{
-					id: rootNode.uid,
-					name: rootNode.name,
-					path: "/",
-					type: "folder",
-				},
-				...folders,
-			];
+			await this.refreshFolderList();
 		} catch (loadError) {
 			console.warn("Failed to list Proton Drive folders.", loadError);
 			this.error = "Unable to list Proton Drive folders.";
@@ -120,55 +125,215 @@ export class ProtonDriveRemoteRootModal extends Modal {
 		}
 
 		new Setting(contentEl)
-			.setName("Filter folders")
-			.setDesc("Type to filter folder paths.")
+			.setName("Create folder")
+			.setDesc("Create a folder path under My files and select it.")
 			.addText((text) =>
 				text
-					.setPlaceholder("e.g. notes/")
-					.setValue(this.filter)
+					.setPlaceholder("notes/obsidian/sync")
+					.setValue(this.createPath)
 					.onChange((value) => {
-						this.filter = value.trim();
-						this.render();
+						this.createPath = value;
+						this.createError = null;
 					}),
-			);
+			)
+			.addButton((button) => {
+				button.setButtonText(this.creating ? "Creating..." : "Create and select");
+				button.setDisabled(this.creating || this.refreshing);
+				button.onClick(() => {
+					void this.createAndSelectFolder();
+				});
+			});
+		if (this.createError) {
+			contentEl.createEl("p", {
+				text: this.createError,
+				cls: "protondrive-folder-create-error",
+			});
+		}
 
-		const table = contentEl.createDiv({ cls: "protondrive-folder-list" });
-		const list = this.getFilteredFolders();
+		const list = this.getSelectableFolders();
 		if (list.length === 0) {
-			table.createEl("p", { text: "No folders matched the filter." });
+			contentEl.createEl("p", {
+				text: "No folders available to select.",
+			});
 			return;
 		}
 
-		for (const folder of list) {
-			const row = table.createDiv({ cls: "protondrive-folder-row" });
-			const label = folder.path && folder.path !== "/" ? folder.path : "/";
-			row.createEl("div", {
-				text: `${label} (${this.rootLabel})`.replace(/\(My files\)$/, ""),
-				cls: "protondrive-folder-path",
+		const selected = this.resolveSelectedFolder(list);
+		if (!selected) {
+			contentEl.createEl("p", { text: "No folder available to select." });
+			return;
+		}
+
+		new Setting(contentEl)
+			.setName("Select folder")
+			.setDesc("Choose a folder path from Proton Drive.")
+			.addDropdown((dropdown) => {
+				for (const folder of list) {
+					dropdown.addOption(folder.id, this.toOptionLabel(folder));
+				}
+				dropdown.setValue(selected.id).onChange((value) => {
+					this.selectedFolderId = value;
+				});
+			})
+			.addButton((button) => {
+				button.setButtonText("Select");
+				button.setCta();
+				button.setDisabled(this.refreshing || this.creating);
+				button.onClick(() => {
+					const selectedFolder = list.find(
+						(folder) => folder.id === this.selectedFolderId,
+					);
+					if (!selectedFolder) {
+						new Notice("Select a folder first.");
+						return;
+					}
+					void this.selectFolder(selectedFolder.id, selectedFolder.path ?? "");
+				});
+			})
+			.addButton((button) => {
+				button.setButtonText(this.refreshing ? "Refreshing..." : "Refresh");
+				button.setDisabled(this.refreshing || this.creating);
+				button.onClick(() => {
+					void this.refreshFolders();
+				});
 			});
-			row.createEl("div", {
-				text: folder.id,
-				cls: "protondrive-folder-id",
-			});
-			const action = row.createDiv({ cls: "protondrive-folder-action" });
-			const button = action.createEl("button", { text: "Select" });
-			button.addEventListener("click", async () => {
-				this.plugin.settings.remoteFolderId = folder.id;
-				await this.plugin.saveSettings();
-				new Notice("Remote folder selected.");
-				this.close();
-			});
+	}
+
+	private getSelectableFolders(): RemoteFileEntry[] {
+		return this.folders.filter((folder) => {
+			const path = this.toAbsolutePath(folder.path ?? folder.name);
+			if (path === "/") {
+				return false;
+			}
+			return true;
+		});
+	}
+
+	private async refreshFolderList(): Promise<void> {
+		if (!this.remoteFs || !this.rootFolderId) {
+			this.folders = [];
+			return;
+		}
+		const folders = await this.remoteFs.listFolders();
+		this.folders = [
+			{
+				id: this.rootFolderId,
+				name: this.rootLabel,
+				path: "",
+				type: "folder",
+			},
+			...folders,
+		];
+	}
+
+	private resolveSelectedFolder(list: RemoteFileEntry[]): RemoteFileEntry | null {
+		if (list.length === 0) {
+			return null;
+		}
+		if (this.selectedFolderId) {
+			const selected = list.find((folder) => folder.id === this.selectedFolderId);
+			if (selected) {
+				return selected;
+			}
+		}
+		const configuredId = this.plugin.settings.remoteFolderId.trim();
+		if (configuredId) {
+			const configured = list.find((folder) => folder.id === configuredId);
+			if (configured) {
+				this.selectedFolderId = configured.id;
+				return configured;
+			}
+		}
+		const first = list[0];
+		if (!first) {
+			return null;
+		}
+		this.selectedFolderId = first.id;
+		return first;
+	}
+
+	private async createAndSelectFolder(): Promise<void> {
+		const folderPath = this.normalizeFolderPath(this.createPath.trim());
+		if (!folderPath) {
+			this.createError = "Enter a folder path, for example notes/obsidian/sync.";
+			this.render();
+			return;
+		}
+		if (!this.remoteFs) {
+			this.createError = "Unable to create folder before drive folders are loaded.";
+			this.render();
+			return;
+		}
+
+		this.creating = true;
+		this.createError = null;
+		this.render();
+
+		try {
+			const result = await this.remoteFs.createFolder(folderPath);
+			if (!result.id) {
+				throw new Error("Created folder has no ID.");
+			}
+			await this.selectFolder(result.id, folderPath);
+		} catch (error) {
+			console.warn("Failed to create Proton Drive folder.", error);
+			this.creating = false;
+			this.createError = "Failed to create folder. Check console for details.";
+			this.render();
 		}
 	}
 
-	private getFilteredFolders(): RemoteFileEntry[] {
-		const filter = this.filter.toLowerCase();
-		if (!filter) {
-			return this.folders;
+	private async refreshFolders(): Promise<void> {
+		if (!this.remoteFs) {
+			new Notice("Unable to refresh folders right now.");
+			return;
 		}
-		return this.folders.filter((folder) => {
-			const path = folder.path ?? folder.name;
-			return path.toLowerCase().includes(filter);
-		});
+
+		this.refreshing = true;
+		this.error = null;
+		this.createError = null;
+		this.render();
+		try {
+			// Rebuild SDK client to avoid stale folder cache in the current session.
+			this.plugin.protonDriveService.disconnect();
+			await this.loadFolders();
+			if (this.error) {
+				new Notice(this.error);
+				return;
+			}
+			new Notice("Folder list refreshed.");
+		} catch (error) {
+			console.warn("Failed to refresh Proton Drive folders.", error);
+			new Notice("Failed to refresh folder list.");
+		} finally {
+			this.refreshing = false;
+			this.render();
+		}
+	}
+
+	private async selectFolder(folderId: string, folderPath: string): Promise<void> {
+		const absolutePath = this.toAbsolutePath(folderPath);
+		this.plugin.settings.remoteFolderId = folderId;
+		this.plugin.settings.remoteFolderPath = absolutePath;
+		await this.plugin.saveSettings();
+		new Notice(`Remote folder selected: ${absolutePath}`);
+		this.close();
+	}
+
+	private toAbsolutePath(path: string): string {
+		const normalized = this.normalizeFolderPath(path);
+		return normalized ? `/${normalized}` : "/";
+	}
+
+	private toOptionLabel(folder: RemoteFileEntry): string {
+		const path = this.toAbsolutePath(folder.path ?? "");
+		if (path === "/") {
+			return "/ (root)";
+		}
+		return path;
+	}
+
+	private normalizeFolderPath(path: string): string {
+		return normalizePath(path).replace(/\/+$/g, "");
 	}
 }

@@ -41,6 +41,18 @@ If your plugin does not need CSS, delete this file.
 	white-space: nowrap;
 }
 
+.protondrive-folder-create-error {
+	margin-top: 6px;
+	font-size: 12px;
+	color: var(--text-error);
+}
+
+.protondrive-remote-validation-status {
+	margin-top: 6px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
 .protondrive-exclude-preview {
 	margin-top: 6px;
 	font-size: 12px;

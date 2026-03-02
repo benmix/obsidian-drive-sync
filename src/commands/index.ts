@@ -68,7 +68,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		name: "Pre-sync check (job counts + size estimate)",
 		callback: async () => {
 			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Set a remote folder ID in settings first.");
+				new Notice("Select a remote folder in settings first.");
 				return;
 			}
 			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
@@ -127,7 +127,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		name: "Validate Proton Drive remote operations",
 		callback: async () => {
 			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Set a remote folder ID in settings first.");
+				new Notice("Select a remote folder in settings first.");
 				return;
 			}
 			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
@@ -223,7 +223,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		name: "Plan Proton Drive sync",
 		callback: async () => {
 			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Set a remote folder ID in settings first.");
+				new Notice("Select a remote folder in settings first.");
 				return;
 			}
 			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
@@ -260,7 +260,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		name: "Poll Proton Drive changes",
 		callback: async () => {
 			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Set a remote folder ID in settings first.");
+				new Notice("Select a remote folder in settings first.");
 				return;
 			}
 			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
@@ -302,7 +302,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		name: "Run planned Proton Drive sync",
 		callback: async () => {
 			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Set a remote folder ID in settings first.");
+				new Notice("Select a remote folder in settings first.");
 				return;
 			}
 			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
@@ -346,7 +346,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		name: "Run auto sync now",
 		callback: async () => {
 			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Set a remote folder ID in settings first.");
+				new Notice("Select a remote folder in settings first.");
 				return;
 			}
 			try {
@@ -364,7 +364,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		name: "Sync vault to Proton Drive",
 		callback: async () => {
 			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Set a remote folder ID in settings first.");
+				new Notice("Select a remote folder in settings first.");
 				return;
 			}
 			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
@@ -403,7 +403,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		name: "Restore vault from Proton Drive",
 		callback: async () => {
 			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Set a remote folder ID in settings first.");
+				new Notice("Select a remote folder in settings first.");
 				return;
 			}
 			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
@@ -468,7 +468,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		name: "Rebuild sync index",
 		callback: async () => {
 			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Set a remote folder ID in settings first.");
+				new Notice("Select a remote folder in settings first.");
 				return;
 			}
 			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {

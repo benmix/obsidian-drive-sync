@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { Notice, PluginSettingTab, Setting } from "obsidian";
+import { PluginSettingTab, Setting } from "obsidian";
 import ProtonDriveSyncPlugin from "./main";
 import { ProtonDriveRemoteRootModal } from "./ui/remote-root-modal";
 import { ProtonDriveLoginModal } from "./ui/login-modal";
@@ -16,6 +16,7 @@ import type { ProtonSession } from "./proton-drive/sdk-session";
 
 export interface ProtonDriveSettings {
 	remoteFolderId: string;
+	remoteFolderPath: string;
 	protonSession?: ReusableCredentials;
 	accountEmail: string;
 	hasAuthSession: boolean;
@@ -26,6 +27,7 @@ export interface ProtonDriveSettings {
 
 export const DEFAULT_SETTINGS: ProtonDriveSettings = {
 	remoteFolderId: "",
+	remoteFolderPath: "",
 	protonSession: undefined,
 	accountEmail: "",
 	hasAuthSession: false,
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS: ProtonDriveSettings = {
 
 export class ProtonDriveSettingTab extends PluginSettingTab {
 	plugin: ProtonDriveSyncPlugin;
+	private remoteValidationSequence = 0;
 
 	constructor(app: App, plugin: ProtonDriveSyncPlugin) {
 		super(app, plugin);
@@ -77,36 +80,31 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 			});
 		}
 
-		new Setting(containerEl)
-			.setName("Remote folder ID")
-			.setDesc("Target Proton Drive folder ID to sync your vault.")
-			.addText((text) =>
-				text
-					.setPlaceholder("folder-id")
-					.setValue(this.plugin.settings.remoteFolderId)
-					.onChange(async (value) => {
-						this.plugin.settings.remoteFolderId = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-		new Setting(containerEl)
-			.setName("Validate remote folder")
-			.setDesc("Verify the selected folder ID exists and is accessible.")
-			.addButton((button) => {
-				button.setButtonText("Validate");
-				button.onClick(() => {
-					void this.validateRemoteFolder();
-				});
-			});
-		new Setting(containerEl)
-			.setName("Browse remote folders")
-			.setDesc("Select a folder from Proton Drive instead of pasting an ID.")
+		const remoteFolderPath = this.plugin.settings.remoteFolderPath.trim();
+		const remoteFolderId = this.plugin.settings.remoteFolderId.trim();
+		const remotePathLabel = remoteFolderPath
+			? remoteFolderPath
+			: remoteFolderId
+				? "(legacy ID configured, reselect to show path)"
+				: "(not selected)";
+		const remoteFolderSetting = new Setting(containerEl)
+			.setName("Remote folder")
+			.setDesc("Choose the target Proton Drive folder path. Validation runs automatically.")
+			.addText((text) => text.setValue(remotePathLabel).setDisabled(true))
 			.addButton((button) => {
 				button.setButtonText("Choose folder");
 				button.onClick(() => {
-					new ProtonDriveRemoteRootModal(this.app, this.plugin).open();
+					const modal = new ProtonDriveRemoteRootModal(this.app, this.plugin);
+					modal.onClose = () => {
+						this.display();
+					};
+					modal.open();
 				});
 			});
+		const remoteValidationStatus = remoteFolderSetting.descEl.createDiv({
+			cls: "protondrive-remote-validation-status",
+		});
+		void this.autoValidateRemoteFolder(remoteValidationStatus);
 
 		new Setting(containerEl)
 			.setName("Exclude paths")
@@ -233,20 +231,30 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 		return "Sign in here to store a session locally.";
 	}
 
-	private async validateRemoteFolder(): Promise<void> {
-		if (!this.plugin.settings.remoteFolderId.trim()) {
-			new Notice("Select a remote folder first.");
+	private async autoValidateRemoteFolder(statusEl: HTMLDivElement): Promise<void> {
+		const requestId = ++this.remoteValidationSequence;
+		statusEl.setText("Validation: checking...");
+		const result = await this.validateRemoteFolder();
+		if (requestId !== this.remoteValidationSequence || !statusEl.isConnected) {
 			return;
 		}
+		statusEl.setText(`Validation: ${result.message}`);
+	}
+
+	private async validateRemoteFolder(): Promise<{
+		ok: boolean;
+		message: string;
+	}> {
+		if (!this.plugin.settings.remoteFolderId.trim()) {
+			return { ok: false, message: "Select a folder first." };
+		}
 		if (!this.plugin.settings.protonSession || !this.plugin.settings.hasAuthSession) {
-			new Notice("Sign in to Proton Drive first.");
-			return;
+			return { ok: false, message: "Sign in to Proton Drive first." };
 		}
 
 		const session = this.plugin.authService.getSession();
 		if (!session) {
-			new Notice("Sign in to Proton Drive first.");
-			return;
+			return { ok: false, message: "Sign in to Proton Drive first." };
 		}
 		const activeSession: ProtonSession = { ...session };
 		activeSession.onTokenRefresh = async () => {
@@ -268,25 +276,22 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 		};
 		const client = await this.plugin.protonDriveService.connect(activeSession);
 		if (!client) {
-			new Notice("Unable to connect to Proton Drive.");
-			return;
+			return { ok: false, message: "Unable to connect to Proton Drive." };
 		}
 
 		try {
 			const remoteFs = new ProtonDriveRemoteFs(client, this.plugin.settings.remoteFolderId);
 			const node = await remoteFs.getNode?.(this.plugin.settings.remoteFolderId);
 			if (!node) {
-				new Notice("Remote folder not found.");
-				return;
+				return { ok: false, message: "Folder not found." };
 			}
 			if (node.type !== "folder") {
-				new Notice("Remote ID is not a folder.");
-				return;
+				return { ok: false, message: "Selected node is not a folder." };
 			}
-			new Notice("Remote folder validated.");
+			return { ok: true, message: "OK" };
 		} catch (error) {
 			console.warn("Remote folder validation failed.", error);
-			new Notice("Failed to validate remote folder.");
+			return { ok: false, message: "Failed to validate folder." };
 		}
 	}
 }
