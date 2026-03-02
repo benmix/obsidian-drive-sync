@@ -156,10 +156,6 @@ export class ProtonDriveConflictModal extends Modal {
 				return;
 			}
 			const data = await loadPluginData(this.plugin);
-			if (!data.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
 			if (!data.settings.remoteFolderId.trim()) {
 				new Notice("Set a remote folder ID in settings first.");
 				return;

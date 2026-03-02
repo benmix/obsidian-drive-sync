@@ -175,9 +175,6 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 	}
 
 	private async performAutoSync(trigger: AutoSyncTrigger, force = false): Promise<void> {
-		if (!this.settings.enableProtonDrive) {
-			return;
-		}
 		if (!this.settings.remoteFolderId.trim()) {
 			return;
 		}

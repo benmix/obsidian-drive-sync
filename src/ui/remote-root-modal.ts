@@ -28,12 +28,6 @@ export class ProtonDriveRemoteRootModal extends Modal {
 		this.error = null;
 		this.folders = [];
 
-		if (!this.plugin.settings.enableProtonDrive) {
-			this.error = "Enable Proton Drive integration in settings first.";
-			this.loading = false;
-			return;
-		}
-
 		if (!this.plugin.settings.protonSession || !this.plugin.settings.hasAuthSession) {
 			this.error = "Sign in to Proton Drive first.";
 			this.loading = false;

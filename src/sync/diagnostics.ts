@@ -6,7 +6,6 @@ import { formatBytes } from "./utils";
 type DiagnosticsReport = {
 	generatedAt: string;
 	settings: {
-		enableProtonDrive: boolean;
 		remoteFolderId: string;
 		accountEmail: string;
 		hasSession: boolean;
@@ -70,7 +69,6 @@ export async function exportDiagnostics(
 	const report: DiagnosticsReport = {
 		generatedAt: new Date().toISOString(),
 		settings: {
-			enableProtonDrive: data.settings.enableProtonDrive,
 			remoteFolderId: redactRemoteFolderId(data.settings.remoteFolderId),
 			accountEmail: data.settings.accountEmail,
 			hasSession: Boolean(data.settings.protonSession),

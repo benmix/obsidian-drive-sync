@@ -33,6 +33,7 @@ Recent updates:
 
 ```bash
 pnpm install
+pnpm run link:obsidian -- --vault "/path/to/YourVault"
 pnpm run dev
 ```
 
@@ -40,6 +41,15 @@ Production build:
 
 ```bash
 pnpm run build
+```
+
+`pnpm run build` now outputs `dist/main.js` and copies `manifest.json` + `styles.css` into `dist/`.
+
+You can also set `OBSIDIAN_VAULT_PATH` once and reuse it:
+
+```bash
+export OBSIDIAN_VAULT_PATH="/path/to/YourVault"
+pnpm run link:obsidian
 ```
 
 Manual install for testing:

@@ -15,7 +15,6 @@ import { ProtonDriveRemoteFs } from "./sync/remote-fs";
 import type { ProtonSession } from "./proton-drive/sdk-session";
 
 export interface ProtonDriveSettings {
-	enableProtonDrive: boolean;
 	remoteFolderId: string;
 	protonSession?: ReusableCredentials;
 	accountEmail: string;
@@ -30,7 +29,6 @@ export interface ProtonDriveSettings {
 }
 
 export const DEFAULT_SETTINGS: ProtonDriveSettings = {
-	enableProtonDrive: false,
 	remoteFolderId: "",
 	protonSession: undefined,
 	accountEmail: "",
@@ -56,16 +54,6 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 
 		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName("Enable Proton Drive integration")
-			.setDesc("Connect to Proton Drive only when you run a command.")
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.enableProtonDrive).onChange(async (value) => {
-					this.plugin.settings.enableProtonDrive = value;
-					await this.plugin.saveSettings();
-				}),
-			);
 
 		const accountSetting = new Setting(containerEl)
 			.setName("Proton Drive account")
@@ -325,10 +313,6 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 	}
 
 	private async validateRemoteFolder(): Promise<void> {
-		if (!this.plugin.settings.enableProtonDrive) {
-			new Notice("Enable Proton Drive integration in settings first.");
-			return;
-		}
 		if (!this.plugin.settings.remoteFolderId.trim()) {
 			new Notice("Select a remote folder first.");
 			return;

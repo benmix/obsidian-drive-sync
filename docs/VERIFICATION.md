@@ -11,7 +11,7 @@
 
 ## Remote operations (CRUD) and UID stability
 
-1. Ensure **Enable Proton Drive integration** is on and a **Remote folder ID** is set.
+1. Ensure a **Remote folder ID** is set.
 2. Run **Validate Proton Drive remote operations**.
 3. Confirm a success notice appears.
 4. If validation fails, open the dev console to review the failed step.

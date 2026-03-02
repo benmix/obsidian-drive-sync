@@ -67,10 +67,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-pre-sync-check",
 		name: "Pre-sync check (job counts + size estimate)",
 		callback: async () => {
-			if (!plugin.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
 			if (!plugin.settings.remoteFolderId.trim()) {
 				new Notice("Set a remote folder ID in settings first.");
 				return;
@@ -136,10 +132,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-validate-remote-ops",
 		name: "Validate Proton Drive remote operations",
 		callback: async () => {
-			if (!plugin.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
 			if (!plugin.settings.remoteFolderId.trim()) {
 				new Notice("Set a remote folder ID in settings first.");
 				return;
@@ -182,11 +174,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-connect",
 		name: "Connect to Proton Drive",
 		callback: async () => {
-			if (!plugin.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
-
 			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
 				new Notice("Sign in to Proton Drive first.");
 				return;
@@ -241,11 +228,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-plan-sync",
 		name: "Plan Proton Drive sync",
 		callback: async () => {
-			if (!plugin.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
-
 			if (!plugin.settings.remoteFolderId.trim()) {
 				new Notice("Set a remote folder ID in settings first.");
 				return;
@@ -285,11 +267,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-poll-remote",
 		name: "Poll Proton Drive changes",
 		callback: async () => {
-			if (!plugin.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
-
 			if (!plugin.settings.remoteFolderId.trim()) {
 				new Notice("Set a remote folder ID in settings first.");
 				return;
@@ -334,11 +311,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-run-planned-sync",
 		name: "Run planned Proton Drive sync",
 		callback: async () => {
-			if (!plugin.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
-
 			if (!plugin.settings.remoteFolderId.trim()) {
 				new Notice("Set a remote folder ID in settings first.");
 				return;
@@ -385,10 +357,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-auto-sync-now",
 		name: "Run auto sync now",
 		callback: async () => {
-			if (!plugin.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
 			if (!plugin.settings.remoteFolderId.trim()) {
 				new Notice("Set a remote folder ID in settings first.");
 				return;
@@ -407,11 +375,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-sync-vault",
 		name: "Sync vault to Proton Drive",
 		callback: async () => {
-			if (!plugin.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
-
 			if (!plugin.settings.remoteFolderId.trim()) {
 				new Notice("Set a remote folder ID in settings first.");
 				return;
@@ -451,11 +414,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-restore-vault",
 		name: "Restore vault from Proton Drive",
 		callback: async () => {
-			if (!plugin.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
-
 			if (!plugin.settings.remoteFolderId.trim()) {
 				new Notice("Set a remote folder ID in settings first.");
 				return;
@@ -521,11 +479,6 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-rebuild-index",
 		name: "Rebuild sync index",
 		callback: async () => {
-			if (!plugin.settings.enableProtonDrive) {
-				new Notice("Enable Proton Drive integration in settings first.");
-				return;
-			}
-
 			if (!plugin.settings.remoteFolderId.trim()) {
 				new Notice("Set a remote folder ID in settings first.");
 				return;
