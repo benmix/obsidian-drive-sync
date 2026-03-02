@@ -85,6 +85,7 @@ export class ProtonDriveLoginModal extends Modal {
 					this.plugin.settings.accountEmail = result.userEmail ?? username.trim();
 					this.plugin.settings.hasAuthSession = true;
 					await this.plugin.saveSettings();
+					this.plugin.handleAuthRecovered();
 
 					new Notice("Signed in to Proton Drive.");
 					this.close();

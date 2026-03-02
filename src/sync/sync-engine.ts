@@ -115,31 +115,30 @@ export class SyncEngine {
 		);
 		const buckets = this.bucketByPath(dueJobs);
 		for (const batch of buckets) {
-			const active = batch.slice(0, concurrency);
-			const results = await Promise.all(active.map((job) => this.executeJob(job, retryJobs)));
-			for (const result of results) {
-				if (!result) {
-					continue;
+			const grouped: SyncJob[][] = [];
+			for (let index = 0; index < batch.length; index += concurrency) {
+				grouped.push(batch.slice(index, index + concurrency));
+			}
+			for (const group of grouped) {
+				const results = await Promise.all(
+					group.map((job) => this.executeJob(job, retryJobs)),
+				);
+				for (const result of results) {
+					if (!result) {
+						continue;
+					}
+					entries.push(...result.entries);
+					jobsExecuted += result.jobsExecuted;
+					uploadBytes += result.uploadBytes;
+					downloadBytes += result.downloadBytes;
 				}
-				entries.push(...result.entries);
-				jobsExecuted += result.jobsExecuted;
-				uploadBytes += result.uploadBytes;
-				downloadBytes += result.downloadBytes;
+				if (this.authPaused) {
+					this.index.addLog("Authentication required. Sync paused.", "auth");
+					break;
+				}
 			}
 			if (this.authPaused) {
-				this.index.addLog("Authentication required. Sync paused.", "auth");
 				break;
-			}
-			for (const job of batch.slice(concurrency)) {
-				retryJobs.push({
-					...job,
-					attempt: job.attempt + 1,
-					nextRunAt: now() + backoffMs(job.attempt + 1),
-					reason: "path-queue",
-					status: "pending",
-					lockedAt: undefined,
-					lastError: undefined,
-				});
 			}
 		}
 
@@ -331,6 +330,16 @@ export class SyncEngine {
 				});
 				return null;
 			}
+			if (isPathConflictError(message)) {
+				this.index.addLog(`Job blocked (path conflict): ${job.id}`, "retry");
+				retryJobs.push({
+					...job,
+					status: "blocked",
+					lockedAt: undefined,
+					lastError: message,
+				});
+				return null;
+			}
 			if (job.attempt + 1 >= this.maxRetryAttempts) {
 				this.index.addLog(
 					`Job failed after ${this.maxRetryAttempts} attempts: ${job.id}`,
@@ -366,6 +375,15 @@ export class SyncEngine {
 				return {
 					...job,
 					status: "pending",
+					lockedAt: undefined,
+					nextRunAt: Math.min(job.nextRunAt, nowTs),
+				};
+			}
+			if (job.status === "blocked" && shouldRetryBlockedJob(job.lastError)) {
+				return {
+					...job,
+					status: "pending",
+					attempt: 0,
 					lockedAt: undefined,
 					nextRunAt: Math.min(job.nextRunAt, nowTs),
 				};
@@ -457,6 +475,15 @@ function isNotFoundError(message: string): boolean {
 	return normalized.includes("not found") || normalized.includes("404");
 }
 
+function isPathConflictError(message: string): boolean {
+	const normalized = message.toLowerCase();
+	return (
+		normalized.includes("already exists") ||
+		normalized.includes("file or folder with that name already exists") ||
+		normalized.includes("remote path conflict")
+	);
+}
+
 function backoffForError(message: string, attempt: number): number {
 	const normalized = message.toLowerCase();
 	if (isNotFoundError(normalized)) {
@@ -479,4 +506,15 @@ function backoffForError(message: string, attempt: number): number {
 		return backoffMs(attempt);
 	}
 	return Math.min(5000 * attempt, 60000);
+}
+
+function shouldRetryBlockedJob(lastError?: string): boolean {
+	if (!lastError) {
+		return false;
+	}
+	const normalized = lastError.toLowerCase();
+	return (
+		normalized.includes("session key is missing openpgp metadata") ||
+		normalized.includes("missing block file")
+	);
 }

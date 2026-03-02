@@ -83,6 +83,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 		try {
 			await this.authService.restore(credentials);
 			this.settings.hasAuthSession = true;
+			this.handleAuthRecovered(false);
 		} catch (error) {
 			const message =
 				error instanceof Error ? error.message : "Failed to restore Proton session.";
@@ -129,7 +130,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 	}
 
 	async runAutoSync(force = false): Promise<void> {
-		await this.performAutoSync("manual", force || this.autoSyncPaused);
+		await this.performAutoSync("manual", force || this.autoSyncPaused || this.authPaused);
 	}
 
 	isSyncRunning(): boolean {
@@ -232,6 +233,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 					this.settings.protonSession = this.authService.getReusableCredentials();
 					this.settings.hasAuthSession = true;
 					await this.saveSettings();
+					this.handleAuthRecovered(false);
 				} catch (refreshError) {
 					console.warn("Failed to refresh Proton session.", refreshError);
 					this.settings.hasAuthSession = false;
@@ -247,6 +249,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 			if (!client) {
 				throw new Error("Unable to connect to Proton Drive.");
 			}
+			this.handleAuthRecovered(false);
 
 			const localFs = new ObsidianLocalFs(this.app);
 			const remoteFs = new ProtonDriveRemoteFs(client, this.settings.remoteFolderId);
@@ -333,5 +336,13 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 			lastError: message,
 			lastErrorAt: now(),
 		});
+	}
+
+	handleAuthRecovered(scheduleSync = true): void {
+		this.authPaused = false;
+		this.lastAuthError = undefined;
+		if (scheduleSync && this.settings.autoSyncEnabled && !this.autoSyncPaused) {
+			this.scheduleAutoSync(0, "manual");
+		}
 	}
 }

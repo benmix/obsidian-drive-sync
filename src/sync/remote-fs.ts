@@ -219,38 +219,59 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 		data: Uint8Array,
 		metadata?: { mtimeMs?: number; size?: number },
 	): Promise<{ id?: string; revisionId?: string }> {
-		if (!this.client.getFileUploader || !this.client.getFileRevisionUploader) {
+		const getFileUploader = this.client.getFileUploader?.bind(this.client);
+		const getFileRevisionUploader = this.client.getFileRevisionUploader?.bind(this.client);
+		if (!getFileUploader || !getFileRevisionUploader) {
 			throw new Error("Proton Drive SDK does not expose upload methods.");
 		}
 		const normalized = normalizePath(path);
 		const parentPath = dirname(normalized);
 		const name = basename(normalized);
 		const parentId = await this.ensureRemoteFolder(parentPath);
-		const existing = await this.findChildByName(parentId, name, "file");
+		const existingFile = await this.findChildByName(parentId, name, "file");
+		const existingFolder = await this.findChildByName(parentId, name, "folder");
 
 		const uploadMetadata = {
 			mediaType: "application/octet-stream",
 			expectedSize: metadata?.size ?? data.byteLength,
 			modificationTime: metadata?.mtimeMs ? new Date(metadata.mtimeMs) : undefined,
 		};
-
-		if (existing?.id) {
-			const uploader = await this.client.getFileRevisionUploader(existing.id, uploadMetadata);
-			const stream = new Blob([data.slice().buffer], {
-				type: "application/octet-stream",
-			}).stream();
-			const controller = await uploader.uploadFromStream(stream, []);
+		const blob = new Blob([data.slice().buffer], {
+			type: "application/octet-stream",
+		});
+		const uploadRevision = async (fileId: string) => {
+			const uploader = await getFileRevisionUploader(fileId, uploadMetadata);
+			const controller = await uploader.uploadFromStream(blob.stream(), []);
 			const result = await controller.completion();
 			return { id: result.nodeUid, revisionId: result.nodeRevisionUid };
+		};
+		const uploadNewFile = async () => {
+			const uploader = await getFileUploader(parentId, name, uploadMetadata);
+			const controller = await uploader.uploadFromStream(blob.stream(), []);
+			const result = await controller.completion();
+			return { id: result.nodeUid, revisionId: result.nodeRevisionUid };
+		};
+
+		if (existingFolder?.id && !existingFile?.id) {
+			throw new Error(`Remote path conflict: folder exists at ${normalized}`);
+		}
+		if (existingFile?.id) {
+			return uploadRevision(existingFile.id);
 		}
 
-		const uploader = await this.client.getFileUploader(parentId, name, uploadMetadata);
-		const stream = new Blob([data.slice().buffer], {
-			type: "application/octet-stream",
-		}).stream();
-		const controller = await uploader.uploadFromStream(stream, []);
-		const result = await controller.completion();
-		return { id: result.nodeUid, revisionId: result.nodeRevisionUid };
+		try {
+			return await uploadNewFile();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			if (!isAlreadyExistsError(message)) {
+				throw error;
+			}
+			const latestFile = await this.findChildByName(parentId, name, "file");
+			if (!latestFile?.id) {
+				throw error;
+			}
+			return uploadRevision(latestFile.id);
+		}
 	}
 
 	async downloadFile(id: string): Promise<Uint8Array> {
@@ -418,4 +439,12 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 			eventId: typeof record.eventId === "string" ? record.eventId : undefined,
 		};
 	}
+}
+
+function isAlreadyExistsError(message: string): boolean {
+	const normalized = message.toLowerCase();
+	return (
+		normalized.includes("already exists") ||
+		normalized.includes("file or folder with that name already exists")
+	);
 }

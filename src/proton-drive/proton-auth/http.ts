@@ -10,6 +10,11 @@ type HttpOptions = {
 	signal?: AbortSignal;
 };
 
+type PreparedBody = {
+	body?: string | ArrayBuffer;
+	contentType?: string;
+};
+
 function normalizeHeaders(
 	headers?: Headers | Record<string, string> | [string, string][],
 ): Record<string, string> {
@@ -43,6 +48,34 @@ function buildResponse(
 	return new Response(body, { status, headers: responseHeaders });
 }
 
+function hasContentType(headers: Record<string, string>): boolean {
+	return Object.keys(headers).some((key) => key.toLowerCase() === "content-type");
+}
+
+async function prepareBody(body?: BodyInit | null): Promise<PreparedBody> {
+	if (body === undefined || body === null) {
+		return {};
+	}
+	if (typeof body === "string" || body instanceof ArrayBuffer) {
+		return { body };
+	}
+	if (ArrayBuffer.isView(body)) {
+		return {
+			body: body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
+		};
+	}
+
+	// Obsidian requestUrl only accepts string/ArrayBuffer payloads. For FormData/Blob and
+	// other BodyInit variants, serialize through Request so multipart boundaries are preserved.
+	const request = new Request("https://obsidian.invalid", {
+		method: "POST",
+		body,
+	});
+	const contentType = request.headers.get("content-type") ?? undefined;
+	const arrayBuffer = await request.arrayBuffer();
+	return { body: arrayBuffer, contentType };
+}
+
 export async function requestHttp(
 	url: string,
 	options: HttpOptions,
@@ -52,14 +85,17 @@ export async function requestHttp(
 		throw new Error("requestUrl is not available in this environment.");
 	}
 
+	const headers = normalizeHeaders(options.headers);
+	const prepared = await prepareBody(options.body);
+	if (prepared.contentType && !hasContentType(headers)) {
+		headers["content-type"] = prepared.contentType;
+	}
+
 	const result = await requestUrl({
 		url,
 		method: options.method ?? "GET",
-		headers: normalizeHeaders(options.headers),
-		body:
-			typeof options.body === "string" || options.body instanceof ArrayBuffer
-				? options.body
-				: undefined,
+		headers,
+		body: prepared.body,
 		throw: false,
 	});
 

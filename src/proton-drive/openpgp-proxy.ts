@@ -30,6 +30,11 @@ type EncryptMessageBinaryDetachedResult = {
 };
 
 const sessionKeyStore = new WeakMap<DriveSessionKey, openpgp.SessionKey>();
+const SESSION_KEY_ALGORITHM_FIELD = "__openpgpAlgorithm";
+
+type SessionKeyWithMetadata = DriveSessionKey & {
+	[SESSION_KEY_ALGORITHM_FIELD]?: openpgp.enums.symmetricNames;
+};
 
 export function wrapPublicKey(key: openpgp.PublicKey): DrivePublicKey {
 	const wrapped: DrivePublicKey = { _idx: key };
@@ -66,7 +71,10 @@ function unwrapPublicKeys(keys: DrivePublicKey | DrivePublicKey[]): openpgp.Publ
 }
 
 function wrapSessionKey(key: openpgp.SessionKey): DriveSessionKey {
-	const sessionKey: DriveSessionKey = { data: key.data };
+	const sessionKey: SessionKeyWithMetadata = {
+		data: key.data,
+		[SESSION_KEY_ALGORITHM_FIELD]: key.algorithm,
+	};
 	sessionKeyStore.set(sessionKey, key);
 	return sessionKey;
 }
@@ -74,9 +82,35 @@ function wrapSessionKey(key: openpgp.SessionKey): DriveSessionKey {
 function unwrapSessionKey(key: DriveSessionKey): openpgp.SessionKey {
 	const stored = sessionKeyStore.get(key);
 	if (!stored) {
+		const withMetadata = key as SessionKeyWithMetadata;
+		const algorithm =
+			withMetadata[SESSION_KEY_ALGORITHM_FIELD] ??
+			inferSessionKeyAlgorithm(withMetadata.data);
+		if (withMetadata.data && algorithm) {
+			return {
+				data: withMetadata.data,
+				algorithm,
+			};
+		}
 		throw new Error("Session key is missing OpenPGP metadata.");
 	}
 	return stored;
+}
+
+function inferSessionKeyAlgorithm(data?: Uint8Array): openpgp.enums.symmetricNames | undefined {
+	if (!data) {
+		return undefined;
+	}
+	if (data.byteLength === 16) {
+		return "aes128";
+	}
+	if (data.byteLength === 24) {
+		return "aes192";
+	}
+	if (data.byteLength === 32) {
+		return "aes256";
+	}
+	return undefined;
 }
 
 function toVerificationStatus(verified: boolean | undefined): VerificationStatus {

@@ -53,7 +53,16 @@ export class SyncIndexStore {
 	}
 
 	setEntry(entry: SyncEntry): void {
-		this.state.entries[entry.relPath] = entry;
+		const prior = this.state.entries[entry.relPath];
+		const merged: SyncEntry = {
+			...(prior ?? {}),
+			...entry,
+		};
+		// Treat any non-tombstone write as the path becoming live again.
+		if (entry.tombstone !== true) {
+			merged.tombstone = undefined;
+		}
+		this.state.entries[entry.relPath] = merged;
 	}
 
 	removeEntry(path: string): void {

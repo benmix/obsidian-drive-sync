@@ -135,7 +135,7 @@ export async function reconcileSnapshot(
 
 		if (entry.local && !entry.remote) {
 			jobs.push({
-				id: `upload:${entry.path}:${entry.local.mtimeMs ?? 0}`,
+				id: `upload:${entry.path}`,
 				op: "upload",
 				path: entry.path,
 				entryType: "file",
@@ -202,7 +202,7 @@ export async function reconcileSnapshot(
 						reason: "conflict",
 					});
 					jobs.push({
-						id: `upload:${entry.path}:${entry.local.mtimeMs ?? 0}`,
+						id: `upload:${entry.path}`,
 						op: "upload",
 						path: entry.path,
 						entryType: "file",
@@ -214,7 +214,7 @@ export async function reconcileSnapshot(
 				}
 			} else if (localChanged) {
 				jobs.push({
-					id: `upload:${entry.path}:${entry.local.mtimeMs ?? 0}`,
+					id: `upload:${entry.path}`,
 					op: "upload",
 					path: entry.path,
 					entryType: "file",

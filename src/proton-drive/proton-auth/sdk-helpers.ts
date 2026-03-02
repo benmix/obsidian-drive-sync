@@ -92,10 +92,7 @@ export function createProtonHttpClient(
 	};
 
 	const normalizeBody = (body: BodyInit | undefined): BodyInit | undefined => {
-		if (typeof body === "string" || body instanceof ArrayBuffer || body instanceof Blob) {
-			return body;
-		}
-		return undefined;
+		return body;
 	};
 
 	return {
