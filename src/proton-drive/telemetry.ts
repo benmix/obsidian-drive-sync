@@ -1,4 +1,4 @@
-import type { MetricEvent, Telemetry, Logger } from "@protontech/drive-sdk";
+import type { Logger, MetricEvent, Telemetry } from "@protontech/drive-sdk";
 import { logger } from "./logger";
 
 function sanitizeUrl(url: string): string {

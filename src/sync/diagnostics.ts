@@ -1,6 +1,4 @@
 import type { App, Plugin } from "obsidian";
-import { loadPluginData } from "../data/plugin-data";
-import { PluginDataStateStore } from "./state-store";
 import {
 	INTERNAL_AUTO_SYNC_INTERVAL_MS,
 	INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
@@ -9,6 +7,8 @@ import {
 } from "../internal-config";
 import { formatBytes } from "./utils";
 import { getBuiltInExcludePatterns } from "./exclude";
+import { loadPluginData } from "../data/plugin-data";
+import { PluginDataStateStore } from "./state-store";
 
 type DiagnosticsReport = {
 	generatedAt: string;

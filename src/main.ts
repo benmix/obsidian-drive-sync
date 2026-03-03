@@ -1,21 +1,21 @@
-import { Notice, Plugin } from "obsidian";
-import { registerCommands } from "./commands";
-import { ProtonDriveAuthService } from "./proton-drive/auth";
-import { ProtonDriveService } from "./proton-drive/service";
-import { ProtonDriveSettingTab, type ProtonDriveSettings, DEFAULT_SETTINGS } from "./settings";
-import { loadPluginData, mergePluginData, savePluginData } from "./data/plugin-data";
-import { LocalFsWatcher, type LocalChange } from "./sync/local-watcher";
-import { planLocalChanges } from "./sync/local-change-planner";
-import { ObsidianLocalFs } from "./sync/local-fs";
-import { ProtonDriveRemoteFs } from "./sync/remote-fs";
-import { SyncEngine } from "./sync/sync-engine";
-import { PluginDataStateStore } from "./sync/state-store";
-import { pollRemoteChanges } from "./sync/remote-poller";
-import { now } from "./sync/utils";
+import { DEFAULT_SETTINGS, type ProtonDriveSettings, ProtonDriveSettingTab } from "./settings";
 import {
 	INTERNAL_AUTO_SYNC_INTERVAL_MS,
 	INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
 } from "./internal-config";
+import { loadPluginData, mergePluginData, savePluginData } from "./data/plugin-data";
+import { type LocalChange, LocalFsWatcher } from "./sync/local-watcher";
+import { Notice, Plugin } from "obsidian";
+import { now } from "./sync/utils";
+import { ObsidianLocalFs } from "./sync/local-fs";
+import { planLocalChanges } from "./sync/local-change-planner";
+import { PluginDataStateStore } from "./sync/state-store";
+import { pollRemoteChanges } from "./sync/remote-poller";
+import { ProtonDriveAuthService } from "./proton-drive/auth";
+import { ProtonDriveRemoteFs } from "./sync/remote-fs";
+import { ProtonDriveService } from "./proton-drive/service";
+import { registerCommands } from "./commands";
+import { SyncEngine } from "./sync/sync-engine";
 
 type AutoSyncTrigger = "manual" | "interval" | "local";
 

@@ -1,19 +1,19 @@
 import * as openpgp from "openpgp";
 import type { AuthInfo, Credentials, SrpProofs, SrpResult } from "./types";
-import { SRP_LEN, SRP_MODULUS_KEY } from "./types";
 import {
 	base64Decode,
 	base64Encode,
-	uint8ArrayToBinaryString,
-	expandHash,
-	mergeUint8Arrays,
-	uint8ArrayToBigIntLE,
 	bigIntByteLength,
 	bigIntToUint8ArrayLE,
-	modExp,
-	mod,
+	expandHash,
 	hashPassword,
+	mergeUint8Arrays,
+	mod,
+	modExp,
+	uint8ArrayToBigIntLE,
+	uint8ArrayToBinaryString,
 } from "./crypto-utils";
+import { SRP_LEN, SRP_MODULUS_KEY } from "./types";
 
 // ============================================================================
 // SRP Protocol

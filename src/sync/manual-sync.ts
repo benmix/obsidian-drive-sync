@@ -1,5 +1,5 @@
-import type { LocalFileSystem, RemoteFileSystem } from "./types";
 import { getBuiltInExcludeRules, isExcluded } from "./exclude";
+import type { LocalFileSystem, RemoteFileSystem } from "./types";
 
 export async function syncLocalToRemote(
 	localFs: LocalFileSystem,

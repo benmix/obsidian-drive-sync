@@ -1,14 +1,14 @@
+import { backoffMs, normalizePath, now } from "./utils";
+import { type ExcludeRule, getBuiltInExcludeRules } from "./exclude";
+import { executeJobs, type ExecuteResult } from "./executor";
+import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../internal-config";
 import type { LocalFileSystem, RemoteFileSystem } from "./types";
 import type { SyncEntry, SyncJob } from "../data/sync-schema";
-import { SyncIndexStore } from "./index-store";
-import type { SyncState } from "./index-store";
-import { SyncJobQueue } from "./job-queue";
 import { reconcileSnapshot } from "./reconciler";
-import { executeJobs, type ExecuteResult } from "./executor";
 import type { StateStore } from "./state-store";
-import { backoffMs, normalizePath, now } from "./utils";
-import { getBuiltInExcludeRules, type ExcludeRule } from "./exclude";
-import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../internal-config";
+import { SyncIndexStore } from "./index-store";
+import { SyncJobQueue } from "./job-queue";
+import type { SyncState } from "./index-store";
 
 type SyncEngineOptions = {
 	conflictStrategy?: "local-wins" | "remote-wins" | "manual";

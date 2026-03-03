@@ -1,7 +1,7 @@
+import { buildConflictName, normalizePath, now } from "./utils";
+import type { LocalFileSystem, RemoteFileSystem } from "./types";
 import type { SyncEntry, SyncJob } from "../data/sync-schema";
 import type { SyncState } from "./index-store";
-import type { LocalFileSystem, RemoteFileSystem } from "./types";
-import { buildConflictName, normalizePath, now } from "./utils";
 
 type ConflictStrategy = "local-wins" | "remote-wins" | "manual";
 

@@ -1,10 +1,10 @@
-import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
-import type ProtonDriveSyncPlugin from "../main";
+import type { App } from "obsidian";
+import { normalizePath } from "../sync/utils";
 import { ProtonDriveRemoteFs } from "../sync/remote-fs";
+import type ProtonDriveSyncPlugin from "../main";
 import type { ProtonSession } from "../proton-drive/sdk-session";
 import type { RemoteFileEntry } from "../sync/types";
-import { normalizePath } from "../sync/utils";
 
 export class ProtonDriveRemoteRootModal extends Modal {
 	private plugin: ProtonDriveSyncPlugin;

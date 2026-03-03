@@ -1,9 +1,9 @@
-import type { App } from "obsidian";
+import { formatBytes, now } from "../sync/utils";
 import { Modal, Setting } from "obsidian";
-import type ProtonDriveSyncPlugin from "../main";
+import type { App } from "obsidian";
 import { loadPluginData } from "../data/plugin-data";
 import { PluginDataStateStore } from "../sync/state-store";
-import { formatBytes, now } from "../sync/utils";
+import type ProtonDriveSyncPlugin from "../main";
 
 export class ProtonDriveStatusModal extends Modal {
 	private plugin: ProtonDriveSyncPlugin;

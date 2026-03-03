@@ -15,6 +15,13 @@
 		"browser": true
 	},
 	"rules": {
-		"unicorn/no-useless-fallback-in-spread": "off"
+		"unicorn/no-useless-fallback-in-spread": "off",
+		"sort-imports": [
+			"error",
+			{
+				"allowSeparatedGroups": true,
+				"ignoreCase": true
+			}
+		]
 	}
 }

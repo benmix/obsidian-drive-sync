@@ -1,11 +1,11 @@
 import * as openpgp from "openpgp";
-import type { OpenPGPCryptoProxy } from "@protontech/drive-sdk";
 import type {
 	PrivateKey as DrivePrivateKey,
 	PublicKey as DrivePublicKey,
 	SessionKey as DriveSessionKey,
 	VERIFICATION_STATUS as VerificationStatus,
 } from "@protontech/drive-sdk/dist/crypto/interface";
+import type { OpenPGPCryptoProxy } from "@protontech/drive-sdk";
 import { VERIFICATION_STATUS } from "@protontech/drive-sdk/dist/crypto/interface";
 
 type EncryptMessageOptions = {

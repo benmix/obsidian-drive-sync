@@ -1,7 +1,7 @@
-import type { SyncEntry, SyncJob } from "../data/sync-schema";
-import type { SyncState } from "./index-store";
-import type { LocalChange } from "./local-watcher";
 import { dirname, normalizePath, now } from "./utils";
+import type { SyncEntry, SyncJob } from "../data/sync-schema";
+import type { LocalChange } from "./local-watcher";
+import type { SyncState } from "./index-store";
 
 export type LocalChangePlan = {
 	jobs: SyncJob[];

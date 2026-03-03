@@ -1,13 +1,13 @@
-import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
-import type ProtonDriveSyncPlugin from "../main";
+import type { App } from "obsidian";
 import { loadPluginData } from "../data/plugin-data";
-import { PluginDataStateStore } from "../sync/state-store";
-import { ObsidianLocalFs } from "../sync/local-fs";
-import { ProtonDriveRemoteFs } from "../sync/remote-fs";
-import { SyncEngine } from "../sync/sync-engine";
 import { now } from "../sync/utils";
+import { ObsidianLocalFs } from "../sync/local-fs";
+import { PluginDataStateStore } from "../sync/state-store";
+import { ProtonDriveRemoteFs } from "../sync/remote-fs";
+import type ProtonDriveSyncPlugin from "../main";
 import type { ProtonSession } from "../proton-drive/sdk-session";
+import { SyncEngine } from "../sync/sync-engine";
 
 type ConflictItem = {
 	path: string;

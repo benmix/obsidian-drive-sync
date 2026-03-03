@@ -1,11 +1,11 @@
+import { syncLocalToRemote, syncRemoteToLocal } from "../sync/manual-sync";
 import type { App } from "obsidian";
 import { ObsidianLocalFs } from "../sync/local-fs";
-import { syncLocalToRemote, syncRemoteToLocal } from "../sync/manual-sync";
-import { ProtonDriveRemoteFs } from "../sync/remote-fs";
-import { SyncEngine } from "../sync/sync-engine";
 import { PluginDataStateStore } from "../sync/state-store";
 import { pollRemoteChanges } from "../sync/remote-poller";
 import type { ProtonDriveClient } from "@protontech/drive-sdk";
+import { ProtonDriveRemoteFs } from "../sync/remote-fs";
+import { SyncEngine } from "../sync/sync-engine";
 
 export async function syncVaultToProtonDrive(
 	app: App,

@@ -1,7 +1,7 @@
+import { normalizePath, now } from "./utils";
+import type { RemoteFileSystem, RemoteTreeEvent } from "./types";
 import type { SyncEntry, SyncJob } from "../data/sync-schema";
 import type { SyncState } from "./index-store";
-import type { RemoteFileSystem, RemoteTreeEvent } from "./types";
-import { normalizePath, now } from "./utils";
 
 export type RemotePollResult = {
 	jobs: SyncJob[];

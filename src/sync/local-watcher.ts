@@ -1,4 +1,4 @@
-import { TFile, TFolder, type App, type TAbstractFile, type EventRef } from "obsidian";
+import { type App, type EventRef, type TAbstractFile, TFile, TFolder } from "obsidian";
 import { normalizePath } from "./utils";
 
 export type LocalChange =

@@ -1,20 +1,20 @@
-import type {
-	ProtonDriveHTTPClient,
-	ProtonDriveAccount,
-	Telemetry,
-	MetricEvent,
-} from "@protontech/drive-sdk";
-import { OpenPGPCryptoWithCryptoProxy } from "@protontech/drive-sdk";
-import { createOpenPGPCryptoProxy } from "./openpgp-proxy";
-import { createSdkTelemetry } from "./telemetry";
+import { createOpenPGPCrypto, initCrypto } from "./proton-auth/openpgp";
 import {
 	createProtonAccount,
 	createProtonHttpClient,
 	createSrpModule,
 	type SRPModuleInterface,
 } from "./proton-auth/sdk-helpers";
+import type {
+	MetricEvent,
+	ProtonDriveAccount,
+	ProtonDriveHTTPClient,
+	Telemetry,
+} from "@protontech/drive-sdk";
+import { createOpenPGPCryptoProxy } from "./openpgp-proxy";
+import { createSdkTelemetry } from "./telemetry";
+import { OpenPGPCryptoWithCryptoProxy } from "@protontech/drive-sdk";
 import type { Session } from "./proton-auth/types";
-import { createOpenPGPCrypto, initCrypto } from "./proton-auth/openpgp";
 
 export type ProtonSession = Session & {
 	onTokenRefresh?: () => Promise<void>;

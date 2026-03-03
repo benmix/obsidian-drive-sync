@@ -1,5 +1,5 @@
-import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
+import type { App } from "obsidian";
 import type ProtonDriveSyncPlugin from "../main";
 
 export class ProtonDriveLoginModal extends Modal {

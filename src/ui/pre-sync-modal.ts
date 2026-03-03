@@ -1,5 +1,5 @@
-import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
+import type { App } from "obsidian";
 import { formatBytes } from "../sync/utils";
 
 export type PreSyncEstimate = {

@@ -1,5 +1,6 @@
-import type { RemoteFileEntry, RemoteFileSystem, RemoteTreeEvent } from "./types";
 import { basename, dirname, normalizePath, splitPath } from "./utils";
+import type { RemoteFileEntry, RemoteFileSystem, RemoteTreeEvent } from "./types";
+import mimeTypes from "mime-types";
 
 type ProtonDriveClient = {
 	iterateFolderChildren?: (parentNodeUid: string) => AsyncIterable<unknown>;
@@ -116,6 +117,13 @@ type NodeEntity = {
 
 type MaybeNode = { ok: true; value: NodeEntity } | { ok: false; error: unknown };
 
+const DEFAULT_MEDIA_TYPE = "application/octet-stream";
+
+function inferMediaType(fileName: string): string {
+	const mediaType = mimeTypes.lookup(fileName);
+	return typeof mediaType === "string" ? mediaType : DEFAULT_MEDIA_TYPE;
+}
+
 export class ProtonDriveRemoteFs implements RemoteFileSystem {
 	private client: ProtonDriveClient;
 	private remoteFolderId: string;
@@ -230,14 +238,15 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 		const parentId = await this.ensureRemoteFolder(parentPath);
 		const existingFile = await this.findChildByName(parentId, name, "file");
 		const existingFolder = await this.findChildByName(parentId, name, "folder");
+		const mediaType = inferMediaType(name);
 
 		const uploadMetadata = {
-			mediaType: "application/octet-stream",
+			mediaType,
 			expectedSize: metadata?.size ?? data.byteLength,
 			modificationTime: metadata?.mtimeMs ? new Date(metadata.mtimeMs) : undefined,
 		};
 		const blob = new Blob([data.slice().buffer], {
-			type: "application/octet-stream",
+			type: mediaType,
 		});
 		const uploadRevision = async (fileId: string) => {
 			const uploader = await getFileRevisionUploader(fileId, uploadMetadata);

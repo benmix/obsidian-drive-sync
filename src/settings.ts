@@ -1,12 +1,12 @@
-import type { App } from "obsidian";
 import { PluginSettingTab, Setting } from "obsidian";
-import ProtonDriveSyncPlugin from "./main";
-import { ProtonDriveRemoteRootModal } from "./ui/remote-root-modal";
-import { ProtonDriveLoginModal } from "./ui/login-modal";
+import type { App } from "obsidian";
 import { getBuiltInExcludePatterns } from "./sync/exclude";
-import type { ReusableCredentials } from "./proton-drive/proton-auth/types";
+import { ProtonDriveLoginModal } from "./ui/login-modal";
 import { ProtonDriveRemoteFs } from "./sync/remote-fs";
+import { ProtonDriveRemoteRootModal } from "./ui/remote-root-modal";
+import ProtonDriveSyncPlugin from "./main";
 import type { ProtonSession } from "./proton-drive/sdk-session";
+import type { ReusableCredentials } from "./proton-drive/proton-auth/types";
 
 export interface ProtonDriveSettings {
 	remoteFolderId: string;

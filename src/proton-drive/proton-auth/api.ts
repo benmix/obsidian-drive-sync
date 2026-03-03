@@ -1,5 +1,5 @@
-import type { Session, ApiResponse, ApiError } from "./types";
 import { API_BASE_URL, APP_VERSION } from "./types";
+import type { ApiError, ApiResponse, Session } from "./types";
 import { requestHttp } from "./http";
 
 // ============================================================================

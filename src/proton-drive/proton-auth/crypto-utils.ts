@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
-import type { ForkEncryptedBlob } from "./types";
 import { BCRYPT_PREFIX } from "./types";
+import type { ForkEncryptedBlob } from "./types";
 
 // ============================================================================
 // BigInt Utilities

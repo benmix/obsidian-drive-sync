@@ -1,28 +1,28 @@
 import * as openpgp from "openpgp";
-import { logger } from "../logger";
 import type {
-	Session,
+	Address,
+	AddressData,
 	ApiError,
 	ApiResponse,
 	AuthInfo,
 	AuthResponse,
-	ReusableCredentials,
-	PasswordMode,
-	User,
 	KeySalt,
-	Address,
-	PushForkResponse,
+	PasswordMode,
 	PullForkResponse,
-	AddressData,
+	PushForkResponse,
+	ReusableCredentials,
+	Session,
+	User,
 } from "./types";
-import { INVALID_REFRESH_TOKEN_CODE, APP_VERSION, CHILD_CLIENT_ID, API_BASE_URL } from "./types";
+import { API_BASE_URL, APP_VERSION, CHILD_CLIENT_ID, INVALID_REFRESH_TOKEN_CODE } from "./types";
 import { apiRequest, createHeaders } from "./api";
-import { getSrp } from "./srp";
 import {
 	computeKeyPassword,
 	createForkEncryptedBlob,
 	decryptForkEncryptedBlob,
 } from "./crypto-utils";
+import { getSrp } from "./srp";
+import { logger } from "../logger";
 import { requestHttp } from "./http";
 
 // ============================================================================

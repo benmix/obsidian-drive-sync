@@ -1,5 +1,5 @@
-import type { ProtonDriveSettings } from "../settings";
 import { DEFAULT_SETTINGS } from "../settings";
+import type { ProtonDriveSettings } from "../settings";
 
 export type PluginDataStore = {
 	loadData: () => Promise<unknown>;

@@ -1,23 +1,23 @@
-import { Notice } from "obsidian";
-import type ProtonDriveSyncPlugin from "../main";
 import {
+	estimateSyncPlan,
 	planSync,
 	pollRemoteSync,
 	restoreVaultFromProtonDrive,
 	runPlannedSync,
 	syncVaultToProtonDrive,
-	estimateSyncPlan,
 } from "../proton-drive/sync";
 import { exportDiagnostics } from "../sync/diagnostics";
+import { Notice } from "obsidian";
 import { ObsidianLocalFs } from "../sync/local-fs";
-import { ProtonDriveRemoteFs } from "../sync/remote-fs";
-import { SyncEngine } from "../sync/sync-engine";
 import { PluginDataStateStore } from "../sync/state-store";
-import { ProtonDriveStatusModal } from "../ui/status-modal";
-import { ProtonDriveLoginModal } from "../ui/login-modal";
 import { ProtonDriveConflictModal } from "../ui/conflict-modal";
+import { ProtonDriveLoginModal } from "../ui/login-modal";
 import { ProtonDrivePreSyncModal } from "../ui/pre-sync-modal";
+import { ProtonDriveRemoteFs } from "../sync/remote-fs";
+import { ProtonDriveStatusModal } from "../ui/status-modal";
+import type ProtonDriveSyncPlugin from "../main";
 import type { ProtonSession } from "../proton-drive/sdk-session";
+import { SyncEngine } from "../sync/sync-engine";
 import { validateRemoteOperations } from "../proton-drive/remote-validation";
 
 export function registerCommands(plugin: ProtonDriveSyncPlugin) {
