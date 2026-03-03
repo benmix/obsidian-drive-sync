@@ -85,4 +85,5 @@
 ## Testing and compatibility
 
 - [ ] Validate mobile compatibility (runtime tests + UX polish).
-- [ ] Add unit tests for adapters, reconciler, job queue, exclude rules.
+- [x] Add unit tests for reconciler, job queue, exclude rules.
+- [ ] Add unit tests for adapters.

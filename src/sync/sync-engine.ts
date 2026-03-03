@@ -114,30 +114,21 @@ export class SyncEngine {
 			Math.min(INTERNAL_MAX_CONCURRENT_JOBS, MAX_CONCURRENT_JOBS_CAP),
 		);
 		const buckets = this.bucketByPath(dueJobs);
-		for (const batch of buckets) {
-			const grouped: SyncJob[][] = [];
-			for (let index = 0; index < batch.length; index += concurrency) {
-				grouped.push(batch.slice(index, index + concurrency));
-			}
-			for (const group of grouped) {
-				const results = await Promise.all(
-					group.map((job) => this.executeJob(job, retryJobs)),
-				);
+		for (let index = 0; index < buckets.length; index += concurrency) {
+			const parallelBuckets = buckets.slice(index, index + concurrency);
+			const bucketResults = await Promise.all(
+				parallelBuckets.map((bucket) => this.executeBucketSequentially(bucket, retryJobs)),
+			);
+			for (const results of bucketResults) {
 				for (const result of results) {
-					if (!result) {
-						continue;
-					}
 					entries.push(...result.entries);
 					jobsExecuted += result.jobsExecuted;
 					uploadBytes += result.uploadBytes;
 					downloadBytes += result.downloadBytes;
 				}
-				if (this.authPaused) {
-					this.index.addLog("Authentication required. Sync paused.", "auth");
-					break;
-				}
 			}
 			if (this.authPaused) {
+				this.index.addLog("Authentication required. Sync paused.", "auth");
 				break;
 			}
 		}
@@ -230,6 +221,14 @@ export class SyncEngine {
 		return this.queue.list();
 	}
 
+	getStateSnapshot(): SyncState {
+		const base = this.index.toJSON();
+		return {
+			...base,
+			jobs: this.queue.list(),
+		};
+	}
+
 	async rebuildIndex(): Promise<void> {
 		this.index = new SyncIndexStore();
 		this.queue = new SyncJobQueue();
@@ -296,6 +295,23 @@ export class SyncEngine {
 		return Array.from(buckets.values());
 	}
 
+	private async executeBucketSequentially(
+		jobs: SyncJob[],
+		retryJobs: SyncJob[],
+	): Promise<ExecuteResult[]> {
+		const results: ExecuteResult[] = [];
+		for (const job of jobs) {
+			if (this.authPaused) {
+				break;
+			}
+			const result = await this.executeJob(job, retryJobs);
+			if (result) {
+				results.push(result);
+			}
+		}
+		return results;
+	}
+
 	private async executeJob(job: SyncJob, retryJobs: SyncJob[]): Promise<ExecuteResult | null> {
 		try {
 			const activeJob: SyncJob = {
@@ -308,7 +324,30 @@ export class SyncEngine {
 			return result;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "retry";
-			if (isNotFoundError(message)) {
+			if (isNotFoundError(message) && job.op === "delete-remote") {
+				return {
+					entries: [
+						{
+							relPath: job.path,
+							type: job.entryType ?? "file",
+							tombstone: true,
+							remoteId: job.remoteId,
+							remoteRev: undefined,
+							syncedRemoteRev: undefined,
+							localMtimeMs: undefined,
+							localSize: undefined,
+							localHash: undefined,
+							syncedLocalHash: undefined,
+							conflict: undefined,
+							lastSyncAt: now(),
+						},
+					],
+					jobsExecuted: 1,
+					uploadBytes: 0,
+					downloadBytes: 0,
+				};
+			}
+			if (isNotFoundError(message) && job.op !== "upload") {
 				this.index.addLog(`Job blocked: ${job.id} (${message})`, "retry");
 				retryJobs.push({
 					...job,

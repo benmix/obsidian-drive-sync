@@ -1,7 +1,14 @@
+import {
+	evaluateRemoteMissingConfirmation,
+	resolveLocalOnlyDecision,
+	resolveRemoteOnlyDecision,
+} from "./presence-policy";
 import { normalizePath, now } from "./utils";
 import type { RemoteFileSystem, RemoteTreeEvent } from "./types";
 import type { SyncEntry, SyncJob } from "../data/sync-schema";
 import type { SyncState } from "./index-store";
+
+type ConflictStrategy = "local-wins" | "remote-wins" | "manual";
 
 export type RemotePollResult = {
 	jobs: SyncJob[];
@@ -13,8 +20,10 @@ export type RemotePollResult = {
 export async function pollRemoteChanges(
 	remoteFs: RemoteFileSystem,
 	state: SyncState,
+	options?: { conflictStrategy?: ConflictStrategy },
 ): Promise<RemotePollResult> {
-	const cursorPlan = await pollRemoteCursor(remoteFs, state);
+	const conflictStrategy = options?.conflictStrategy ?? "local-wins";
+	const cursorPlan = await pollRemoteCursor(remoteFs, state, conflictStrategy);
 	if (cursorPlan) {
 		return cursorPlan;
 	}
@@ -40,6 +49,21 @@ export async function pollRemoteChanges(
 		seen.add(relPath);
 		const prior = state.entries[relPath] ?? priorByRemoteId.get(entry.id)?.entry;
 		const priorPath = priorByRemoteId.get(entry.id)?.path;
+		const remoteOnlyDecision = prior?.tombstone
+			? resolveRemoteOnlyDecision({
+					path: relPath,
+					entryType: entry.type,
+					nowTs,
+					conflictStrategy,
+					prior,
+					remoteId: entry.id,
+					remoteRev: entry.revisionId,
+				})
+			: undefined;
+		if (remoteOnlyDecision?.job?.op === "delete-remote") {
+			jobs.push(remoteOnlyDecision.job);
+			continue;
+		}
 
 		if (priorPath && priorPath !== relPath) {
 			movedFromPaths.add(priorPath);
@@ -69,8 +93,14 @@ export async function pollRemoteChanges(
 			remoteMtimeMs: entry.mtimeMs,
 			remoteSize: entry.size,
 			remoteRev: entry.revisionId,
+			remoteMissingCount: undefined,
+			remoteMissingSinceMs: undefined,
 			lastSyncAt: nowTs,
 		});
+		if (remoteOnlyDecision?.job) {
+			jobs.push(remoteOnlyDecision.job);
+			continue;
+		}
 
 		if (entry.type === "folder") {
 			if (!prior && entry.path) {
@@ -116,30 +146,25 @@ export async function pollRemoteChanges(
 		if (!prior || prior.tombstone) {
 			continue;
 		}
-		if (prior.type === "folder") {
-			jobs.push({
-				id: `delete-local:${priorPath}`,
-				op: "delete-local",
-				path: priorPath,
-				entryType: "folder",
-				priority: 25,
-				attempt: 0,
-				nextRunAt: nowTs,
-				reason: "remote-folder-delete",
-			});
-			continue;
-		}
 		if (prior.remoteId) {
-			jobs.push({
-				id: `delete-local:${priorPath}`,
-				op: "delete-local",
+			const missing = evaluateRemoteMissingConfirmation(prior, nowTs);
+			if (!missing.confirmed) {
+				snapshot.push(buildRemoteMissingTrackingEntry(priorPath, prior, missing, nowTs));
+				continue;
+			}
+			const decision = resolveLocalOnlyDecision({
 				path: priorPath,
 				entryType: prior.type,
-				priority: 20,
-				attempt: 0,
-				nextRunAt: nowTs,
-				reason: "remote-delete",
+				nowTs,
+				conflictStrategy,
+				prior,
 			});
+			if (decision.job) {
+				jobs.push(decision.job);
+			}
+			if (decision.removePriorPath) {
+				removedPaths.push(priorPath);
+			}
 		}
 	}
 
@@ -149,6 +174,7 @@ export async function pollRemoteChanges(
 async function pollRemoteCursor(
 	remoteFs: RemoteFileSystem,
 	state: SyncState,
+	conflictStrategy: ConflictStrategy,
 ): Promise<RemotePollResult | null> {
 	if (!remoteFs.getRootFolder || !remoteFs.subscribeToTreeEvents) {
 		return null;
@@ -220,17 +246,28 @@ async function pollRemoteCursor(
 			);
 			if (priorPath) {
 				const prior = state.entries[priorPath];
-				removedPaths.push(priorPath);
-				remoteJobs.push({
-					id: `delete-local:${priorPath}`,
-					op: "delete-local",
-					path: priorPath,
-					entryType: prior?.type,
-					priority: 20,
-					attempt: 0,
-					nextRunAt: nowTs,
-					reason: "remote-delete",
-				});
+				if (prior) {
+					const missing = evaluateRemoteMissingConfirmation(prior, nowTs);
+					if (!missing.confirmed) {
+						snapshot.push(
+							buildRemoteMissingTrackingEntry(priorPath, prior, missing, nowTs),
+						);
+						continue;
+					}
+					const decision = resolveLocalOnlyDecision({
+						path: priorPath,
+						entryType: prior.type,
+						nowTs,
+						conflictStrategy,
+						prior,
+					});
+					if (decision.job) {
+						remoteJobs.push(decision.job);
+					}
+					if (decision.removePriorPath) {
+						removedPaths.push(priorPath);
+					}
+				}
 			}
 			continue;
 		}
@@ -246,6 +283,8 @@ async function pollRemoteCursor(
 			remoteMtimeMs: node.mtimeMs,
 			remoteSize: node.size,
 			remoteRev: node.revisionId,
+			remoteMissingCount: undefined,
+			remoteMissingSinceMs: undefined,
 			lastSyncAt: nowTs,
 		};
 		if (prior?.conflict) {
@@ -289,5 +328,20 @@ async function pollRemoteCursor(
 		snapshot,
 		removedPaths,
 		remoteEventCursor: latestEventId,
+	};
+}
+
+function buildRemoteMissingTrackingEntry(
+	path: string,
+	prior: SyncEntry,
+	missing: { nextCount: number; sinceMs: number },
+	nowTs: number,
+): SyncEntry {
+	return {
+		...prior,
+		relPath: path,
+		lastSyncAt: nowTs,
+		remoteMissingCount: missing.nextCount,
+		remoteMissingSinceMs: missing.sinceMs,
 	};
 }

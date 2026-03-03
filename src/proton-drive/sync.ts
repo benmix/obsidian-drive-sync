@@ -73,12 +73,13 @@ export async function pollRemoteSync(
 ): Promise<{ jobsPlanned: number; entries: number }> {
 	const remoteFs = new ProtonDriveRemoteFs(client, remoteFolderId);
 	const stateStore = new PluginDataStateStore();
-	const state = await stateStore.load();
-	const result = await pollRemoteChanges(remoteFs, state);
 	const engine = new SyncEngine(new ObsidianLocalFs(app), remoteFs, stateStore, {
 		conflictStrategy: settings?.conflictStrategy,
 	});
 	await engine.load();
+	const result = await pollRemoteChanges(remoteFs, engine.getStateSnapshot(), {
+		conflictStrategy: settings?.conflictStrategy,
+	});
 	engine.applyEntries(result.snapshot);
 	engine.removeEntries(result.removedPaths);
 	for (const job of result.jobs) {

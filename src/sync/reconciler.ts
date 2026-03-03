@@ -1,5 +1,12 @@
-import { buildConflictName, normalizePath, now } from "./utils";
+import {
+	evaluateRemoteMissingConfirmation,
+	resolveBothPresentDecision,
+	resolveLocalOnlyDecision,
+	resolveRemoteOnlyDecision,
+	resolveTrackedMissingDecision,
+} from "./presence-policy";
 import type { LocalFileSystem, RemoteFileSystem } from "./types";
+import { normalizePath, now } from "./utils";
 import type { SyncEntry, SyncJob } from "../data/sync-schema";
 import type { SyncState } from "./index-store";
 
@@ -80,6 +87,8 @@ export async function reconcileSnapshot(
 			remoteMtimeMs: entry.remote?.mtimeMs,
 			remoteSize: entry.remote?.size,
 			remoteRev: entry.remote?.revisionId,
+			remoteMissingCount: undefined,
+			remoteMissingSinceMs: undefined,
 			lastSyncAt: nowTs,
 		};
 		if (prior?.conflict) {
@@ -90,30 +99,40 @@ export async function reconcileSnapshot(
 		const effectivePrior = prior?.tombstone ? undefined : prior;
 		void effectivePrior;
 		if (entry.type === "folder") {
-			if (!entry.local && entry.remote) {
-				jobs.push({
-					id: `create-local-folder:${entry.path}`,
-					op: "create-local-folder",
+			if (entry.local && !entry.remote) {
+				if (prior?.remoteId) {
+					const missing = evaluateRemoteMissingConfirmation(prior, nowTs);
+					if (!missing.confirmed) {
+						keepUnconfirmedRemoteMissing(base, prior, missing);
+						continue;
+					}
+				}
+				const decision = resolveLocalOnlyDecision({
 					path: entry.path,
 					entryType: "folder",
-					remoteId: entry.remote?.id,
-					priority: 2,
-					attempt: 0,
-					nextRunAt: nowTs,
-					reason: "remote-folder",
+					nowTs,
+					conflictStrategy,
+					prior,
 				});
-			} else if (entry.local && !entry.remote) {
-				jobs.push({
-					id: `create-remote-folder:${entry.path}`,
-					op: "create-remote-folder",
+				if (decision.job) {
+					jobs.push(decision.job);
+				}
+			} else if (!entry.local && entry.remote) {
+				const decision = resolveRemoteOnlyDecision({
 					path: entry.path,
 					entryType: "folder",
-					remoteId: undefined,
-					priority: 8,
-					attempt: 0,
-					nextRunAt: nowTs,
-					reason: "local-folder",
+					nowTs,
+					conflictStrategy,
+					prior,
+					remoteId: entry.remote.id,
+					remoteRev: entry.remote.revisionId,
 				});
+				if (decision.job) {
+					if (decision.job.op === "delete-remote") {
+						base.tombstone = true;
+					}
+					jobs.push(decision.job);
+				}
 			}
 			continue;
 		}
@@ -128,113 +147,62 @@ export async function reconcileSnapshot(
 			: false;
 		const remoteChanged = entry.remote
 			? !effectivePrior?.syncedRemoteRev ||
-				(entry.remote.revisionId &&
+				Boolean(
+					entry.remote.revisionId &&
 					entry.remote.revisionId !==
-						(effectivePrior?.syncedRemoteRev ?? effectivePrior?.remoteRev))
+						(effectivePrior?.syncedRemoteRev ?? effectivePrior?.remoteRev),
+				)
 			: false;
 
 		if (entry.local && !entry.remote) {
-			jobs.push({
-				id: `upload:${entry.path}`,
-				op: "upload",
+			if (prior?.remoteId) {
+				const missing = evaluateRemoteMissingConfirmation(prior, nowTs);
+				if (!missing.confirmed) {
+					keepUnconfirmedRemoteMissing(base, prior, missing);
+					continue;
+				}
+			}
+			const decision = resolveLocalOnlyDecision({
 				path: entry.path,
 				entryType: "file",
-				priority: 5,
-				attempt: 0,
-				nextRunAt: nowTs,
+				nowTs,
+				conflictStrategy,
+				prior,
 			});
+			if (decision.job) {
+				jobs.push(decision.job);
+			}
 		} else if (!entry.local && entry.remote) {
-			jobs.push({
-				id: `download:${entry.remote.id}`,
-				op: "download",
+			const decision = resolveRemoteOnlyDecision({
 				path: entry.path,
+				entryType: "file",
+				nowTs,
+				conflictStrategy,
+				prior,
 				remoteId: entry.remote.id,
 				remoteRev: entry.remote.revisionId,
-				entryType: "file",
-				priority: 10,
-				attempt: 0,
-				nextRunAt: nowTs,
 			});
-		} else if (entry.local && entry.remote) {
-			if (localChanged && remoteChanged) {
-				if (conflictStrategy === "manual") {
-					base.conflict = {
-						localMtimeMs: entry.local?.mtimeMs,
-						remoteRev: entry.remote?.revisionId,
-						remoteId: entry.remote?.id,
-						detectedAt: nowTs,
-					};
-					jobs.push({
-						id: `conflict:${entry.path}:${nowTs}`,
-						op: "download",
-						path: entry.path,
-						entryType: "file",
-						priority: 1,
-						attempt: 0,
-						nextRunAt: nowTs + 1000 * 60 * 60 * 24 * 365,
-						reason: "conflict-manual",
-					});
-				} else if (conflictStrategy === "remote-wins") {
-					jobs.push({
-						id: `download:${entry.remote.id}`,
-						op: "download",
-						path: entry.path,
-						remoteId: entry.remote.id,
-						remoteRev: entry.remote.revisionId,
-						entryType: "file",
-						priority: 5,
-						attempt: 0,
-						nextRunAt: nowTs,
-						reason: "conflict-remote-wins",
-					});
-				} else {
-					const conflictPath = buildConflictName(entry.path, nowTs);
-					jobs.push({
-						id: `download:${entry.remote.id}:conflict`,
-						op: "download",
-						path: conflictPath,
-						remoteId: entry.remote.id,
-						remoteRev: entry.remote.revisionId,
-						entryType: "file",
-						priority: 1,
-						attempt: 0,
-						nextRunAt: nowTs,
-						reason: "conflict",
-					});
-					jobs.push({
-						id: `upload:${entry.path}`,
-						op: "upload",
-						path: entry.path,
-						entryType: "file",
-						priority: 5,
-						attempt: 0,
-						nextRunAt: nowTs,
-						reason: "conflict-local-wins",
-					});
+			if (decision.job) {
+				if (decision.job.op === "delete-remote") {
+					base.tombstone = true;
 				}
-			} else if (localChanged) {
-				jobs.push({
-					id: `upload:${entry.path}`,
-					op: "upload",
-					path: entry.path,
-					entryType: "file",
-					priority: 5,
-					attempt: 0,
-					nextRunAt: nowTs,
-				});
-			} else if (remoteChanged) {
-				jobs.push({
-					id: `download:${entry.remote.id}`,
-					op: "download",
-					path: entry.path,
-					remoteId: entry.remote.id,
-					remoteRev: entry.remote.revisionId,
-					entryType: "file",
-					priority: 10,
-					attempt: 0,
-					nextRunAt: nowTs,
-				});
+				jobs.push(decision.job);
 			}
+		} else if (entry.local && entry.remote) {
+			const decision = resolveBothPresentDecision({
+				path: entry.path,
+				nowTs,
+				conflictStrategy,
+				remoteId: entry.remote.id,
+				remoteRev: entry.remote.revisionId,
+				localMtimeMs: entry.local?.mtimeMs,
+				localChanged,
+				remoteChanged,
+			});
+			if (decision.conflict) {
+				base.conflict = decision.conflict;
+			}
+			jobs.push(...decision.jobs);
 		}
 	}
 
@@ -242,31 +210,29 @@ export async function reconcileSnapshot(
 		if (seen.has(path) || prior.tombstone) {
 			continue;
 		}
-		if (prior.remoteId) {
-			jobs.push({
-				id: `delete-remote:${path}`,
-				op: "delete-remote",
-				path,
-				remoteId: prior.remoteId,
-				entryType: prior.type,
-				priority: 20,
-				attempt: 0,
-				nextRunAt: nowTs,
-				reason: "local-missing",
-			});
-		} else {
-			jobs.push({
-				id: `delete-local:${path}`,
-				op: "delete-local",
-				path,
-				entryType: prior.type,
-				priority: 20,
-				attempt: 0,
-				nextRunAt: nowTs,
-				reason: "remote-missing",
-			});
+		const decision = resolveTrackedMissingDecision({
+			path,
+			nowTs,
+			prior,
+		});
+		if (decision.job) {
+			jobs.push(decision.job);
 		}
 	}
 
 	return { jobs, snapshot };
+}
+
+function keepUnconfirmedRemoteMissing(
+	base: SyncEntry,
+	prior: SyncEntry,
+	missing: { nextCount: number; sinceMs: number },
+): void {
+	base.remoteId = prior.remoteId;
+	base.remoteParentId = prior.remoteParentId;
+	base.remoteMtimeMs = prior.remoteMtimeMs;
+	base.remoteSize = prior.remoteSize;
+	base.remoteRev = prior.remoteRev;
+	base.remoteMissingCount = missing.nextCount;
+	base.remoteMissingSinceMs = missing.sinceMs;
 }

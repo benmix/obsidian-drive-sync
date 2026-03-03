@@ -58,9 +58,27 @@ export class SyncIndexStore {
 			...(prior ?? {}),
 			...entry,
 		};
+		const hasRemoteMissingCount = Object.prototype.hasOwnProperty.call(
+			entry,
+			"remoteMissingCount",
+		);
+		const hasRemoteMissingSinceMs = Object.prototype.hasOwnProperty.call(
+			entry,
+			"remoteMissingSinceMs",
+		);
 		// Treat any non-tombstone write as the path becoming live again.
 		if (entry.tombstone !== true) {
 			merged.tombstone = undefined;
+		}
+		// By default, seeing a live remote node or writing a tombstone clears stale
+		// remote-missing tracking unless the caller explicitly updates the counter.
+		if (
+			!hasRemoteMissingCount &&
+			!hasRemoteMissingSinceMs &&
+			(entry.remoteId !== undefined || entry.tombstone === true)
+		) {
+			merged.remoteMissingCount = undefined;
+			merged.remoteMissingSinceMs = undefined;
 		}
 		this.state.entries[entry.relPath] = merged;
 	}

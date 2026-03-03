@@ -43,7 +43,14 @@ function splitPatterns(patterns: string): string[] {
 }
 
 function toRegExp(pattern: string): RegExp {
-	const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-	const normalized = escaped.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*");
+	const isDirectoryPattern = pattern.endsWith("/");
+	const normalizedPattern = isDirectoryPattern ? pattern.slice(0, -1) : pattern;
+	const escaped = normalizedPattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+	const withGlobStarSentinel = escaped.replace(/\*\*/g, "__DOUBLE_STAR__");
+	const withSingleStar = withGlobStarSentinel.replace(/\*/g, "[^/]*");
+	const normalized = withSingleStar.split("__DOUBLE_STAR__").join(".*");
+	if (isDirectoryPattern) {
+		return new RegExp(`^${normalized}(?:$|/.*$)`);
+	}
 	return new RegExp(`^${normalized}(?:$|/)`);
 }

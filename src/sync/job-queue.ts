@@ -29,6 +29,7 @@ export class SyncJobQueue {
 				...job,
 				status: job.status ?? "pending",
 			});
+			existing.add(job.id);
 		}
 		this.sort();
 	}

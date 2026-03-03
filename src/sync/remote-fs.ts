@@ -265,7 +265,14 @@ export class ProtonDriveRemoteFs implements RemoteFileSystem {
 			throw new Error(`Remote path conflict: folder exists at ${normalized}`);
 		}
 		if (existingFile?.id) {
-			return uploadRevision(existingFile.id);
+			try {
+				return await uploadRevision(existingFile.id);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				if (!isNotFoundError(message)) {
+					throw error;
+				}
+			}
 		}
 
 		try {
@@ -456,4 +463,9 @@ function isAlreadyExistsError(message: string): boolean {
 		normalized.includes("already exists") ||
 		normalized.includes("file or folder with that name already exists")
 	);
+}
+
+function isNotFoundError(message: string): boolean {
+	const normalized = message.toLowerCase();
+	return normalized.includes("not found") || normalized.includes("404");
 }

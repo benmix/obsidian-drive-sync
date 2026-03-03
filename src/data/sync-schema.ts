@@ -13,6 +13,8 @@ export type SyncEntry = {
 	syncedRemoteRev?: string;
 	remoteMtimeMs?: number;
 	remoteSize?: number;
+	remoteMissingCount?: number;
+	remoteMissingSinceMs?: number;
 	tombstone?: boolean;
 	conflict?: {
 		localMtimeMs?: number;

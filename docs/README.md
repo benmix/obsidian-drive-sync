@@ -43,6 +43,18 @@ Production build:
 pnpm run build
 ```
 
+Unit tests:
+
+```bash
+pnpm run test
+```
+
+Watch mode:
+
+```bash
+pnpm run test:watch
+```
+
 `pnpm run build` now outputs `dist/main.js` and copies `manifest.json` + `styles.css` into `dist/`.
 
 You can also set `OBSIDIAN_VAULT_PATH` once and reuse it:

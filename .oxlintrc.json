@@ -2,6 +2,7 @@
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
 	"plugins": ["typescript", "unicorn"],
 	"ignorePatterns": [
+		".test-dist",
 		"example_repo",
 		"node_modules",
 		"dist",

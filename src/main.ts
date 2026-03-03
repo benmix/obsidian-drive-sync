@@ -254,7 +254,6 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 			const localFs = new ObsidianLocalFs(this.app);
 			const remoteFs = new ProtonDriveRemoteFs(client, this.settings.remoteFolderId);
 			const stateStore = new PluginDataStateStore();
-			const state = await stateStore.load();
 			const engine = new SyncEngine(localFs, remoteFs, stateStore, {
 				conflictStrategy: this.settings.conflictStrategy,
 				onAuthError: (message) => {
@@ -266,7 +265,7 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 
 			const localChanges = this.drainLocalChanges();
 			if (localChanges.length > 0) {
-				const plan = planLocalChanges(localChanges, state);
+				const plan = planLocalChanges(localChanges, engine.getStateSnapshot());
 				engine.applyEntries(plan.entries);
 				engine.removeEntries(plan.removedPaths);
 				if (plan.rewritePrefixes.length > 0) {
@@ -278,7 +277,9 @@ export default class ProtonDriveSyncPlugin extends Plugin {
 			}
 
 			if (trigger !== "local" || localChanges.length === 0 || shouldReconcile) {
-				const remotePlan = await pollRemoteChanges(remoteFs, state);
+				const remotePlan = await pollRemoteChanges(remoteFs, engine.getStateSnapshot(), {
+					conflictStrategy: this.settings.conflictStrategy,
+				});
 				engine.applyEntries(remotePlan.snapshot);
 				engine.removeEntries(remotePlan.removedPaths);
 				for (const job of remotePlan.jobs) {
