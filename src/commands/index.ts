@@ -2,108 +2,98 @@ import {
 	estimateSyncPlan,
 	planSync,
 	pollRemoteSync,
-	restoreVaultFromProtonDrive,
+	restoreVaultFromRemote,
 	runPlannedSync,
-	syncVaultToProtonDrive,
-} from "../proton-drive/sync";
-import { exportDiagnostics } from "../sync/diagnostics";
+	syncVaultToRemote,
+} from "../runtime/use-cases/sync-workflows";
+import { buildActiveRemoteSession } from "../provider/session";
+import { exportDiagnostics } from "../runtime/use-cases/diagnostics";
 import { Notice } from "obsidian";
-import { ObsidianLocalFs } from "../sync/local-fs";
-import { PluginDataStateStore } from "../sync/state-store";
-import { ProtonDriveConflictModal } from "../ui/conflict-modal";
-import { ProtonDriveLoginModal } from "../ui/login-modal";
-import { ProtonDrivePreSyncModal } from "../ui/pre-sync-modal";
-import { ProtonDriveRemoteFs } from "../sync/remote-fs";
-import { ProtonDriveStatusModal } from "../ui/status-modal";
-import type ProtonDriveSyncPlugin from "../main";
-import type { ProtonSession } from "../proton-drive/sdk-session";
-import { SyncEngine } from "../sync/sync-engine";
-import { validateRemoteOperations } from "../proton-drive/remote-validation";
+import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
+import { PluginDataStateStore } from "../sync/state/state-store";
+import { RemoteProviderLoginModal } from "../ui/login-modal";
+import { SyncConflictModal } from "../ui/conflict-modal";
+import { SyncEngine } from "../sync/engine/sync-engine";
+import { SyncPreflightModal } from "../ui/pre-sync-modal";
+import { SyncStatusModal } from "../ui/status-modal";
+import { validateRemoteOperations } from "../runtime/use-cases/remote-validation";
 
-export function registerCommands(plugin: ProtonDriveSyncPlugin) {
-	const buildActiveSession = async (): Promise<ProtonSession | null> => {
-		const saved = plugin.settings.protonSession;
-		let session = plugin.authService.getSession();
-		if (!session && saved) {
-			try {
-				session = await plugin.authService.restore(saved);
-				plugin.settings.hasAuthSession = true;
-				await plugin.saveSettings();
-			} catch (error) {
-				console.warn("Failed to restore Proton session.", error);
-				plugin.settings.protonSession = undefined;
-				plugin.settings.accountEmail = "";
-				plugin.settings.hasAuthSession = false;
-				await plugin.saveSettings();
-				return null;
-			}
-		}
-		if (!session) {
+type ConnectedRemoteClient = {
+	provider: ReturnType<ObsidianDriveSyncPluginApi["getRemoteProvider"]>;
+	client: unknown;
+};
+
+export function registerCommands(plugin: ObsidianDriveSyncPluginApi) {
+	const localProvider = plugin.getLocalProvider();
+
+	const requireScopeId = (): string | null => {
+		const scopeId = plugin.getRemoteScopeId();
+		if (!scopeId) {
+			new Notice("Select a remote folder in settings first.");
 			return null;
 		}
-		const activeSession = {
-			...session,
-		} as ProtonSession;
-		activeSession.onTokenRefresh = async () => {
-			try {
-				await plugin.authService.refreshToken();
-				const refreshedSession = plugin.authService.getSession();
-				if (refreshedSession) {
-					Object.assign(activeSession, refreshedSession);
-				}
-				plugin.settings.protonSession = plugin.authService.getReusableCredentials();
-				plugin.settings.hasAuthSession = true;
-				await plugin.saveSettings();
-			} catch (refreshError) {
-				console.warn("Failed to refresh Proton session.", refreshError);
-				plugin.settings.hasAuthSession = false;
-				await plugin.saveSettings();
-			}
-		};
-		return activeSession;
+		return scopeId;
+	};
+
+	const requireConnectedRemoteClient = async (): Promise<ConnectedRemoteClient | null> => {
+		const provider = plugin.getRemoteProvider();
+		if (!plugin.getStoredProviderCredentials() && !provider.getSession()) {
+			new Notice(`Sign in to ${provider.label} first.`);
+			return null;
+		}
+
+		const activeSession = await buildActiveRemoteSession(plugin);
+		if (!activeSession) {
+			new Notice(`Sign in to ${provider.label} first.`);
+			return null;
+		}
+
+		const client = await provider.connect(activeSession);
+		if (!client) {
+			new Notice(`Unable to connect to ${provider.label}.`);
+			return null;
+		}
+
+		plugin.handleAuthRecovered(false);
+		return { provider, client };
 	};
 
 	plugin.addCommand({
 		id: "protondrive-pre-sync-check",
 		name: "Pre-sync check (job counts + size estimate)",
 		callback: async () => {
-			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Select a remote folder in settings first.");
-				return;
-			}
-			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
-				new Notice("Sign in to Proton Drive first.");
+			const scopeId = requireScopeId();
+			if (!scopeId) {
 				return;
 			}
 
-			const activeSession = await buildActiveSession();
-			if (!activeSession) {
-				new Notice("Sign in to Proton Drive first.");
-				return;
-			}
-			const client = await plugin.protonDriveService.connect(activeSession);
-			if (!client) {
-				new Notice("Unable to connect to Proton Drive.");
+			const connection = await requireConnectedRemoteClient();
+			if (!connection) {
 				return;
 			}
 
+			const { provider, client } = connection;
 			try {
 				const estimate = await estimateSyncPlan(
 					plugin.app,
+					localProvider,
+					provider,
 					client,
-					plugin.settings.remoteFolderId,
+					scopeId,
 					{
 						conflictStrategy: plugin.settings.conflictStrategy,
 					},
 				);
-				new ProtonDrivePreSyncModal(plugin.app, estimate, async () => {
-					await planSync(plugin.app, client, plugin.settings.remoteFolderId, {
+				new SyncPreflightModal(plugin.app, estimate, async () => {
+					await planSync(plugin.app, localProvider, provider, client, scopeId, {
 						conflictStrategy: plugin.settings.conflictStrategy,
 					});
 					const result = await runPlannedSync(
 						plugin.app,
+						localProvider,
+						provider,
 						client,
-						plugin.settings.remoteFolderId,
+						scopeId,
 						{
 							conflictStrategy: plugin.settings.conflictStrategy,
 						},
@@ -121,33 +111,23 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 
 	plugin.addCommand({
 		id: "protondrive-validate-remote-ops",
-		name: "Validate Proton Drive remote operations",
+		name: "Validate remote operations",
 		callback: async () => {
-			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Select a remote folder in settings first.");
-				return;
-			}
-			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
-				new Notice("Sign in to Proton Drive first.");
+			const scopeId = requireScopeId();
+			if (!scopeId) {
 				return;
 			}
 
-			const activeSession = await buildActiveSession();
-			if (!activeSession) {
-				new Notice("Sign in to Proton Drive first.");
-				return;
-			}
-			const client = await plugin.protonDriveService.connect(activeSession);
-			if (!client) {
-				new Notice("Unable to connect to Proton Drive.");
+			const connection = await requireConnectedRemoteClient();
+			if (!connection) {
 				return;
 			}
 
+			const { provider, client } = connection;
 			try {
-				const report = await validateRemoteOperations(
-					client,
-					plugin.settings.remoteFolderId,
-				);
+				const remoteFileSystem = provider.createRemoteFileSystem(client, scopeId);
+				const prefix = `__${provider.id.replace(/[^A-Za-z0-9_]+/g, "_")}_sync_validation`;
+				const report = await validateRemoteOperations(remoteFileSystem, prefix);
 				const failed = report.steps.filter((step) => !step.ok);
 				if (failed.length === 0) {
 					new Notice("Remote operations validated successfully.");
@@ -163,86 +143,72 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 
 	plugin.addCommand({
 		id: "protondrive-connect",
-		name: "Connect to Proton Drive",
+		name: "Connect remote provider",
 		callback: async () => {
-			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
-				new Notice("Sign in to Proton Drive first.");
+			const connection = await requireConnectedRemoteClient();
+			if (!connection) {
 				return;
 			}
 
-			const activeSession = await buildActiveSession();
-			if (!activeSession) {
-				new Notice("Sign in to Proton Drive first.");
-				return;
-			}
-			const client = await plugin.protonDriveService.connect(activeSession);
-			if (client) {
-				new Notice("Connected to Proton Drive.");
-				return;
-			}
-
-			new Notice("Unable to connect to Proton Drive.");
+			new Notice(`Connected to ${connection.provider.label}.`);
 		},
 	});
 
 	plugin.addCommand({
 		id: "protondrive-login",
-		name: "Sign in to Proton Drive",
+		name: "Sign in to remote provider",
 		callback: () => {
-			new ProtonDriveLoginModal(plugin.app, plugin).open();
+			new RemoteProviderLoginModal(plugin.app, plugin).open();
 		},
 	});
 
 	plugin.addCommand({
 		id: "protondrive-logout",
-		name: "Sign out of Proton Drive",
+		name: "Sign out of remote provider",
 		callback: async () => {
-			await plugin.authService.logout();
-			plugin.settings.protonSession = undefined;
-			plugin.settings.accountEmail = "";
-			plugin.settings.hasAuthSession = false;
+			const provider = plugin.getRemoteProvider();
+			await provider.logout();
+			plugin.clearStoredRemoteSession();
 			await plugin.saveSettings();
-			plugin.protonDriveService.disconnect();
-			new Notice("Signed out of Proton Drive.");
+			provider.disconnect();
+			new Notice(`Signed out of ${provider.label}.`);
 		},
 	});
 
 	plugin.addCommand({
 		id: "protondrive-review-conflicts",
-		name: "Review Proton Drive conflicts",
+		name: "Review sync conflicts",
 		callback: () => {
-			new ProtonDriveConflictModal(plugin.app, plugin).open();
+			new SyncConflictModal(plugin.app, plugin).open();
 		},
 	});
 
 	plugin.addCommand({
 		id: "protondrive-plan-sync",
-		name: "Plan Proton Drive sync",
+		name: "Plan remote sync",
 		callback: async () => {
-			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Select a remote folder in settings first.");
-				return;
-			}
-			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
-				new Notice("Sign in to Proton Drive first.");
+			const scopeId = requireScopeId();
+			if (!scopeId) {
 				return;
 			}
 
-			const activeSession = await buildActiveSession();
-			if (!activeSession) {
-				new Notice("Sign in to Proton Drive first.");
-				return;
-			}
-			const client = await plugin.protonDriveService.connect(activeSession);
-			if (!client) {
-				new Notice("Unable to connect to Proton Drive.");
+			const connection = await requireConnectedRemoteClient();
+			if (!connection) {
 				return;
 			}
 
+			const { provider, client } = connection;
 			try {
-				const result = await planSync(plugin.app, client, plugin.settings.remoteFolderId, {
-					conflictStrategy: plugin.settings.conflictStrategy,
-				});
+				const result = await planSync(
+					plugin.app,
+					localProvider,
+					provider,
+					client,
+					scopeId,
+					{
+						conflictStrategy: plugin.settings.conflictStrategy,
+					},
+				);
 				new Notice(`Planned ${result.jobsPlanned} jobs across ${result.entries} entries.`);
 			} catch (error) {
 				console.warn("Sync planning failed.", error);
@@ -253,33 +219,26 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 
 	plugin.addCommand({
 		id: "protondrive-poll-remote",
-		name: "Poll Proton Drive changes",
+		name: "Poll remote changes",
 		callback: async () => {
-			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Select a remote folder in settings first.");
-				return;
-			}
-			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
-				new Notice("Sign in to Proton Drive first.");
+			const scopeId = requireScopeId();
+			if (!scopeId) {
 				return;
 			}
 
-			const activeSession = await buildActiveSession();
-			if (!activeSession) {
-				new Notice("Sign in to Proton Drive first.");
-				return;
-			}
-			const client = await plugin.protonDriveService.connect(activeSession);
-			if (!client) {
-				new Notice("Unable to connect to Proton Drive.");
+			const connection = await requireConnectedRemoteClient();
+			if (!connection) {
 				return;
 			}
 
+			const { provider, client } = connection;
 			try {
 				const result = await pollRemoteSync(
 					plugin.app,
+					localProvider,
+					provider,
 					client,
-					plugin.settings.remoteFolderId,
+					scopeId,
 					{
 						conflictStrategy: plugin.settings.conflictStrategy,
 					},
@@ -294,33 +253,26 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 
 	plugin.addCommand({
 		id: "protondrive-run-planned-sync",
-		name: "Run planned Proton Drive sync",
+		name: "Run planned remote sync",
 		callback: async () => {
-			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Select a remote folder in settings first.");
-				return;
-			}
-			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
-				new Notice("Sign in to Proton Drive first.");
+			const scopeId = requireScopeId();
+			if (!scopeId) {
 				return;
 			}
 
-			const activeSession = await buildActiveSession();
-			if (!activeSession) {
-				new Notice("Sign in to Proton Drive first.");
-				return;
-			}
-			const client = await plugin.protonDriveService.connect(activeSession);
-			if (!client) {
-				new Notice("Unable to connect to Proton Drive.");
+			const connection = await requireConnectedRemoteClient();
+			if (!connection) {
 				return;
 			}
 
+			const { provider, client } = connection;
 			try {
 				const result = await runPlannedSync(
 					plugin.app,
+					localProvider,
+					provider,
 					client,
-					plugin.settings.remoteFolderId,
+					scopeId,
 					{
 						conflictStrategy: plugin.settings.conflictStrategy,
 					},
@@ -339,8 +291,8 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-auto-sync-now",
 		name: "Run auto sync now",
 		callback: async () => {
-			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Select a remote folder in settings first.");
+			const scopeId = requireScopeId();
+			if (!scopeId) {
 				return;
 			}
 			try {
@@ -355,35 +307,28 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 
 	plugin.addCommand({
 		id: "protondrive-sync-vault",
-		name: "Sync vault to Proton Drive",
+		name: "Sync vault to remote",
 		callback: async () => {
-			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Select a remote folder in settings first.");
-				return;
-			}
-			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
-				new Notice("Sign in to Proton Drive first.");
+			const scopeId = requireScopeId();
+			if (!scopeId) {
 				return;
 			}
 
-			const activeSession = await buildActiveSession();
-			if (!activeSession) {
-				new Notice("Sign in to Proton Drive first.");
-				return;
-			}
-			const client = await plugin.protonDriveService.connect(activeSession);
-			if (!client) {
-				new Notice("Unable to connect to Proton Drive.");
+			const connection = await requireConnectedRemoteClient();
+			if (!connection) {
 				return;
 			}
 
+			const { provider, client } = connection;
 			try {
-				const result = await syncVaultToProtonDrive(
+				const result = await syncVaultToRemote(
 					plugin.app,
+					localProvider,
+					provider,
 					client,
-					plugin.settings.remoteFolderId,
+					scopeId,
 				);
-				new Notice(`Uploaded ${result.uploaded} files to Proton Drive.`);
+				new Notice(`Uploaded ${result.uploaded} files to ${provider.label}.`);
 			} catch (error) {
 				console.warn("Vault sync failed.", error);
 				new Notice("Vault sync failed. Check the console for details.");
@@ -393,35 +338,28 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 
 	plugin.addCommand({
 		id: "protondrive-restore-vault",
-		name: "Restore vault from Proton Drive",
+		name: "Restore vault from remote",
 		callback: async () => {
-			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Select a remote folder in settings first.");
-				return;
-			}
-			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
-				new Notice("Sign in to Proton Drive first.");
+			const scopeId = requireScopeId();
+			if (!scopeId) {
 				return;
 			}
 
-			const activeSession = await buildActiveSession();
-			if (!activeSession) {
-				new Notice("Sign in to Proton Drive first.");
-				return;
-			}
-			const client = await plugin.protonDriveService.connect(activeSession);
-			if (!client) {
-				new Notice("Unable to connect to Proton Drive.");
+			const connection = await requireConnectedRemoteClient();
+			if (!connection) {
 				return;
 			}
 
+			const { provider, client } = connection;
 			try {
-				const result = await restoreVaultFromProtonDrive(
+				const result = await restoreVaultFromRemote(
 					plugin.app,
+					localProvider,
+					provider,
 					client,
-					plugin.settings.remoteFolderId,
+					scopeId,
 				);
-				new Notice(`Downloaded ${result.downloaded} files from Proton Drive.`);
+				new Notice(`Downloaded ${result.downloaded} files from ${provider.label}.`);
 			} catch (error) {
 				console.warn("Vault restore failed.", error);
 				new Notice("Vault restore failed. Check the console for details.");
@@ -431,9 +369,9 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 
 	plugin.addCommand({
 		id: "protondrive-show-status",
-		name: "Show Proton Drive sync status",
+		name: "Show sync status",
 		callback: () => {
-			new ProtonDriveStatusModal(plugin.app, plugin).open();
+			new SyncStatusModal(plugin.app, plugin).open();
 		},
 	});
 
@@ -459,31 +397,22 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 		id: "protondrive-rebuild-index",
 		name: "Rebuild sync index",
 		callback: async () => {
-			if (!plugin.settings.remoteFolderId.trim()) {
-				new Notice("Select a remote folder in settings first.");
-				return;
-			}
-			if (!plugin.settings.protonSession || !plugin.settings.hasAuthSession) {
-				new Notice("Sign in to Proton Drive first.");
+			const scopeId = requireScopeId();
+			if (!scopeId) {
 				return;
 			}
 
-			const activeSession = await buildActiveSession();
-			if (!activeSession) {
-				new Notice("Sign in to Proton Drive first.");
-				return;
-			}
-			const client = await plugin.protonDriveService.connect(activeSession);
-			if (!client) {
-				new Notice("Unable to connect to Proton Drive.");
+			const connection = await requireConnectedRemoteClient();
+			if (!connection) {
 				return;
 			}
 
+			const { provider, client } = connection;
 			try {
-				const localFs = new ObsidianLocalFs(plugin.app);
-				const remoteFs = new ProtonDriveRemoteFs(client, plugin.settings.remoteFolderId);
+				const localFileSystem = localProvider.createLocalFileSystem(plugin.app);
+				const remoteFileSystem = provider.createRemoteFileSystem(client, scopeId);
 				const stateStore = new PluginDataStateStore();
-				const engine = new SyncEngine(localFs, remoteFs, stateStore, {
+				const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
 					conflictStrategy: plugin.settings.conflictStrategy,
 				});
 				await engine.load();
@@ -498,7 +427,7 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 
 	plugin.addCommand({
 		id: "protondrive-export-diagnostics",
-		name: "Export Proton Drive diagnostics",
+		name: "Export diagnostics",
 		callback: async () => {
 			try {
 				const path = await exportDiagnostics(plugin.app, plugin);
@@ -512,10 +441,11 @@ export function registerCommands(plugin: ProtonDriveSyncPlugin) {
 
 	plugin.addCommand({
 		id: "protondrive-reset-connection",
-		name: "Reset Proton Drive connection",
+		name: "Reset remote connection",
 		callback: () => {
-			plugin.protonDriveService.disconnect();
-			new Notice("Proton Drive connection reset.");
+			const provider = plugin.getRemoteProvider();
+			provider.disconnect();
+			new Notice(`${provider.label} connection reset.`);
 		},
 	});
 }

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
 	createEntry,
-	createLocalFs,
-	createRemoteFs,
+	createLocalFileSystem,
+	createRemoteFileSystem,
 	createState,
 	FIXED_NOW,
 } from "../helpers/sync-fixtures";
-import { reconcileSnapshot } from "../../src/sync/reconciler";
+import { reconcileSnapshot } from "../../src/sync/planner/reconciler";
 
 describe("reconcileSnapshot", () => {
 	afterEach(() => {
@@ -16,8 +16,8 @@ describe("reconcileSnapshot", () => {
 	test("creates upload job for local-only new file", async () => {
 		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
 		const result = await reconcileSnapshot(
-			createLocalFs([{ path: "notes/new.md", type: "file", mtimeMs: 100, size: 42 }]),
-			createRemoteFs([]),
+			createLocalFileSystem([{ path: "notes/new.md", type: "file", mtimeMs: 100, size: 42 }]),
+			createRemoteFileSystem([]),
 			createState(),
 		);
 
@@ -50,8 +50,8 @@ describe("reconcileSnapshot", () => {
 		]);
 
 		const result = await reconcileSnapshot(
-			createLocalFs([{ path: "notes/a.md", type: "file", mtimeMs: 200, size: 10 }]),
-			createRemoteFs([]),
+			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 200, size: 10 }]),
+			createRemoteFileSystem([]),
 			state,
 			{ conflictStrategy: "remote-wins" },
 		);
@@ -80,8 +80,8 @@ describe("reconcileSnapshot", () => {
 		]);
 
 		const result = await reconcileSnapshot(
-			createLocalFs([{ path: "notes/a.md", type: "file", mtimeMs: 200, size: 10 }]),
-			createRemoteFs([]),
+			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 200, size: 10 }]),
+			createRemoteFileSystem([]),
 			state,
 			{ conflictStrategy: "remote-wins" },
 		);
@@ -107,8 +107,8 @@ describe("reconcileSnapshot", () => {
 		]);
 
 		const result = await reconcileSnapshot(
-			createLocalFs([]),
-			createRemoteFs([
+			createLocalFileSystem([]),
+			createRemoteFileSystem([
 				{
 					id: "remote-a",
 					name: "a.md",
@@ -146,8 +146,8 @@ describe("reconcileSnapshot", () => {
 		]);
 
 		const result = await reconcileSnapshot(
-			createLocalFs([{ path: "notes/a.md", type: "file", mtimeMs: 200, size: 5 }]),
-			createRemoteFs([
+			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 200, size: 5 }]),
+			createRemoteFileSystem([
 				{
 					id: "remote-a",
 					name: "a.md",
@@ -182,7 +182,11 @@ describe("reconcileSnapshot", () => {
 			}),
 		]);
 
-		const result = await reconcileSnapshot(createLocalFs([]), createRemoteFs([]), state);
+		const result = await reconcileSnapshot(
+			createLocalFileSystem([]),
+			createRemoteFileSystem([]),
+			state,
+		);
 
 		expect(result.jobs).toEqual([
 			expect.objectContaining({

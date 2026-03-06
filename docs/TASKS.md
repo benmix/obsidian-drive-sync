@@ -87,3 +87,79 @@
 - [ ] Validate mobile compatibility (runtime tests + UX polish).
 - [x] Add unit tests for reconciler, job queue, exclude rules.
 - [ ] Add unit tests for adapters.
+
+## Runtime architecture refactor
+
+### Phase A - behavior-preserving split
+
+- [x] Move auto-sync/session/scheduler orchestration from `main.ts` into `runtime/plugin-runtime.ts`.
+- [x] Keep `main.ts` as plugin facade (load/save settings, UI registration, command registration).
+- [x] Preserve existing external plugin methods used by UI/commands (`runAutoSync`, `pauseAutoSync`, `resumeAutoSync`, `isSyncRunning`, auth pause status).
+
+### Phase B - orchestration boundaries
+
+- [x] Introduce `runtime/session-manager.ts` for restore/refresh/persist auth session logic.
+- [x] Introduce `runtime/trigger-scheduler.ts` for interval/debounce/pending single-flight scheduling.
+- [x] Split sync execution into `runtime/sync-coordinator.ts` (runtime orchestration) and `sync/use-cases/sync-runner.ts` (provider-agnostic one-cycle pipeline).
+
+### Phase C - resilience extension points
+
+- [x] Add provider-scoped `RateLimitedRemoteFileSystem` strategy chain (`provider/remote-file-system/strategies/*`).
+- [x] Add optional `runtime/network-policy.ts` to centralize network gating decisions.
+
+### Phase D - sync module layout hygiene
+
+- [x] Reorganize `sync/` by responsibility: `contracts/`, `planner/`, `engine/`, `state/`, `support/`, `use-cases/`.
+- [x] Move use-case orchestration (`manual-sync`, `diagnostics`) into `runtime/use-cases/`.
+- [x] Keep behavior unchanged while updating all import boundaries and tests/build.
+- [x] Add `oxlint` import boundary guards (`no-restricted-imports` overrides) for sync layering.
+
+### Verification
+
+- [x] `pnpm run test` passes after each phase.
+- [x] `pnpm run build` passes with no new type-unsafe bypasses.
+- [ ] Manual checks: login restore, token refresh, pause/resume, local rename sync, remote rename sync.
+
+## Remote provider abstraction
+
+### Phase A - provider foundation
+
+- [x] Add `RemoteProvider` contracts and registry.
+- [x] Add Proton provider implementation over existing auth/service/remote-file-system.
+- [x] Add `LocalProvider` abstraction and Obsidian local provider implementation (`local-file-system` + watcher).
+- [x] Add `LocalProviderRegistry` and local provider bootstrap (`createLocalProviderRegistry`).
+- [x] Add provider-aware settings fields (`remoteProviderId`, `remoteScope*`, `remoteProviderCredentials`).
+
+### Phase B - runtime integration
+
+- [x] Refactor `SessionManager` to restore/refresh/connect via provider abstraction.
+- [x] Refactor `SyncRunner` to create remote file system via provider (`provider.createRemoteFileSystem(...)`).
+
+### Phase C - UI and command migration
+
+- [x] Migrate login/settings auth flows to provider interface (keep current Proton UX).
+- [x] Migrate command handlers and conflict/remote-root modals off direct Proton service usage.
+
+### Verification
+
+- [x] `pnpm run lint` passes with provider changes.
+- [x] `pnpm run test` and `pnpm run build` pass with provider changes.
+- [x] One-time legacy settings migration on load, then persist provider-only settings.
+
+## Filesystem contract extraction
+
+- [x] Extract shared file-system contracts from `sync/contracts/types.ts` into `src/filesystem/contracts.ts`.
+- [x] Migrate `provider/` imports from `sync/contracts` to `filesystem/contracts`.
+- [x] Migrate `sync/runtime/ui/tests` imports for file-system types to `filesystem/contracts`.
+- [x] Keep `sync/contracts/types.ts` focused on sync-run contracts (`SyncRunTrigger` / `SyncRunRequest`).
+- [x] Add lint boundaries to enforce `provider` cannot import `sync/**` and `filesystem` stays dependency-light.
+- [x] Verification: `pnpm run lint` + `pnpm run test` + `pnpm run build`.
+
+## Remote rate limiting evolution
+
+- [x] Document necessity/trade-offs and alternatives (`docs/REMOTE_RATE_LIMITING.md`).
+- [x] Keep throttling and add adaptive cooldown behavior for rate-limit/transient failures.
+- [x] Support `retryAfterMs`/`Retry-After` hints when available.
+- [x] Move rate limiting to provider strategy chain and remove runtime/settings coupling.
+- [x] Remove external toggle (`enableRateLimitedRemoteFileSystem`) and keep provider-internal defaults.
+- [x] Extend unit tests for adaptive cooldown and strategy composition behavior.

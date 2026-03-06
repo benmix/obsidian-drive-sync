@@ -1,38 +1,41 @@
 import { PluginSettingTab, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { getBuiltInExcludePatterns } from "./sync/exclude";
-import { ProtonDriveLoginModal } from "./ui/login-modal";
-import { ProtonDriveRemoteFs } from "./sync/remote-fs";
-import { ProtonDriveRemoteRootModal } from "./ui/remote-root-modal";
-import ProtonDriveSyncPlugin from "./main";
-import type { ProtonSession } from "./proton-drive/sdk-session";
-import type { ReusableCredentials } from "./proton-drive/proton-auth/types";
+import { buildActiveRemoteSession } from "./provider/session";
+import { DEFAULT_REMOTE_PROVIDER_ID } from "./provider/contracts";
+import { getBuiltInExcludePatterns } from "./sync/planner/exclude";
+import type { ObsidianDriveSyncPluginApi } from "./plugin/contracts";
+import { RemoteFolderPickerModal } from "./ui/remote-root-modal";
+import { RemoteProviderLoginModal } from "./ui/login-modal";
 
 export interface ProtonDriveSettings {
-	remoteFolderId: string;
-	remoteFolderPath: string;
-	protonSession?: ReusableCredentials;
-	accountEmail: string;
-	hasAuthSession: boolean;
+	remoteProviderId: string;
+	remoteScopeId: string;
+	remoteScopePath: string;
+	remoteProviderCredentials?: unknown;
+	remoteAccountEmail: string;
+	remoteHasAuthSession: boolean;
 	conflictStrategy: "local-wins" | "remote-wins" | "manual";
 	autoSyncEnabled: boolean;
+	enableNetworkPolicy: boolean;
 }
 
 export const DEFAULT_SETTINGS: ProtonDriveSettings = {
-	remoteFolderId: "",
-	remoteFolderPath: "",
-	protonSession: undefined,
-	accountEmail: "",
-	hasAuthSession: false,
+	remoteProviderId: DEFAULT_REMOTE_PROVIDER_ID,
+	remoteScopeId: "",
+	remoteScopePath: "",
+	remoteProviderCredentials: undefined,
+	remoteAccountEmail: "",
+	remoteHasAuthSession: false,
 	conflictStrategy: "local-wins",
 	autoSyncEnabled: false,
+	enableNetworkPolicy: false,
 };
 
 export class ProtonDriveSettingTab extends PluginSettingTab {
-	plugin: ProtonDriveSyncPlugin;
+	plugin: ObsidianDriveSyncPluginApi;
 	private remoteValidationSequence = 0;
 
-	constructor(app: App, plugin: ProtonDriveSyncPlugin) {
+	constructor(app: App, plugin: ObsidianDriveSyncPluginApi) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -41,19 +44,19 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 
 		containerEl.empty();
+		const provider = this.plugin.getRemoteProvider();
 
 		const accountSetting = new Setting(containerEl)
-			.setName("Proton Drive account")
+			.setName("Remote account")
 			.setDesc(this.getAuthStatusText());
-		if (this.plugin.settings.hasAuthSession) {
+		if (this.plugin.hasRemoteAuthSession()) {
 			accountSetting.addButton((button) => {
 				button.setButtonText("Sign out");
 				button.onClick(async () => {
-					this.plugin.settings.protonSession = undefined;
-					this.plugin.settings.accountEmail = "";
-					this.plugin.settings.hasAuthSession = false;
-					await this.plugin.authService.logout();
-					this.plugin.protonDriveService.disconnect();
+					const provider = this.plugin.getRemoteProvider();
+					await provider.logout();
+					this.plugin.clearStoredRemoteSession();
+					provider.disconnect();
 					await this.plugin.saveSettings();
 					this.display();
 				});
@@ -63,7 +66,7 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 				button.setButtonText("Sign in");
 				button.setCta();
 				button.onClick(() => {
-					const modal = new ProtonDriveLoginModal(this.app, this.plugin);
+					const modal = new RemoteProviderLoginModal(this.app, this.plugin);
 					modal.onClose = () => {
 						this.display();
 					};
@@ -72,21 +75,23 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 			});
 		}
 
-		const remoteFolderPath = this.plugin.settings.remoteFolderPath.trim();
-		const remoteFolderId = this.plugin.settings.remoteFolderId.trim();
+		const remoteFolderPath = this.plugin.getRemoteScopePath();
+		const remoteFolderId = this.plugin.getRemoteScopeId();
 		const remotePathLabel = remoteFolderPath
 			? remoteFolderPath
 			: remoteFolderId
-				? "(legacy ID configured, reselect to show path)"
+				? "(ID configured, reselect to show path)"
 				: "(not selected)";
 		const remoteFolderSetting = new Setting(containerEl)
 			.setName("Remote folder")
-			.setDesc("Choose the target Proton Drive folder path. Validation runs automatically.")
+			.setDesc(
+				`Choose the target ${provider.label} folder path. Validation runs automatically.`,
+			)
 			.addText((text) => text.setValue(remotePathLabel).setDisabled(true))
 			.addButton((button) => {
 				button.setButtonText("Choose folder");
 				button.onClick(() => {
-					const modal = new ProtonDriveRemoteRootModal(this.app, this.plugin);
+					const modal = new RemoteFolderPickerModal(this.app, this.plugin);
 					modal.onClose = () => {
 						this.display();
 					};
@@ -94,7 +99,7 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 				});
 			});
 		const remoteValidationStatus = remoteFolderSetting.descEl.createDiv({
-			cls: "protondrive-remote-validation-status",
+			cls: "drive-sync-remote-validation-status",
 		});
 		void this.autoValidateRemoteFolder(remoteValidationStatus);
 
@@ -133,18 +138,32 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 					this.plugin.refreshAutoSync();
 				}),
 			);
+
+		new Setting(containerEl)
+			.setName("Experimental: network policy")
+			.setDesc(
+				"Gate sync runs by online status and transient-network cooldown. Disabled by default.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableNetworkPolicy)
+					.onChange(async (value) => {
+						this.plugin.settings.enableNetworkPolicy = value;
+						await this.plugin.saveSettings();
+					}),
+			);
 	}
 
 	private getAuthStatusText(): string {
-		if (this.plugin.settings.hasAuthSession && !this.plugin.authService.isSessionValidated()) {
+		const provider = this.plugin.getRemoteProvider();
+		if (this.plugin.hasRemoteAuthSession() && !provider.isSessionValidated()) {
 			return "Session stored. Validation pending.";
 		}
-		if (this.plugin.settings.hasAuthSession) {
-			return this.plugin.settings.accountEmail
-				? `Signed in as ${this.plugin.settings.accountEmail}.`
-				: "Signed in to Proton Drive.";
+		if (this.plugin.hasRemoteAuthSession()) {
+			const email = this.plugin.getRemoteAccountEmail();
+			return email ? `Signed in as ${email}.` : `Signed in to ${provider.label}.`;
 		}
-		if (this.plugin.settings.protonSession) {
+		if (this.plugin.getStoredProviderCredentials()) {
 			return "Session needs attention. Sign in again to restore access.";
 		}
 		if (this.plugin.isAuthPaused()) {
@@ -170,53 +189,32 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 		ok: boolean;
 		message: string;
 	}> {
-		if (!this.plugin.settings.remoteFolderId.trim()) {
+		const scopeId = this.plugin.getRemoteScopeId();
+		const provider = this.plugin.getRemoteProvider();
+		if (!scopeId) {
 			return { ok: false, message: "Select a folder first." };
 		}
-		if (!this.plugin.settings.protonSession || !this.plugin.settings.hasAuthSession) {
-			return { ok: false, message: "Sign in to Proton Drive first." };
+		if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
+			return {
+				ok: false,
+				message: `Sign in to ${provider.label} first.`,
+			};
 		}
 
-		const session = this.plugin.authService.getSession();
-		if (!session) {
-			return { ok: false, message: "Sign in to Proton Drive first." };
+		const activeSession = await buildActiveRemoteSession(this.plugin);
+		if (!activeSession) {
+			return {
+				ok: false,
+				message: `Sign in to ${provider.label} first.`,
+			};
 		}
-		const activeSession: ProtonSession = { ...session };
-		activeSession.onTokenRefresh = async () => {
-			try {
-				await this.plugin.authService.refreshToken();
-				const refreshedSession = this.plugin.authService.getSession();
-				if (refreshedSession) {
-					Object.assign(activeSession, refreshedSession);
-				}
-				this.plugin.settings.protonSession =
-					this.plugin.authService.getReusableCredentials();
-				this.plugin.settings.hasAuthSession = true;
-				await this.plugin.saveSettings();
-			} catch (refreshError) {
-				console.warn("Failed to refresh Proton session.", refreshError);
-				this.plugin.settings.hasAuthSession = false;
-				await this.plugin.saveSettings();
-			}
-		};
-		const client = await this.plugin.protonDriveService.connect(activeSession);
+		const client = await provider.connect(activeSession);
 		if (!client) {
-			return { ok: false, message: "Unable to connect to Proton Drive." };
+			return {
+				ok: false,
+				message: `Unable to connect to ${provider.label}.`,
+			};
 		}
-
-		try {
-			const remoteFs = new ProtonDriveRemoteFs(client, this.plugin.settings.remoteFolderId);
-			const node = await remoteFs.getNode?.(this.plugin.settings.remoteFolderId);
-			if (!node) {
-				return { ok: false, message: "Folder not found." };
-			}
-			if (node.type !== "folder") {
-				return { ok: false, message: "Selected node is not a folder." };
-			}
-			return { ok: true, message: "OK" };
-		} catch (error) {
-			console.warn("Remote folder validation failed.", error);
-			return { ok: false, message: "Failed to validate folder." };
-		}
+		return await provider.validateScope(client, scopeId);
 	}
 }

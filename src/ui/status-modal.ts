@@ -1,14 +1,14 @@
-import { formatBytes, now } from "../sync/utils";
+import { formatBytes, now } from "../sync/support/utils";
 import { Modal, Setting } from "obsidian";
 import type { App } from "obsidian";
 import { loadPluginData } from "../data/plugin-data";
-import { PluginDataStateStore } from "../sync/state-store";
-import type ProtonDriveSyncPlugin from "../main";
+import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
+import { PluginDataStateStore } from "../sync/state/state-store";
 
-export class ProtonDriveStatusModal extends Modal {
-	private plugin: ProtonDriveSyncPlugin;
+export class SyncStatusModal extends Modal {
+	private plugin: ObsidianDriveSyncPluginApi;
 
-	constructor(app: App, plugin: ProtonDriveSyncPlugin) {
+	constructor(app: App, plugin: ObsidianDriveSyncPluginApi) {
 		super(app);
 		this.plugin = plugin;
 	}
@@ -16,7 +16,8 @@ export class ProtonDriveStatusModal extends Modal {
 	async onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl("h2", { text: "Proton Drive sync status" });
+		const provider = this.plugin.getRemoteProvider();
+		contentEl.createEl("h2", { text: `${provider.label} sync status` });
 
 		const data = await loadPluginData(this.plugin);
 		const state = await new PluginDataStateStore().load();
@@ -29,9 +30,11 @@ export class ProtonDriveStatusModal extends Modal {
 			: "Disabled";
 		const authStatus = this.plugin.isAuthPaused()
 			? (this.plugin.getLastAuthError() ?? "Auth paused")
-			: this.plugin.authService.isSessionValidated()
-				? "OK"
-				: "Session stored (validation pending)";
+			: this.plugin.hasRemoteAuthSession()
+				? provider.isSessionValidated()
+					? "OK"
+					: "Session stored (validation pending)"
+				: "Signed out";
 
 		const jobCounts = {
 			pending: 0,
@@ -151,11 +154,11 @@ export class ProtonDriveStatusModal extends Modal {
 		if ((state.jobs?.length ?? 0) > 0) {
 			contentEl.createEl("h3", { text: "Queue details" });
 			const queueTable = contentEl.createEl("div", {
-				cls: "protondrive-queue",
+				cls: "drive-sync-queue",
 			});
 			for (const job of (state.jobs ?? []).slice(0, 12)) {
 				const row = queueTable.createEl("div", {
-					cls: "protondrive-queue-row",
+					cls: "drive-sync-queue-row",
 				});
 				if (job.status === "processing") {
 					row.addClass("is-processing");
@@ -183,11 +186,11 @@ export class ProtonDriveStatusModal extends Modal {
 		if (logs.length > 0) {
 			contentEl.createEl("h3", { text: "Recent logs" });
 			const logList = contentEl.createEl("div", {
-				cls: "protondrive-sync-logs",
+				cls: "drive-sync-logs",
 			});
 			for (const entry of logs.slice(-20)) {
 				const row = logList.createEl("div", {
-					cls: "protondrive-sync-log-row",
+					cls: "drive-sync-log-row",
 				});
 				row.createEl("div", { text: entry.at });
 				row.createEl("div", { text: entry.context ?? "general" });

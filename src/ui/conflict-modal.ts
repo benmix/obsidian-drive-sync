@@ -1,13 +1,10 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { loadPluginData } from "../data/plugin-data";
-import { now } from "../sync/utils";
-import { ObsidianLocalFs } from "../sync/local-fs";
-import { PluginDataStateStore } from "../sync/state-store";
-import { ProtonDriveRemoteFs } from "../sync/remote-fs";
-import type ProtonDriveSyncPlugin from "../main";
-import type { ProtonSession } from "../proton-drive/sdk-session";
-import { SyncEngine } from "../sync/sync-engine";
+import { buildActiveRemoteSession } from "../provider/session";
+import { now } from "../sync/support/utils";
+import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
+import { PluginDataStateStore } from "../sync/state/state-store";
+import { SyncEngine } from "../sync/engine/sync-engine";
 
 type ConflictItem = {
 	path: string;
@@ -16,13 +13,13 @@ type ConflictItem = {
 	localMtimeMs?: number;
 };
 
-export class ProtonDriveConflictModal extends Modal {
-	private plugin: ProtonDriveSyncPlugin;
+export class SyncConflictModal extends Modal {
+	private plugin: ObsidianDriveSyncPluginApi;
 	private conflicts: ConflictItem[] = [];
 	private loading = false;
 	private error: string | null = null;
 
-	constructor(app: App, plugin: ProtonDriveSyncPlugin) {
+	constructor(app: App, plugin: ObsidianDriveSyncPluginApi) {
 		super(app);
 		this.plugin = plugin;
 	}
@@ -71,14 +68,14 @@ export class ProtonDriveConflictModal extends Modal {
 
 		for (const item of this.conflicts) {
 			const section = contentEl.createDiv({
-				cls: "protondrive-conflict-row",
+				cls: "drive-sync-conflict-row",
 			});
 			section.createEl("div", {
 				text: item.path,
-				cls: "protondrive-conflict-path",
+				cls: "drive-sync-conflict-path",
 			});
 			const detail = section.createEl("div", {
-				cls: "protondrive-conflict-meta",
+				cls: "drive-sync-conflict-meta",
 			});
 			detail.createEl("div", {
 				text: item.localMtimeMs
@@ -155,50 +152,37 @@ export class ProtonDriveConflictModal extends Modal {
 				await this.clearConflict(item.path, false);
 				return;
 			}
-			const data = await loadPluginData(this.plugin);
-			if (!data.settings.remoteFolderId.trim()) {
+
+			const scopeId = this.plugin.getRemoteScopeId();
+			if (!scopeId) {
 				new Notice("Select a remote folder in settings first.");
 				return;
 			}
-			if (!data.settings.protonSession || !data.settings.hasAuthSession) {
-				new Notice("Sign in to Proton Drive first.");
+
+			const provider = this.plugin.getRemoteProvider();
+			if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
+				new Notice(`Sign in to ${provider.label} first.`);
 				return;
 			}
 
-			const session = this.plugin.authService.getSession();
-			if (!session) {
-				new Notice("Sign in to Proton Drive first.");
+			const activeSession = await buildActiveRemoteSession(this.plugin);
+			if (!activeSession) {
+				new Notice(`Sign in to ${provider.label} first.`);
 				return;
 			}
-			const activeSession: ProtonSession = { ...session };
-			activeSession.onTokenRefresh = async () => {
-				try {
-					await this.plugin.authService.refreshToken();
-					const refreshedSession = this.plugin.authService.getSession();
-					if (refreshedSession) {
-						Object.assign(activeSession, refreshedSession);
-					}
-					this.plugin.settings.protonSession =
-						this.plugin.authService.getReusableCredentials();
-					this.plugin.settings.hasAuthSession = true;
-					await this.plugin.saveSettings();
-				} catch (refreshError) {
-					console.warn("Failed to refresh Proton session.", refreshError);
-					this.plugin.settings.hasAuthSession = false;
-					await this.plugin.saveSettings();
-				}
-			};
-			const client = await this.plugin.protonDriveService.connect(activeSession);
+
+			const client = await provider.connect(activeSession);
 			if (!client) {
-				new Notice("Unable to connect to Proton Drive.");
+				new Notice(`Unable to connect to ${provider.label}.`);
 				return;
 			}
+			this.plugin.handleAuthRecovered(false);
 
-			const localFs = new ObsidianLocalFs(this.app);
-			const remoteFs = new ProtonDriveRemoteFs(client, data.settings.remoteFolderId);
+			const localFileSystem = this.plugin.getLocalProvider().createLocalFileSystem(this.app);
+			const remoteFileSystem = provider.createRemoteFileSystem(client, scopeId);
 			const stateStore = new PluginDataStateStore();
-			const engine = new SyncEngine(localFs, remoteFs, stateStore, {
-				conflictStrategy: data.settings.conflictStrategy,
+			const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
+				conflictStrategy: this.plugin.settings.conflictStrategy,
 			});
 			await engine.load();
 

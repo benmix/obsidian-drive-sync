@@ -70,6 +70,10 @@
     - Scheduler（调度任务队列）
     - State Machine（路径级状态）
 
+- **Filesystem Contracts Layer**
+    - 提供 `LocalFileSystem` / `RemoteFileSystem` / `LocalChange` 等共享类型契约
+    - 为 `sync/` 与 `provider/` 的共同底层依赖，不包含业务流程逻辑
+
 - **LocalFS Adapter**
     - 基于 Obsidian Vault API
     - 提供事件流与文件操作能力
@@ -418,5 +422,142 @@ if localChanged && remoteChanged → Conflict
 
 - 是否存在官方 change feed / cursor
 - 是否能在 SDK 公共 API 中获得更强的远端变更指纹（etag/mtime/size 组合）
+
+---
+
+## 19. Runtime Refactor Plan (2026-03)
+
+### 19.1 Goals
+
+- 将插件入口与同步编排解耦：`main.ts` 保持“壳层”职责，运行时逻辑下沉至 `runtime/*`。
+- 保持同步内核语义不变：`reconciler + queue + executor` 作为稳定内核，不在本轮重构改写算法。
+- 提升可测试性：调度、会话、单轮执行可独立测试。
+
+### 19.2 Target layering
+
+- **Plugin Facade (`main.ts`)**
+    - settings load/save
+    - UI tab / commands registration
+    - lifecycle delegation
+
+- **Runtime Layer (`runtime/*`)**
+    - `plugin-runtime.ts`: high-level orchestration and plugin-facing API
+    - `session-manager.ts`: restore/refresh/persist auth session
+    - `trigger-scheduler.ts`: interval + local debounce + pending single-flight
+    - `sync-coordinator.ts`: runtime orchestration for provider/session/scope
+    - `use-cases/*`: manual sync and diagnostics orchestration
+
+- **Sync Kernel (`sync/*`)**
+    - `contracts/*`: stable file system contracts and event types
+    - `planner/*`: local/remote planning + reconciliation policies
+    - `engine/*`: execution engine and queue
+    - `state/*`: state store and in-memory index model
+    - `support/*`: shared helpers
+    - `use-cases/*`: provider-agnostic one-cycle sync execution
+    - keeps conflict/retry/state semantics unchanged
+
+- **Provider remote file system strategy boundary (`provider/remote-file-system/*`)**
+    - shared, composable `RemoteFileSystem` decorators/strategies
+    - provider-owned composition (runtime does not inject decorators)
+    - layering constraints are enforced by lint (`no-restricted-imports` overrides)
+
+### 19.3 Non-goals for this refactor
+
+- 不引入新的冲突策略。
+- 不改变任务优先级和重试策略语义。
+- 不切换存储后端（继续使用 Dexie IndexedDB + plugin data settings）。
+
+### 19.4 Rollout phases
+
+1. **Phase A (behavior-preserving split)**
+    - extract orchestration from `main.ts` into `runtime/plugin-runtime.ts`
+    - keep public plugin methods stable for UI/commands compatibility
+
+2. **Phase B (orchestration boundaries)**
+    - split session/scheduler/runner into dedicated runtime modules
+
+3. **Phase C (resilience extensions)**
+    - add `NetworkPolicy` runtime module (feature-flagged)
+    - add provider-scoped `RateLimitedRemoteFileSystem` strategy chain (provider default)
+    - evolve remote rate limiter to adaptive cooldown on 429/transient failures
+
+### 19.5 Acceptance criteria
+
+- `pnpm run test` and `pnpm run build` pass after each phase.
+- No regression in manual scenarios:
+    - session restore
+    - token refresh
+    - pause/resume auto sync
+    - local/remote rename synchronization
+
+## 20. Remote Provider Abstraction Plan (2026-03)
+
+### 20.1 Goals
+
+- 将“远端文件操作”与“认证/连接/作用域校验”统一抽象为 provider 层。
+- 在不改 sync kernel 算法的前提下，支持未来接入非 Proton 的远端 provider。
+- 保持默认体验不变（默认 provider 仍为 `proton-drive`）。
+
+### 20.2 New abstractions
+
+- **RemoteProvider**
+    - `login/restore/refresh/logout`
+    - `connect/disconnect`
+    - `createRemoteFileSystem(client, scopeId)`
+    - `validateScope(client, scopeId)`
+
+- **LocalProvider**
+    - `createLocalFileSystem(app)`
+    - `createLocalWatcher(app, onChange, registerEvent, debounceMs)`
+
+- **LocalProviderRegistry**
+    - local provider discovery by `localProviderId`
+    - default fallback to `obsidian-local`
+
+- **RemoteProviderRegistry**
+    - provider discovery by `remoteProviderId`
+    - default fallback to `proton-drive`
+
+### 20.3 Settings model evolution
+
+- New provider-oriented fields:
+    - `remoteProviderId`
+    - `remoteScopeId` / `remoteScopePath`
+    - `remoteProviderCredentials`
+    - `remoteAccountEmail`
+    - `remoteHasAuthSession`
+
+- Compatibility policy:
+    - run one-time migration on load from legacy Proton fields (`protonSession`, `remoteFolderId`, etc.) to provider fields
+    - persist provider-only settings after migration (no dual-write back-compat fields)
+    - remove legacy settings paths from runtime reads/writes
+
+### 20.4 Rollout phases
+
+1. **Phase A**
+    - add provider contracts/registry and Proton provider implementation
+
+2. **Phase B**
+    - migrate runtime session/sync runner to provider interfaces
+
+3. **Phase C**
+    - migrate settings/login/commands/modals from direct Proton services to provider APIs
+
+4. **Phase D**
+    - delete unused Proton-only helper modules and keep provider use-cases as the only sync entrypoints
+
+### 20.5 Acceptance criteria
+
+- Providerized runtime works with existing Proton data/state.
+- No behavior regression in login restore, token refresh, auto-sync, manual sync.
+- Lint/test/build remain green after each phase.
+
+### 20.6 Implementation status (2026-03-06)
+
+- Phase A/B/C 已完成（provider contracts/registry、runtime、settings/login/commands/modals）。
+- 新增 provider session helper，统一 restore/refresh/connect 的会话处理路径。
+- 为 provider 增加 `getRootScope(...)`，remote folder selector 不再依赖 Proton SDK 细节。
+- 已移除 legacy settings 双写回兼容路径，改为一次性迁移后仅保存 provider 字段。
+- 当前验证结果：`pnpm run lint`、`pnpm run test`、`pnpm run build` 全部通过。
 
 ---

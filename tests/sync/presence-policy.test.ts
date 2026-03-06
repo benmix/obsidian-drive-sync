@@ -6,7 +6,7 @@ import {
 	resolveLocalOnlyDecision,
 	resolveRemoteOnlyDecision,
 	resolveTrackedMissingDecision,
-} from "../../src/sync/presence-policy";
+} from "../../src/sync/planner/presence-policy";
 import { expect, test } from "vitest";
 import type { SyncEntry } from "../../src/data/sync-schema";
 

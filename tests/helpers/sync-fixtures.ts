@@ -3,9 +3,9 @@ import type {
 	LocalFileSystem,
 	RemoteFileEntry,
 	RemoteFileSystem,
-} from "../../src/sync/types";
+} from "../../src/filesystem/contracts";
 import type { SyncEntry, SyncJob } from "../../src/data/sync-schema";
-import type { SyncState } from "../../src/sync/index-store";
+import type { SyncState } from "../../src/sync/state/index-store";
 
 export const FIXED_NOW = 1_700_000_000_000;
 
@@ -42,7 +42,7 @@ export function createState(entries: SyncEntry[] = []): SyncState {
 	};
 }
 
-export function createLocalFs(entries: LocalFileEntry[]): LocalFileSystem {
+export function createLocalFileSystem(entries: LocalFileEntry[]): LocalFileSystem {
 	return {
 		listEntries: async () => entries,
 		listFiles: async () => entries.filter((entry) => entry.type === "file"),
@@ -61,7 +61,7 @@ export function createLocalFs(entries: LocalFileEntry[]): LocalFileSystem {
 	};
 }
 
-export function createRemoteFs(entries: RemoteFileEntry[]): RemoteFileSystem {
+export function createRemoteFileSystem(entries: RemoteFileEntry[]): RemoteFileSystem {
 	return {
 		listEntries: async () => entries,
 		listFiles: async () => entries.filter((entry) => entry.type === "file"),

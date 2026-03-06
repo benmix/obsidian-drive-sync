@@ -1,13 +1,12 @@
 import { Modal, Notice, Setting } from "obsidian";
+import type { RemoteFileEntry, RemoteFileSystem } from "../filesystem/contracts";
 import type { App } from "obsidian";
-import { normalizePath } from "../sync/utils";
-import { ProtonDriveRemoteFs } from "../sync/remote-fs";
-import type ProtonDriveSyncPlugin from "../main";
-import type { ProtonSession } from "../proton-drive/sdk-session";
-import type { RemoteFileEntry } from "../sync/types";
+import { buildActiveRemoteSession } from "../provider/session";
+import { normalizePath } from "../filesystem/path";
+import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
 
-export class ProtonDriveRemoteRootModal extends Modal {
-	private plugin: ProtonDriveSyncPlugin;
+export class RemoteFolderPickerModal extends Modal {
+	private plugin: ObsidianDriveSyncPluginApi;
 	private folders: RemoteFileEntry[] = [];
 	private createPath = "";
 	private selectedFolderId = "";
@@ -16,11 +15,11 @@ export class ProtonDriveRemoteRootModal extends Modal {
 	private creating = false;
 	private error: string | null = null;
 	private createError: string | null = null;
-	private rootLabel = "My files";
+	private rootLabel = "Remote root";
 	private rootFolderId = "";
-	private remoteFs: ProtonDriveRemoteFs | null = null;
+	private remoteFileSystem: RemoteFileSystem | null = null;
 
-	constructor(app: App, plugin: ProtonDriveSyncPlugin) {
+	constructor(app: App, plugin: ObsidianDriveSyncPluginApi) {
 		super(app);
 		this.plugin = plugin;
 	}
@@ -38,71 +37,47 @@ export class ProtonDriveRemoteRootModal extends Modal {
 		this.createError = null;
 		this.folders = [];
 		this.rootFolderId = "";
-		this.remoteFs = null;
-		this.selectedFolderId = this.plugin.settings.remoteFolderId.trim();
+		this.remoteFileSystem = null;
+		this.selectedFolderId = this.plugin.getRemoteScopeId().trim();
 
-		if (!this.plugin.settings.protonSession || !this.plugin.settings.hasAuthSession) {
-			this.error = "Sign in to Proton Drive first.";
+		const provider = this.plugin.getRemoteProvider();
+		if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
+			this.error = `Sign in to ${provider.label} first.`;
 			this.loading = false;
 			return;
 		}
 
-		const session = this.plugin.authService.getSession();
-		if (!session) {
-			this.error = "Sign in to Proton Drive first.";
+		const activeSession = await buildActiveRemoteSession(this.plugin);
+		if (!activeSession) {
+			this.error = `Sign in to ${provider.label} first.`;
 			this.loading = false;
 			return;
 		}
-		const activeSession: ProtonSession = { ...session };
-		activeSession.onTokenRefresh = async () => {
-			try {
-				await this.plugin.authService.refreshToken();
-				const refreshedSession = this.plugin.authService.getSession();
-				if (refreshedSession) {
-					Object.assign(activeSession, refreshedSession);
-				}
-				this.plugin.settings.protonSession =
-					this.plugin.authService.getReusableCredentials();
-				this.plugin.settings.hasAuthSession = true;
-				await this.plugin.saveSettings();
-			} catch (refreshError) {
-				console.warn("Failed to refresh Proton session.", refreshError);
-				this.plugin.settings.hasAuthSession = false;
-				await this.plugin.saveSettings();
-			}
-		};
-		const client = await this.plugin.protonDriveService.connect(activeSession);
+
+		const client = await provider.connect(activeSession);
 		if (!client) {
-			this.error = "Unable to connect to Proton Drive.";
+			this.error = `Unable to connect to ${provider.label}.`;
 			this.loading = false;
 			return;
 		}
 
-		const rootResult =
-			typeof (client as { getMyFilesRootFolder?: () => Promise<unknown> })
-				.getMyFilesRootFolder === "function"
-				? await (
-						client as {
-							getMyFilesRootFolder: () => Promise<unknown>;
-						}
-					).getMyFilesRootFolder()
-				: null;
-		if (!rootResult || !(rootResult as { ok?: boolean }).ok) {
-			this.error = "Unable to load the Proton Drive root folder.";
+		try {
+			const rootScope = await provider.getRootScope(client);
+			this.rootLabel = rootScope.label || "Remote root";
+			this.rootFolderId = rootScope.id;
+			this.remoteFileSystem = provider.createRemoteFileSystem(client, rootScope.id);
+		} catch (loadRootError) {
+			console.warn("Failed to load remote root folder.", loadRootError);
+			this.error = `Unable to load the ${provider.label} root folder.`;
 			this.loading = false;
 			return;
 		}
-
-		const rootNode = (rootResult as { value: { uid: string; name: string } }).value;
-		this.rootLabel = rootNode.name || "My files";
-		this.rootFolderId = rootNode.uid;
-		this.remoteFs = new ProtonDriveRemoteFs(client, rootNode.uid);
 
 		try {
 			await this.refreshFolderList();
 		} catch (loadError) {
-			console.warn("Failed to list Proton Drive folders.", loadError);
-			this.error = "Unable to list Proton Drive folders.";
+			console.warn("Failed to list remote folders.", loadError);
+			this.error = "Unable to list remote folders.";
 		} finally {
 			this.loading = false;
 		}
@@ -112,7 +87,7 @@ export class ProtonDriveRemoteRootModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl("h2", { text: "Select Proton Drive folder" });
+		contentEl.createEl("h2", { text: "Select remote folder" });
 
 		if (this.loading) {
 			contentEl.createEl("p", { text: "Loading folders..." });
@@ -126,7 +101,7 @@ export class ProtonDriveRemoteRootModal extends Modal {
 
 		new Setting(contentEl)
 			.setName("Create folder")
-			.setDesc("Create a folder path under My files and select it.")
+			.setDesc("Create a folder path under the remote root and select it.")
 			.addText((text) =>
 				text
 					.setPlaceholder("notes/obsidian/sync")
@@ -146,7 +121,7 @@ export class ProtonDriveRemoteRootModal extends Modal {
 		if (this.createError) {
 			contentEl.createEl("p", {
 				text: this.createError,
-				cls: "protondrive-folder-create-error",
+				cls: "drive-sync-folder-create-error",
 			});
 		}
 
@@ -166,7 +141,7 @@ export class ProtonDriveRemoteRootModal extends Modal {
 
 		new Setting(contentEl)
 			.setName("Select folder")
-			.setDesc("Choose a folder path from Proton Drive.")
+			.setDesc("Choose a folder path from your remote provider.")
 			.addDropdown((dropdown) => {
 				for (const folder of list) {
 					dropdown.addOption(folder.id, this.toOptionLabel(folder));
@@ -210,11 +185,17 @@ export class ProtonDriveRemoteRootModal extends Modal {
 	}
 
 	private async refreshFolderList(): Promise<void> {
-		if (!this.remoteFs || !this.rootFolderId) {
+		if (!this.remoteFileSystem || !this.rootFolderId) {
 			this.folders = [];
 			return;
 		}
-		const folders = await this.remoteFs.listFolders();
+
+		const listedFolders = this.remoteFileSystem.listFolders
+			? await this.remoteFileSystem.listFolders()
+			: (await this.remoteFileSystem.listEntries()).filter(
+					(entry) => entry.type === "folder",
+				);
+		const folders = listedFolders.filter((folder) => folder.id !== this.rootFolderId);
 		this.folders = [
 			{
 				id: this.rootFolderId,
@@ -236,7 +217,7 @@ export class ProtonDriveRemoteRootModal extends Modal {
 				return selected;
 			}
 		}
-		const configuredId = this.plugin.settings.remoteFolderId.trim();
+		const configuredId = this.plugin.getRemoteScopeId().trim();
 		if (configuredId) {
 			const configured = list.find((folder) => folder.id === configuredId);
 			if (configured) {
@@ -259,8 +240,13 @@ export class ProtonDriveRemoteRootModal extends Modal {
 			this.render();
 			return;
 		}
-		if (!this.remoteFs) {
-			this.createError = "Unable to create folder before drive folders are loaded.";
+		if (!this.remoteFileSystem) {
+			this.createError = "Unable to create folder before remote folders are loaded.";
+			this.render();
+			return;
+		}
+		if (!this.remoteFileSystem.createFolder) {
+			this.createError = "Current remote provider does not support folder creation.";
 			this.render();
 			return;
 		}
@@ -270,13 +256,13 @@ export class ProtonDriveRemoteRootModal extends Modal {
 		this.render();
 
 		try {
-			const result = await this.remoteFs.createFolder(folderPath);
+			const result = await this.remoteFileSystem.createFolder(folderPath);
 			if (!result.id) {
 				throw new Error("Created folder has no ID.");
 			}
 			await this.selectFolder(result.id, folderPath);
 		} catch (error) {
-			console.warn("Failed to create Proton Drive folder.", error);
+			console.warn("Failed to create remote folder.", error);
 			this.creating = false;
 			this.createError = "Failed to create folder. Check console for details.";
 			this.render();
@@ -284,7 +270,7 @@ export class ProtonDriveRemoteRootModal extends Modal {
 	}
 
 	private async refreshFolders(): Promise<void> {
-		if (!this.remoteFs) {
+		if (!this.remoteFileSystem) {
 			new Notice("Unable to refresh folders right now.");
 			return;
 		}
@@ -294,8 +280,8 @@ export class ProtonDriveRemoteRootModal extends Modal {
 		this.createError = null;
 		this.render();
 		try {
-			// Rebuild SDK client to avoid stale folder cache in the current session.
-			this.plugin.protonDriveService.disconnect();
+			// Rebuild client to avoid stale folder cache from provider SDK session.
+			this.plugin.getRemoteProvider().disconnect();
 			await this.loadFolders();
 			if (this.error) {
 				new Notice(this.error);
@@ -303,7 +289,7 @@ export class ProtonDriveRemoteRootModal extends Modal {
 			}
 			new Notice("Folder list refreshed.");
 		} catch (error) {
-			console.warn("Failed to refresh Proton Drive folders.", error);
+			console.warn("Failed to refresh remote folders.", error);
 			new Notice("Failed to refresh folder list.");
 		} finally {
 			this.refreshing = false;
@@ -313,8 +299,7 @@ export class ProtonDriveRemoteRootModal extends Modal {
 
 	private async selectFolder(folderId: string, folderPath: string): Promise<void> {
 		const absolutePath = this.toAbsolutePath(folderPath);
-		this.plugin.settings.remoteFolderId = folderId;
-		this.plugin.settings.remoteFolderPath = absolutePath;
+		this.plugin.setRemoteScope(folderId, absolutePath);
 		await this.plugin.saveSettings();
 		new Notice(`Remote folder selected: ${absolutePath}`);
 		this.close();

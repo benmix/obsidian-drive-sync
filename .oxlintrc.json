@@ -24,5 +24,514 @@
 				"ignoreCase": true
 			}
 		]
-	}
+	},
+	"overrides": [
+		{
+			"files": ["src/runtime/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../ui/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../commands/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../provider/providers/**",
+									"../../provider/providers/**",
+									"../../../provider/providers/**",
+									"../main",
+									"../main.ts",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts",
+									"../settings",
+									"../settings.ts",
+									"../../settings",
+									"../../settings.ts",
+									"../../../settings",
+									"../../../settings.ts"
+								],
+								"message": "Runtime layer must not depend on UI, commands, provider implementations, main entrypoint, or settings UI."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/ui/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../runtime/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../provider/providers/**",
+									"../../provider/providers/**",
+									"../../../provider/providers/**",
+									"../main",
+									"../main.ts",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts"
+								],
+								"message": "UI layer should consume plugin/provider abstractions and must not depend on runtime internals or main."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/commands/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../provider/providers/**",
+									"../../provider/providers/**",
+									"../main",
+									"../main.ts",
+									"../../main",
+									"../../main.ts"
+								],
+								"message": "Commands must not couple to concrete provider implementations or import main."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/provider/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../runtime/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../../../../runtime/**",
+									"../sync/**",
+									"../../sync/**",
+									"../../../sync/**",
+									"../../../../sync/**",
+									"../ui/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../../../../ui/**",
+									"../commands/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../../../../commands/**",
+									"../main",
+									"../main.ts",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts",
+									"../../../../main",
+									"../../../../main.ts",
+									"../settings",
+									"../settings.ts",
+									"../../settings",
+									"../../settings.ts",
+									"../../../settings",
+									"../../../settings.ts",
+									"../../../../settings",
+									"../../../../settings.ts"
+								],
+								"message": "Provider layer must remain independent from sync/runtime/UI/commands/main/settings."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/filesystem/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../sync/**",
+									"../../sync/**",
+									"../../../sync/**",
+									"../provider/**",
+									"../../provider/**",
+									"../../../provider/**",
+									"../runtime/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../ui/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../commands/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../plugin/**",
+									"../../plugin/**",
+									"../../../plugin/**",
+									"../data/**",
+									"../../data/**",
+									"../../../data/**",
+									"../main",
+									"../main.ts",
+									"../../main",
+									"../../main.ts",
+									"../settings",
+									"../settings.ts",
+									"../../settings",
+									"../../settings.ts"
+								],
+								"message": "Filesystem contracts must be dependency-light and must not depend on sync/provider/runtime/UI/commands/plugin/data/main/settings."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/plugin/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../runtime/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../ui/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../commands/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../provider/providers/**",
+									"../../provider/providers/**",
+									"../../../provider/providers/**",
+									"../main",
+									"../main.ts",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts"
+								],
+								"message": "Plugin contracts must not depend on runtime/UI/commands/provider implementations/main."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/data/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../runtime/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../ui/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../commands/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../provider/providers/**",
+									"../../provider/providers/**",
+									"../../../provider/providers/**",
+									"../main",
+									"../main.ts",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts"
+								],
+								"message": "Data layer must stay storage-focused and cannot import runtime/UI/commands/provider implementations/main."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/sync/adapters/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../planner/**",
+									"../../planner/**",
+									"../../../planner/**",
+									"../engine/**",
+									"../../engine/**",
+									"../../../engine/**",
+									"../state/**",
+									"../../state/**",
+									"../../../state/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../../../../runtime/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../../../../ui/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../../../../commands/**",
+									"../../provider/**",
+									"../../../provider/**",
+									"../../../../provider/**",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts",
+									"../../../../main",
+									"../../../../main.ts"
+								],
+								"message": "Sync adapters must stay IO-only and must not depend on planner/engine/state/runtime/UI/commands/provider/main."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/sync/planner/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../adapters/**",
+									"../../adapters/**",
+									"../../../adapters/**",
+									"../engine/**",
+									"../../engine/**",
+									"../../../engine/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../../../../runtime/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../../../../ui/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../../../../commands/**",
+									"../../provider/**",
+									"../../../provider/**",
+									"../../../../provider/**",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts",
+									"../../../../main",
+									"../../../../main.ts"
+								],
+								"message": "Sync planner must not depend on adapters, engine, runtime, UI, commands, provider, or main."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/sync/engine/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../adapters/**",
+									"../../adapters/**",
+									"../../../adapters/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../../../../runtime/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../../../../ui/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../../../../commands/**",
+									"../../provider/**",
+									"../../../provider/**",
+									"../../../../provider/**",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts",
+									"../../../../main",
+									"../../../../main.ts"
+								],
+								"message": "Sync engine must not depend on adapters, runtime, UI, commands, provider, or main."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/sync/use-cases/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../adapters/**",
+									"../../adapters/**",
+									"../../../adapters/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../../../../runtime/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../../../../ui/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../../../../commands/**",
+									"../../provider/**",
+									"../../../provider/**",
+									"../../../../provider/**",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts",
+									"../../../../main",
+									"../../../../main.ts"
+								],
+								"message": "Sync use-cases must remain provider-agnostic and cannot import adapters, runtime, UI, commands, provider, or main."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/sync/state/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../adapters/**",
+									"../../adapters/**",
+									"../../../adapters/**",
+									"../planner/**",
+									"../../planner/**",
+									"../../../planner/**",
+									"../engine/**",
+									"../../engine/**",
+									"../../../engine/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../../../../runtime/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../../../../ui/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../../../../commands/**",
+									"../../provider/**",
+									"../../../provider/**",
+									"../../../../provider/**",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts",
+									"../../../../main",
+									"../../../../main.ts"
+								],
+								"message": "Sync state must not depend on adapters, planner, engine, runtime, UI, commands, provider, or main."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/sync/support/**/*.ts", "src/sync/contracts/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../adapters/**",
+									"../../adapters/**",
+									"../../../adapters/**",
+									"../planner/**",
+									"../../planner/**",
+									"../../../planner/**",
+									"../engine/**",
+									"../../engine/**",
+									"../../../engine/**",
+									"../state/**",
+									"../../state/**",
+									"../../../state/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../../../../runtime/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../../../../ui/**",
+									"../../commands/**",
+									"../../../commands/**",
+									"../../../../commands/**",
+									"../../provider/**",
+									"../../../provider/**",
+									"../../../../provider/**",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts",
+									"../../../../main",
+									"../../../../main.ts"
+								],
+								"message": "Sync support/contracts must stay dependency-light and cannot import higher layers."
+							}
+						]
+					}
+				]
+			}
+		}
+	]
 }

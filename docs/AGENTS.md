@@ -39,6 +39,10 @@ pnpm run build
 - To use eslint to analyze this project use this command: `eslint main.ts`
 - eslint will then create a report with suggestions for code improvement by file and line number.
 - If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder: `eslint ./src/`
+- For this repository, prefer project scripts:
+    - Check lint issues: `pnpm run lint`
+    - Auto-fix lint issues where possible: `pnpm run lint-fix`
+    - Fix import order issues directly: `pnpm run fix:imports` (runs `scripts/fix-sort-imports.mjs`)
 
 ## File & folder conventions
 

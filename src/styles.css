@@ -1,0 +1,117 @@
+/*
+
+This CSS file will be included with your plugin, and
+available in the app when your plugin is enabled.
+
+If your plugin does not need CSS, delete this file.
+
+*/
+
+.drive-sync-folder-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.drive-sync-folder-row {
+	display: grid;
+	grid-template-columns: 1fr minmax(160px, 240px) auto;
+	gap: 8px;
+	align-items: center;
+	padding: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+}
+
+.drive-sync-folder-path {
+	font-weight: 600;
+}
+
+.drive-sync-folder-id {
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.drive-sync-folder-action button {
+	white-space: nowrap;
+}
+
+.drive-sync-folder-create-error {
+	margin-top: 6px;
+	font-size: 12px;
+	color: var(--text-error);
+}
+
+.drive-sync-remote-validation-status {
+	margin-top: 6px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.drive-sync-conflict-row {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 10px;
+	margin-top: 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.drive-sync-conflict-path {
+	font-weight: 600;
+}
+
+.drive-sync-conflict-meta {
+	font-size: 12px;
+	color: var(--text-muted);
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.drive-sync-logs {
+	display: grid;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.drive-sync-log-row {
+	display: grid;
+	grid-template-columns: minmax(140px, 200px) minmax(80px, 120px) 1fr;
+	gap: 8px;
+	padding: 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	font-size: 12px;
+}
+
+.drive-sync-queue {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.drive-sync-queue-row {
+	display: grid;
+	grid-template-columns: minmax(90px, 130px) 1fr minmax(80px, 120px) minmax(
+			180px,
+			260px
+		);
+	gap: 8px;
+	padding: 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	font-size: 12px;
+}
+
+.drive-sync-queue-row.is-processing {
+	border-color: var(--interactive-accent);
+	box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}

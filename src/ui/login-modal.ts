@@ -1,11 +1,11 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
-import type ProtonDriveSyncPlugin from "../main";
+import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
 
-export class ProtonDriveLoginModal extends Modal {
-	private plugin: ProtonDriveSyncPlugin;
+export class RemoteProviderLoginModal extends Modal {
+	private plugin: ObsidianDriveSyncPluginApi;
 
-	constructor(app: App, plugin: ProtonDriveSyncPlugin) {
+	constructor(app: App, plugin: ObsidianDriveSyncPluginApi) {
 		super(app);
 		this.plugin = plugin;
 	}
@@ -13,10 +13,13 @@ export class ProtonDriveLoginModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
+		const remoteProvider = this.plugin.getRemoteProvider();
 
-		contentEl.createEl("h2", { text: "Sign in to Proton Drive" });
+		contentEl.createEl("h2", {
+			text: `Sign in to ${remoteProvider.label}`,
+		});
 
-		let username = this.plugin.settings.accountEmail;
+		let username = this.plugin.getRemoteAccountEmail();
 		let password = "";
 		let twoFactorCode = "";
 		let mailboxPassword = "";
@@ -53,7 +56,7 @@ export class ProtonDriveLoginModal extends Modal {
 
 		new Setting(contentEl)
 			.setName("Mailbox password")
-			.setDesc("Only required for two-password Proton accounts.")
+			.setDesc("Only required if your provider uses a secondary mailbox password.")
 			.addText((text) => {
 				text.inputEl.type = "password";
 				text.setPlaceholder("Enter mailbox password");
@@ -69,29 +72,30 @@ export class ProtonDriveLoginModal extends Modal {
 			button.setCta();
 			button.onClick(async () => {
 				if (!username.trim() || !password.trim()) {
-					new Notice("Enter your Proton account email and password.");
+					new Notice("Enter your account email and password.");
 					return;
 				}
 
 				try {
-					const result = await this.plugin.authService.login({
+					const provider = this.plugin.getRemoteProvider();
+					const result = await provider.login({
 						username: username.trim(),
 						password,
 						twoFactorCode: twoFactorCode.trim() || undefined,
 						mailboxPassword: mailboxPassword.trim() || undefined,
 					});
 
-					this.plugin.settings.protonSession = result.credentials;
-					this.plugin.settings.accountEmail = result.userEmail ?? username.trim();
-					this.plugin.settings.hasAuthSession = true;
+					this.plugin.setStoredProviderCredentials(result.credentials);
+					this.plugin.setRemoteAccountEmail(result.userEmail ?? username.trim());
+					this.plugin.setRemoteAuthSession(true);
 					await this.plugin.saveSettings();
 					this.plugin.handleAuthRecovered();
 
-					new Notice("Signed in to Proton Drive.");
+					new Notice(`Signed in to ${provider.label}.`);
 					this.close();
 				} catch (error) {
 					const message = error instanceof Error ? error.message : "Unable to sign in.";
-					this.plugin.settings.hasAuthSession = false;
+					this.plugin.setRemoteAuthSession(false);
 					new Notice(message);
 				}
 			});

@@ -3,7 +3,7 @@ import {
 	getBuiltInExcludePatterns,
 	getBuiltInExcludeRules,
 	isExcluded,
-} from "../../src/sync/exclude";
+} from "../../src/sync/planner/exclude";
 import { describe, expect, test } from "vitest";
 
 describe("exclude rules", () => {

@@ -1,6 +1,6 @@
 import { createEntry, createState, FIXED_NOW } from "../helpers/sync-fixtures";
 import { describe, expect, test } from "vitest";
-import { SyncIndexStore } from "../../src/sync/index-store";
+import { SyncIndexStore } from "../../src/sync/state/index-store";
 
 describe("SyncIndexStore", () => {
 	test("clears tombstone when a live entry is written", () => {

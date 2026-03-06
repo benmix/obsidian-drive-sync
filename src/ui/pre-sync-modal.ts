@@ -1,6 +1,6 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { formatBytes } from "../sync/utils";
+import { formatBytes } from "../sync/support/utils";
 
 export type PreSyncEstimate = {
 	jobsPlanned: number;
@@ -9,7 +9,7 @@ export type PreSyncEstimate = {
 	downloadBytes: number;
 };
 
-export class ProtonDrivePreSyncModal extends Modal {
+export class SyncPreflightModal extends Modal {
 	private estimate: PreSyncEstimate;
 	private onConfirm: () => Promise<void>;
 	private running = false;

@@ -1,349 +1,234 @@
-import { DEFAULT_SETTINGS, type ProtonDriveSettings, ProtonDriveSettingTab } from "./settings";
 import {
-	INTERNAL_AUTO_SYNC_INTERVAL_MS,
-	INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
-} from "./internal-config";
+	createLocalProviderRegistry,
+	createRemoteProviderRegistry,
+} from "./provider/default-registry";
+import {
+	DEFAULT_LOCAL_PROVIDER_ID,
+	DEFAULT_REMOTE_PROVIDER_ID,
+	type LocalProvider,
+	type RemoteProvider,
+	type RemoteProviderCredentials,
+} from "./provider/contracts";
+import { DEFAULT_SETTINGS, type ProtonDriveSettings, ProtonDriveSettingTab } from "./settings";
 import { loadPluginData, mergePluginData, savePluginData } from "./data/plugin-data";
-import { type LocalChange, LocalFsWatcher } from "./sync/local-watcher";
-import { Notice, Plugin } from "obsidian";
-import { now } from "./sync/utils";
-import { ObsidianLocalFs } from "./sync/local-fs";
-import { planLocalChanges } from "./sync/local-change-planner";
-import { PluginDataStateStore } from "./sync/state-store";
-import { pollRemoteChanges } from "./sync/remote-poller";
-import { ProtonDriveAuthService } from "./proton-drive/auth";
-import { ProtonDriveRemoteFs } from "./sync/remote-fs";
-import { ProtonDriveService } from "./proton-drive/service";
+import { LocalProviderRegistry, RemoteProviderRegistry } from "./provider/registry";
+import type { ObsidianDriveSyncPluginApi } from "./plugin/contracts";
+import { Plugin } from "obsidian";
+import { PluginRuntime } from "./runtime/plugin-runtime";
 import { registerCommands } from "./commands";
-import { SyncEngine } from "./sync/sync-engine";
 
-type AutoSyncTrigger = "manual" | "interval" | "local";
+type LegacySettingsSnapshot = {
+	remoteFolderId?: string;
+	remoteFolderPath?: string;
+	protonSession?: unknown;
+	accountEmail?: string;
+	hasAuthSession?: boolean;
+	// Legacy persisted keys from previous versions; kept only for migration.
+	enableRateLimitedRemoteFileSystem?: boolean;
+	enableRateLimitedRemoteFs?: boolean;
+};
 
-export default class ProtonDriveSyncPlugin extends Plugin {
+function normalizeString(value: unknown): string {
+	return typeof value === "string" ? value.trim() : "";
+}
+
+function hasLegacySettings(snapshot: LegacySettingsSnapshot): boolean {
+	return Boolean(
+		snapshot.remoteFolderId ||
+		snapshot.remoteFolderPath ||
+		snapshot.protonSession ||
+		snapshot.accountEmail ||
+		typeof snapshot.hasAuthSession === "boolean" ||
+		typeof snapshot.enableRateLimitedRemoteFileSystem === "boolean" ||
+		typeof snapshot.enableRateLimitedRemoteFs === "boolean",
+	);
+}
+
+function migrateLoadedSettings(loaded: ProtonDriveSettings): {
+	settings: ProtonDriveSettings;
+	migrated: boolean;
+} {
+	const legacy = loaded as ProtonDriveSettings & LegacySettingsSnapshot;
+	const loadedProviderId = normalizeString(loaded.remoteProviderId);
+	const loadedScopeId = normalizeString(loaded.remoteScopeId);
+	const loadedScopePath = normalizeString(loaded.remoteScopePath);
+	const loadedAccountEmail = normalizeString(loaded.remoteAccountEmail);
+
+	const providerId = loadedProviderId || DEFAULT_REMOTE_PROVIDER_ID;
+	const scopeId = loadedScopeId || normalizeString(legacy.remoteFolderId);
+	const scopePath = loadedScopePath || normalizeString(legacy.remoteFolderPath);
+	const credentials = loaded.remoteProviderCredentials ?? legacy.protonSession;
+	const accountEmail = loadedAccountEmail || normalizeString(legacy.accountEmail);
+	const hasAuthSession =
+		typeof loaded.remoteHasAuthSession === "boolean"
+			? loaded.remoteHasAuthSession
+			: Boolean(legacy.hasAuthSession);
+
+	const settings: ProtonDriveSettings = {
+		...DEFAULT_SETTINGS,
+		remoteProviderId: providerId,
+		remoteScopeId: scopeId,
+		remoteScopePath: scopePath,
+		remoteProviderCredentials: credentials,
+		remoteAccountEmail: accountEmail,
+		remoteHasAuthSession: hasAuthSession,
+		conflictStrategy: loaded.conflictStrategy ?? DEFAULT_SETTINGS.conflictStrategy,
+		autoSyncEnabled: loaded.autoSyncEnabled ?? DEFAULT_SETTINGS.autoSyncEnabled,
+		enableNetworkPolicy: loaded.enableNetworkPolicy ?? DEFAULT_SETTINGS.enableNetworkPolicy,
+	};
+
+	const migrated =
+		hasLegacySettings(legacy) ||
+		providerId !== loadedProviderId ||
+		scopeId !== loadedScopeId ||
+		scopePath !== loadedScopePath ||
+		accountEmail !== loadedAccountEmail ||
+		hasAuthSession !== loaded.remoteHasAuthSession ||
+		credentials !== loaded.remoteProviderCredentials;
+
+	return { settings, migrated };
+}
+
+export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianDriveSyncPluginApi {
 	settings: ProtonDriveSettings = DEFAULT_SETTINGS;
-	protonDriveService: ProtonDriveService = new ProtonDriveService();
-	authService: ProtonDriveAuthService = new ProtonDriveAuthService();
+	private localProviderRegistry: LocalProviderRegistry = new LocalProviderRegistry();
+	private remoteProviderRegistry: RemoteProviderRegistry = new RemoteProviderRegistry();
+	private runtime: PluginRuntime | null = null;
 
-	private autoSyncIntervalId: number | null = null;
-	private localWatcher: LocalFsWatcher | null = null;
-	private localChangeQueue: LocalChange[] = [];
-	private localRunTimeout: number | null = null;
-	private autoSyncRunning = false;
-	private autoSyncPending = false;
-	private autoSyncPaused = false;
-	private authPaused = false;
-	private lastAuthError: string | undefined;
-	private lastBackgroundReconcileAt = 0;
-
-	async onload() {
+	async onload(): Promise<void> {
 		const data = await loadPluginData(this);
-		const loaded = data.settings;
-		this.settings = {
-			...DEFAULT_SETTINGS,
-			remoteFolderId: loaded.remoteFolderId,
-			remoteFolderPath: loaded.remoteFolderPath,
-			protonSession: loaded.protonSession,
-			accountEmail: loaded.accountEmail,
-			hasAuthSession: loaded.hasAuthSession,
-			conflictStrategy: loaded.conflictStrategy,
-			autoSyncEnabled: loaded.autoSyncEnabled,
-		};
-		await this.restoreSession();
+		const { settings, migrated } = migrateLoadedSettings(data.settings);
+		this.settings = settings;
+		this.localProviderRegistry = createLocalProviderRegistry(this.getLocalProviderId());
+		this.remoteProviderRegistry = createRemoteProviderRegistry(this.getRemoteProviderId());
+		if (migrated) {
+			await this.saveSettings();
+		}
+
+		this.runtime = new PluginRuntime(this);
+		await this.runtime.restoreSession();
 
 		this.addSettingTab(new ProtonDriveSettingTab(this.app, this));
 		registerCommands(this);
 		this.refreshAutoSync();
 	}
 
-	onunload() {
-		this.stopAutoSync();
+	onunload(): void {
+		this.runtime?.teardown();
+	}
+
+	getRemoteProviderId(): string {
+		const providerId = this.settings.remoteProviderId.trim();
+		return providerId || DEFAULT_REMOTE_PROVIDER_ID;
+	}
+
+	getRemoteProvider(): RemoteProvider {
+		return this.remoteProviderRegistry.get(this.getRemoteProviderId());
+	}
+
+	getLocalProviderId(): string {
+		return DEFAULT_LOCAL_PROVIDER_ID;
+	}
+
+	getLocalProvider(): LocalProvider {
+		return this.localProviderRegistry.get(this.getLocalProviderId());
+	}
+
+	getRemoteScopeId(): string {
+		return this.settings.remoteScopeId.trim();
+	}
+
+	getRemoteScopePath(): string {
+		return this.settings.remoteScopePath.trim();
+	}
+
+	setRemoteScope(scopeId: string, scopePath: string): void {
+		this.settings.remoteScopeId = scopeId.trim();
+		this.settings.remoteScopePath = scopePath.trim();
+	}
+
+	getStoredProviderCredentials(): RemoteProviderCredentials | undefined {
+		return this.settings.remoteProviderCredentials;
+	}
+
+	setStoredProviderCredentials(credentials: RemoteProviderCredentials | undefined): void {
+		this.settings.remoteProviderCredentials = credentials;
+	}
+
+	getRemoteAccountEmail(): string {
+		return this.settings.remoteAccountEmail;
+	}
+
+	setRemoteAccountEmail(email: string): void {
+		this.settings.remoteAccountEmail = email.trim();
+	}
+
+	hasRemoteAuthSession(): boolean {
+		return this.settings.remoteHasAuthSession;
+	}
+
+	setRemoteAuthSession(hasAuthSession: boolean): void {
+		this.settings.remoteHasAuthSession = hasAuthSession;
+	}
+
+	clearStoredRemoteSession(): void {
+		this.setStoredProviderCredentials(undefined);
+		this.setRemoteAccountEmail("");
+		this.setRemoteAuthSession(false);
 	}
 
 	async saveSettings(): Promise<void> {
 		const data = mergePluginData(await loadPluginData(this));
 		data.settings = {
-			remoteFolderId: this.settings.remoteFolderId,
-			remoteFolderPath: this.settings.remoteFolderPath,
-			protonSession: this.settings.protonSession,
-			accountEmail: this.settings.accountEmail,
-			hasAuthSession: this.settings.hasAuthSession,
+			remoteProviderId: this.settings.remoteProviderId,
+			remoteScopeId: this.settings.remoteScopeId,
+			remoteScopePath: this.settings.remoteScopePath,
+			remoteProviderCredentials: this.settings.remoteProviderCredentials,
+			remoteAccountEmail: this.settings.remoteAccountEmail,
+			remoteHasAuthSession: this.settings.remoteHasAuthSession,
 			conflictStrategy: this.settings.conflictStrategy,
 			autoSyncEnabled: this.settings.autoSyncEnabled,
+			enableNetworkPolicy: this.settings.enableNetworkPolicy,
 		};
 		await savePluginData(this, data);
 	}
 
-	private async restoreSession(): Promise<void> {
-		const credentials = this.settings.protonSession;
-		if (!credentials) {
-			this.settings.hasAuthSession = false;
-			return;
-		}
-
-		try {
-			await this.authService.restore(credentials);
-			this.settings.hasAuthSession = true;
-			this.handleAuthRecovered(false);
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Failed to restore Proton session.";
-			console.warn("Failed to restore Proton session.", error);
-			this.settings.protonSession = undefined;
-			this.settings.hasAuthSession = false;
-			this.settings.accountEmail = "";
-			await this.saveSettings();
-			this.authPaused = true;
-			this.lastAuthError = message;
-		}
-	}
-
 	refreshAutoSync(): void {
-		this.stopAutoSync();
-
-		if (!this.settings.autoSyncEnabled) {
-			return;
-		}
-
-		this.startAutoSync();
+		this.runtime?.refreshAutoSync();
 	}
 
 	pauseAutoSync(): void {
-		this.autoSyncPaused = true;
+		this.runtime?.pauseAutoSync();
 	}
 
 	resumeAutoSync(): void {
-		this.autoSyncPaused = false;
-		this.authPaused = false;
-		this.scheduleAutoSync(0, "manual");
+		this.runtime?.resumeAutoSync();
 	}
 
 	isAutoSyncPaused(): boolean {
-		return this.autoSyncPaused;
+		return this.runtime?.isAutoSyncPaused() ?? false;
 	}
 
 	isAuthPaused(): boolean {
-		return this.authPaused;
+		return this.runtime?.isAuthPaused() ?? false;
 	}
 
 	getLastAuthError(): string | undefined {
-		return this.lastAuthError;
+		return this.runtime?.getLastAuthError();
 	}
 
 	async runAutoSync(force = false): Promise<void> {
-		await this.performAutoSync("manual", force || this.autoSyncPaused || this.authPaused);
+		if (!this.runtime) {
+			return;
+		}
+		await this.runtime.runAutoSync(force);
 	}
 
 	isSyncRunning(): boolean {
-		return this.autoSyncRunning;
-	}
-
-	private startAutoSync(): void {
-		this.autoSyncPaused = false;
-		this.localWatcher = new LocalFsWatcher(
-			this.app,
-			(change) => this.handleLocalChange(change),
-			this.registerEvent.bind(this),
-			INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
-		);
-		this.localWatcher.start();
-
-		this.autoSyncIntervalId = window.setInterval(() => {
-			void this.performAutoSync("interval");
-		}, INTERNAL_AUTO_SYNC_INTERVAL_MS);
-		this.registerInterval(this.autoSyncIntervalId);
-
-		this.scheduleAutoSync(0, "interval");
-	}
-
-	private stopAutoSync(): void {
-		if (this.autoSyncIntervalId !== null) {
-			window.clearInterval(this.autoSyncIntervalId);
-			this.autoSyncIntervalId = null;
-		}
-		if (this.localRunTimeout !== null) {
-			window.clearTimeout(this.localRunTimeout);
-			this.localRunTimeout = null;
-		}
-		if (this.localWatcher) {
-			this.localWatcher.stop();
-			this.localWatcher = null;
-		}
-		this.localChangeQueue = [];
-		this.autoSyncPending = false;
-		this.autoSyncRunning = false;
-	}
-
-	private handleLocalChange(change: LocalChange): void {
-		this.localChangeQueue.push(change);
-		this.scheduleAutoSync(Math.max(500, INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS), "local");
-	}
-
-	private scheduleAutoSync(delayMs: number, trigger: AutoSyncTrigger): void {
-		if (!this.settings.autoSyncEnabled || this.autoSyncPaused || this.authPaused) {
-			return;
-		}
-		if (this.localRunTimeout !== null) {
-			return;
-		}
-		this.localRunTimeout = window.setTimeout(() => {
-			this.localRunTimeout = null;
-			void this.performAutoSync(trigger);
-		}, delayMs);
-	}
-
-	private drainLocalChanges(): LocalChange[] {
-		const changes = this.localChangeQueue;
-		this.localChangeQueue = [];
-		return changes;
-	}
-
-	private async performAutoSync(trigger: AutoSyncTrigger, force = false): Promise<void> {
-		if (!this.settings.remoteFolderId.trim()) {
-			return;
-		}
-		if ((this.autoSyncPaused || this.authPaused) && !force) {
-			return;
-		}
-		if (this.autoSyncRunning) {
-			this.autoSyncPending = true;
-			return;
-		}
-
-		this.autoSyncRunning = true;
-
-		try {
-			const nowTs = now();
-			const shouldReconcile =
-				force || nowTs - this.lastBackgroundReconcileAt > 15 * 60 * 1000;
-			const session = this.authService.getSession();
-			if (!session) {
-				throw new Error("Sign in to Proton Drive first.");
-			}
-
-			const activeSession: import("./proton-drive/sdk-session").ProtonSession = {
-				...session,
-			};
-			activeSession.onTokenRefresh = async () => {
-				try {
-					await this.authService.refreshToken();
-					const refreshedSession = this.authService.getSession();
-					if (refreshedSession) {
-						Object.assign(activeSession, refreshedSession);
-					}
-					this.settings.protonSession = this.authService.getReusableCredentials();
-					this.settings.hasAuthSession = true;
-					await this.saveSettings();
-					this.handleAuthRecovered(false);
-				} catch (refreshError) {
-					console.warn("Failed to refresh Proton session.", refreshError);
-					this.settings.hasAuthSession = false;
-					this.authPaused = true;
-					this.lastAuthError =
-						refreshError instanceof Error
-							? refreshError.message
-							: "Failed to refresh Proton session.";
-					await this.saveSettings();
-				}
-			};
-			const client = await this.protonDriveService.connect(activeSession);
-			if (!client) {
-				throw new Error("Unable to connect to Proton Drive.");
-			}
-			this.handleAuthRecovered(false);
-
-			const localFs = new ObsidianLocalFs(this.app);
-			const remoteFs = new ProtonDriveRemoteFs(client, this.settings.remoteFolderId);
-			const stateStore = new PluginDataStateStore();
-			const engine = new SyncEngine(localFs, remoteFs, stateStore, {
-				conflictStrategy: this.settings.conflictStrategy,
-				onAuthError: (message) => {
-					this.authPaused = true;
-					this.lastAuthError = message;
-				},
-			});
-			await engine.load();
-
-			const localChanges = this.drainLocalChanges();
-			if (localChanges.length > 0) {
-				const plan = planLocalChanges(localChanges, engine.getStateSnapshot());
-				engine.applyEntries(plan.entries);
-				engine.removeEntries(plan.removedPaths);
-				if (plan.rewritePrefixes.length > 0) {
-					engine.rewritePaths(plan.rewritePrefixes);
-				}
-				for (const job of plan.jobs) {
-					engine.enqueue(job);
-				}
-			}
-
-			if (trigger !== "local" || localChanges.length === 0 || shouldReconcile) {
-				const remotePlan = await pollRemoteChanges(remoteFs, engine.getStateSnapshot(), {
-					conflictStrategy: this.settings.conflictStrategy,
-				});
-				engine.applyEntries(remotePlan.snapshot);
-				engine.removeEntries(remotePlan.removedPaths);
-				for (const job of remotePlan.jobs) {
-					engine.enqueue(job);
-				}
-				if (remotePlan.remoteEventCursor) {
-					await engine.save({
-						remoteEventCursor: remotePlan.remoteEventCursor,
-					});
-				}
-			}
-
-			if (shouldReconcile) {
-				const reconcile = await engine.plan();
-				if (reconcile.jobsPlanned > 0) {
-					this.lastBackgroundReconcileAt = nowTs;
-				}
-			}
-
-			if (engine.listJobs().length === 0) {
-				await engine.save({
-					lastError: undefined,
-					lastErrorAt: undefined,
-				});
-				return;
-			}
-			await engine.runOnce();
-			if (shouldReconcile) {
-				this.lastBackgroundReconcileAt = nowTs;
-			}
-			if (this.authPaused && trigger === "manual") {
-				new Notice("Authentication required. Sync paused.");
-			}
-		} catch (error) {
-			const message = error instanceof Error ? error.message : "Auto sync failed.";
-			console.warn("Auto sync failed.", error);
-			await this.recordSyncError(message);
-			if (trigger === "manual") {
-				new Notice(message);
-			}
-		} finally {
-			this.autoSyncRunning = false;
-			if (this.autoSyncPending) {
-				this.autoSyncPending = false;
-				void this.performAutoSync("interval");
-			}
-		}
-	}
-
-	private async recordSyncError(message: string): Promise<void> {
-		const stateStore = new PluginDataStateStore();
-		const state = await stateStore.load();
-		await stateStore.save({
-			...state,
-			lastError: message,
-			lastErrorAt: now(),
-		});
+		return this.runtime?.isSyncRunning() ?? false;
 	}
 
 	handleAuthRecovered(scheduleSync = true): void {
-		this.authPaused = false;
-		this.lastAuthError = undefined;
-		if (scheduleSync && this.settings.autoSyncEnabled && !this.autoSyncPaused) {
-			this.scheduleAutoSync(0, "manual");
-		}
+		this.runtime?.handleAuthRecovered(scheduleSync);
 	}
 }
