@@ -88,10 +88,11 @@ Manual install for testing:
 ```
 src/
   main.ts                       # plugin facade lifecycle
+  contracts/                    # shared plugin-level contracts
   settings.ts                   # settings + defaults
   filesystem/                   # shared file-system contracts (local/remote)
   provider/                     # local/remote provider contracts + implementations
-    strategy/                 # provider-side remote file system strategy chain
+    strategy/                   # provider-side remote file system strategy chain
     providers/obsidian/         # Obsidian local file system + watcher
     providers/proton-drive/     # Proton auth/service + remote file system
   commands/                     # command handlers

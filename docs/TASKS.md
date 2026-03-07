@@ -125,7 +125,7 @@
 ### Phase A - provider foundation
 
 - [x] Add `RemoteProvider` contracts and registry.
-- [x] Add Proton provider implementation over existing auth/service/remote-file-system.
+- [x] Add default remote provider (`proton-drive`) implementation over existing auth/service/remote-file-system.
 - [x] Add `LocalProvider` abstraction and Obsidian local provider implementation (`local-file-system` + watcher).
 - [x] Add `LocalProviderRegistry` and local provider bootstrap (`createLocalProviderRegistry`).
 - [x] Add provider-aware settings fields (`remoteProviderId`, `remoteScope*`, `remoteProviderCredentials`).
@@ -137,8 +137,8 @@
 
 ### Phase C - UI and command migration
 
-- [x] Migrate login/settings auth flows to provider interface (keep current Proton UX).
-- [x] Migrate command handlers and conflict/remote-root modals off direct Proton service usage.
+- [x] Migrate login/settings auth flows to provider interface (keep current provider UX).
+- [x] Migrate command handlers and conflict/remote-root modals off direct provider service usage.
 
 ### Verification
 

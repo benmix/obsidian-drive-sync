@@ -1,106 +1,107 @@
-# 初始化同步策略（首次基线建立）
+# Sync Initialization Strategy (First Baseline Establishment)
 
-> 生效日期：2026-03-07  
-> 本文档仅约束“初始化阶段”行为；初始化完成后，请切换到 `SYNC_STRATEGY.md`。
+> Effective date: 2026-03-07
+> This document constrains behavior only during the initialization phase.
+> After initialization completes, switch to `SYNC_STRATEGY.md`.
 
-## 1. 目标与范围
+## 1. Goals and Scope
 
-1. 定义首次同步（尚未建立稳定基线）时的决策规则。
-2. 明确初始化阶段的风险控制、预检确认、退出条件与恢复机制。
-3. 保证初始化不会因策略歧义导致意外批量删除。
+1. Define decision rules for first sync when no stable baseline exists.
+2. Clarify risk controls, preflight confirmation, exit conditions, and recovery behavior in initialization.
+3. Ensure initialization does not cause accidental large-scale destructive actions due to strategy ambiguity.
 
-## 2. 进入与退出条件
+## 2. Entry and Exit Conditions
 
-### 2.1 进入初始化阶段
+### 2.1 Enter Initialization Phase
 
-满足以下任一条件进入初始化阶段：
+Enter initialization when any of the following is true:
 
-1. 未检测到稳定同步基线（无有效 `entries` / `synced*` 基线）。
-2. 无可信 `lastSyncAt`（首次安装或状态重置）。
-3. 用户显式触发“重新初始化”流程。
+1. No stable sync baseline is detected (no valid `entries` / `synced*` baseline).
+2. No trusted `lastSyncAt` exists (first install or state reset).
+3. User explicitly triggers a re-initialization flow.
 
-### 2.2 退出初始化阶段
+### 2.2 Exit Initialization Phase
 
-同时满足以下条件后退出初始化阶段：
+Exit initialization only when all of the following are true:
 
-1. 初始化计划任务执行完成（队列清空且无阻塞失败）。
-2. 同步基线已写入（`syncedLocalHash` / `syncedRemoteRev` 可用于后续增量判断）。
-3. 标记 `initializationCompleted = true`（或等价状态）。
+1. Planned initialization jobs are completed (queue empty and no blocking failures).
+2. Sync baseline has been written (`syncedLocalHash` / `syncedRemoteRev` available for future incremental decisions).
+3. `initializationCompleted = true` (or equivalent state marker) is set.
 
-## 3. 初始化总规则（优先级从高到低）
+## 3. Global Initialization Rules (Highest to Lowest Priority)
 
-1. 安全优先：初始化必须经过 preflight，显示 upload/download/delete 数量。
-2. 空本地恢复优先：本地为空且远端非空时，强制执行远端恢复本地。
-3. 低风险优先：在可选情况下优先选择非删除动作。
-4. 策略兜底：未命中硬规则时，按 `syncStrategy` 决策。
+1. Safety first: initialization must run with preflight and show upload/download/delete counts.
+2. Empty-local restore first: when local is empty and remote is non-empty, force remote-to-local restore.
+3. Prefer lower risk: when alternatives exist, prefer non-destructive actions.
+4. Strategy fallback: if no hard rule matches, decide by `syncStrategy`.
 
-## 4. 初始化决策矩阵
+## 4. Initialization Decision Matrix
 
-| 初始化场景         | `local_win`                            | `remote_win`                           | `bidirectional`                                  |
-| ------------------ | -------------------------------------- | -------------------------------------- | ------------------------------------------------ |
-| 本地空，远端非空   | `download/create-local-folder`（强制） | `download/create-local-folder`（强制） | `download/create-local-folder`（强制）           |
-| 本地非空，远端空   | `upload/create-remote-folder`          | `delete-local`（高风险，需二次确认）   | `upload/create-remote-folder`                    |
-| 本地空，远端空     | no-op（写入空基线）                    | no-op（写入空基线）                    | no-op（写入空基线）                              |
-| 本地非空，远端非空 | 按 `local_win` 决策并保留冲突副本      | 按 `remote_win` 决策并保留冲突副本     | 按 `bidirectional` 决策并进入 `conflict_pending` |
+| Initialization Scenario           | `local_win`                                 | `remote_win`                                             | `bidirectional`                                     |
+| --------------------------------- | ------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| Local empty, remote non-empty     | `download/create-local-folder` (forced)     | `download/create-local-folder` (forced)                  | `download/create-local-folder` (forced)             |
+| Local non-empty, remote empty     | `upload/create-remote-folder`               | `delete-local` (high risk, requires second confirmation) | `upload/create-remote-folder`                       |
+| Local empty, remote empty         | no-op (write empty baseline)                | no-op (write empty baseline)                             | no-op (write empty baseline)                        |
+| Local non-empty, remote non-empty | follow `local_win` and keep conflict copies | follow `remote_win` and keep conflict copies             | follow `bidirectional` and enter `conflict_pending` |
 
-## 5. 空本地恢复远端（硬规则）
+## 5. Empty-Local Remote Restore (Hard Rule)
 
-触发条件（同时满足）：
+Trigger conditions (all must hold):
 
-1. 当前处于初始化阶段。
-2. 本地为空。
-3. 远端非空。
+1. Current phase is initialization.
+2. Local is empty.
+3. Remote is non-empty.
 
-执行要求：
+Execution requirements:
 
-1. 仅允许 `download` 与 `create-local-folder`。
-2. 明确禁止 `upload` / `delete-remote`。
-3. 恢复完成后立即写入同步基线，进入运行期策略。
+1. Only `download` and `create-local-folder` are allowed.
+2. `upload` and `delete-remote` are explicitly forbidden.
+3. After restore completes, write sync baseline immediately and switch to runtime strategy.
 
-约束：
+Constraints:
 
-1. 该规则只在初始化阶段生效。
-2. 初始化完成后本地再被清空，不再触发该规则。
+1. This rule applies only during initialization.
+2. If local is cleared after initialization completes, this rule must not be re-triggered.
 
-## 6. 预检与确认
+## 6. Preflight and Confirmation
 
-1. 初始化执行前必须展示 preflight：
-    - 待上传数
-    - 待下载数
-    - 待删除数（本地/远端分别统计）
-2. 任一删除数 > 0 时必须二次确认。
-3. `remote_win` 下“本地非空、远端空”属于高风险场景，默认阻断，需用户显式确认后继续。
+1. Before initialization execution, preflight must show:
+    - upload count
+    - download count
+    - delete count (local and remote separated)
+2. If any delete count is greater than zero, second confirmation is mandatory.
+3. Under `remote_win`, "local non-empty + remote empty" is a high-risk scenario. It is blocked by default and may continue only after explicit user confirmation.
 
-## 7. 失败恢复与重试
+## 7. Failure Recovery and Retry
 
-1. 初始化中断后可重入，使用已写入基线继续未完成任务。
-2. 未完成前不得切换到运行期增量同步路径。
-3. 连续失败达到阈值时，进入阻塞状态并要求用户处理（认证、网络、权限等）。
+1. Initialization must be re-entrant after interruption; continue unfinished work using already written baseline/state.
+2. Do not switch to runtime incremental path before initialization finishes.
+3. If consecutive failures reach threshold, enter blocking state and require user intervention (auth, network, permissions, etc.).
 
-## 8. 与运行期策略的边界
+## 8. Boundary with Runtime Strategy
 
-1. 初始化文档负责“首次基线建立”。
-2. 运行期文档（`SYNC_STRATEGY.md`）负责“基线建立后”的持续同步。
-3. 两者不得在同一轮决策中并行生效；同一轮只能处于一个阶段。
+1. This document governs first baseline establishment.
+2. Runtime document (`SYNC_STRATEGY.md`) governs continuous sync after baseline exists.
+3. Both phases must not be active in the same decision cycle; each cycle belongs to one phase only.
 
-## 9. 测试与验收标准
+## 9. Testing and Acceptance Criteria
 
-### 9.1 单元测试最低覆盖
+### 9.1 Minimum Unit Test Coverage
 
-1. 初始化阶段识别（进入/退出）。
-2. 空本地恢复远端仅产出 `download/create-local-folder`。
-3. 初始化完成后本地清空，不触发初始化硬规则。
-4. `remote_win` 高风险场景二次确认门禁。
+1. Initialization phase detection (enter/exit).
+2. Empty-local restore outputs only `download/create-local-folder`.
+3. After initialization completes, local clear must not trigger initialization hard rule.
+4. `remote_win` high-risk scenario requires second-confirmation gate.
 
-### 9.2 集成验收
+### 9.2 Integration Acceptance
 
-1. 首次安装 + 远端已有数据 -> 本地正确恢复。
-2. 首次安装 + 双端非空 -> 按策略执行并保留冲突副本。
-3. 初始化中断后重启 -> 能继续完成并写入基线。
+1. First install + existing remote data -> local restored correctly.
+2. First install + both sides non-empty -> strategy respected and conflict copies retained.
+3. Initialization interrupted then restarted -> can continue and complete baseline write.
 
-### 9.3 发布门槛
+### 9.3 Release Gate
 
-1. `pnpm run lint` 通过。
-2. `pnpm run test` 通过。
-3. `pnpm run build` 通过。
-4. 手工验证至少覆盖一次“空本地恢复远端”初始化全流程。
+1. `pnpm run lint` passes.
+2. `pnpm run test` passes.
+3. `pnpm run build` passes.
+4. Manual verification includes at least one full empty-local remote-restore initialization flow.

@@ -14,14 +14,14 @@
 
 ### 1.2 Purpose
 
-为 Obsidian 提供一个插件，使本地 Vault 与远端 Provider 上指定目录实现**可靠的双向同步**，具备冲突检测、失败恢复与可观测性。
+Provide an Obsidian plugin that delivers **reliable two-way synchronization** between a local vault and a designated directory on a remote provider, with conflict detection, failure recovery, and observability.
 
 ### 1.3 Non-Goals
 
-- 不替换 Obsidian 原生 Vault Adapter
-- 不实现多人实时协同编辑
-- 不实现远端 Provider API 之外的自建后端
-- 不保证与 Obsidian Sync 的状态一致性
+- Do not replace the native Obsidian vault adapter.
+- Do not implement real-time multi-user collaboration.
+- Do not implement a custom backend beyond remote provider APIs.
+- Do not guarantee state consistency with Obsidian Sync.
 
 ---
 
@@ -29,30 +29,30 @@
 
 ### 2.1 In Scope
 
-- 本地 Vault ↔ 远端 Provider 目录的双向同步
-- 文件/目录的 create / modify / delete / rename
-- 冲突检测与自动解决（默认策略）
-- 会话恢复、失败重试、断点续跑
-- 桌面端（macOS / Windows / Linux）
+- Two-way sync between local vault and remote provider directory.
+- File/folder create / modify / delete / rename.
+- Conflict detection and automatic handling (default policy).
+- Session restore, retry, and resumable execution.
+- Desktop platforms (macOS / Windows / Linux).
 
 ### 2.2 Out of Scope
 
-- 移动端完整自动同步（可后续降级支持）
-- 富文本级别的 merge（仅文件级）
+- Full mobile auto-sync behavior (possible degraded support later).
+- Rich-text level merge (file-level only).
 
 ---
 
 ## 3. Terminology
 
-| Term            | Definition                       |
-| --------------- | -------------------------------- |
-| Vault           | Obsidian 管理的本地文件目录      |
-| Remote Root     | 远端 Provider 上作为同步根的目录 |
-| relPath         | 相对于 Vault 根目录的规范化路径  |
-| node uid        | 远端节点稳定标识                 |
-| Index           | 本地维护的同步状态数据库         |
-| Job             | 一个可幂等执行的同步任务         |
-| Synced Baseline | 上一次成功同步时的本地/远端指纹  |
+| Term            | Definition                                       |
+| --------------- | ------------------------------------------------ |
+| Vault           | Local file directory managed by Obsidian         |
+| Remote Root     | The remote provider directory used as sync root  |
+| relPath         | Normalized path relative to vault root           |
+| node uid        | Stable identifier of a remote node               |
+| Index           | Local sync state database                        |
+| Job             | An idempotent sync task                          |
+| Synced Baseline | Local/remote fingerprint at last successful sync |
 
 ---
 
@@ -66,25 +66,24 @@
     - Command Palette Commands
 
 - **Sync Orchestrator**
-    - Reconciler（对齐本地与远端状态）
-    - Scheduler（调度任务队列）
-    - State Machine（路径级状态）
+    - Reconciler (align local and remote state)
+    - Scheduler (schedule task queue)
+    - State Machine (path-level state)
 
 - **Filesystem Contracts Layer**
-    - 提供 `LocalFileSystem` / `RemoteFileSystem` / `LocalChange` 等共享类型契约
-    - 为 `sync/` 与 `provider/` 的共同底层依赖，不包含业务流程逻辑
+    - Provides shared type contracts like `LocalFileSystem` / `RemoteFileSystem` / `LocalChange`.
+    - Shared foundational dependency for `sync/` and `provider/`; contains no business workflow logic.
 
 - **LocalFS Adapter**
-    - 基于 Obsidian Vault API
-    - 提供事件流与文件操作能力
+    - Built on Obsidian Vault API.
+    - Provides event stream and file operation capabilities.
 
 - **RemoteFS Adapter**
-    - 远端 Provider SDK 的唯一依赖层
-    - 提供统一的远端文件系统抽象
+    - Sole dependency layer for remote provider SDK.
+    - Exposes a unified remote filesystem abstraction.
 
 - **Persistence Layer**
-
-- Index DB（IndexedDB via Dexie）
+    - Index DB (IndexedDB via Dexie)
     - Job Queue
     - Remote Cursor / Snapshot Metadata
 
@@ -94,32 +93,32 @@
 
 ### 5.1 Authentication Model
 
-- 基于 Proton Account 的 **SDK 会话机制**（由 `httpClient` 注入实现）
-- 登录形态：用户名 + 密码 +（可选）2FA
-- 插件**不保存明文密码**
+- Uses remote provider account based **SDK session mechanism** (implemented via injected `httpClient`).
+- Login shape: username + password + optional 2FA.
+- Plugin does **not** persist plaintext password.
 
 ### 5.4 SDK Client Bootstrapping Requirements
 
-- `httpClient`: 由插件提供的 fetch 适配器，负责附加 auth headers、超时控制、401 refresh + retry。
-- `account`: 基于 Proton API 的账户接口，提供地址/公钥/私钥解密能力。
-- `crypto`: OpenPGP + crypto proxy 封装（SDK 需要的加解密模块）。
-- `srp`: SRP 模块（登录/会话相关的 SRP 计算）。
-- `cache`: `entitiesCache` + `cryptoCache`（MemoryCache）用于 SDK 内部状态。
-- `telemetry`: SDK Telemetry 适配，映射到插件日志（不记录敏感信息）。
+- `httpClient`: plugin-provided fetch adapter that adds auth headers, timeout control, and 401 refresh + retry.
+- `account`: account interface based on remote provider API, for address/key/private-key decryption related capabilities.
+- `crypto`: OpenPGP + crypto proxy wrapper required by SDK cryptographic interfaces.
+- `srp`: SRP module for login/session calculations.
+- `cache`: `entitiesCache` + `cryptoCache` (MemoryCache) for SDK internal state.
+- `telemetry`: SDK telemetry adapter mapped to plugin logs (no sensitive fields).
 
 ### 5.2 Session Persistence
 
-- 持久化内容：SDK 接入层的 **会话凭据（opaque）**，由 `httpClient` 管理
-- 生命周期：
-    1. Plugin start → restore session
-    2. If expired/invalid → re-auth via login flow
-    3. If failed → prompt login
+- Persisted payload: opaque session credentials managed by SDK integration layer (`httpClient`).
+- Lifecycle:
+    1. Plugin start -> restore session
+    2. If expired/invalid -> re-auth via login flow
+    3. If failed -> prompt login
 
 ### 5.3 Security Requirements
 
-- 不记录敏感字段到日志
-- 支持用户手动“Sign out & Clear Session”
-- Session 失败需显式中断同步
+- Do not log sensitive fields.
+- Support user action: "Sign out & Clear Session".
+- Sync must be explicitly interrupted when session fails.
 
 ---
 
@@ -127,7 +126,7 @@
 
 ### 6.1 Event Sources
 
-来自 Obsidian Vault API 的事件：
+Events from Obsidian Vault API:
 
 - `create`
 - `modify`
@@ -136,14 +135,14 @@
 
 ### 6.2 Event Normalization
 
-- 路径统一为 `/` 分隔
-- 去除 `.` / `..`
-- 统一大小写策略（配置项）
+- Normalize path separators to `/`.
+- Remove `.` / `..`.
+- Apply unified case strategy (configurable).
 
 ### 6.3 Event Debounce
 
-- 同一路径事件合并窗口：**300–800ms**
-- rename 优先级高于 create/delete
+- Same-path merge window: **300–800ms**.
+- Rename has higher priority than create/delete.
 
 ---
 
@@ -151,25 +150,25 @@
 
 ### 7.1 Remote Root
 
-- 同步范围限定在一个用户指定的 Remote Root
-- 插件不得访问该目录以外的资源
+- Sync scope is limited to one user-selected remote root.
+- Plugin must not access resources outside that directory.
 
 ### 7.2 Required Remote Capabilities
 
-RemoteFS Adapter 必须提供：
+RemoteFS adapter must provide:
 
-- list tree（分页）
+- list tree (paginated)
 - upload (create/update)
 - download
 - delete
 - move/rename
-- stable identifier（`node uid`）
-- revision / etag / mtime（至少一种）
+- stable identifier (`node uid`)
+- revision / etag / mtime (at least one)
 
 ### 7.3 Remote Change Detection
 
-- **Preferred**：cursor / changes feed（SDK tree events）
-- **Fallback**：periodic snapshot diff
+- **Preferred**: cursor / changes feed (SDK tree events)
+- **Fallback**: periodic snapshot diff
 
 ---
 
@@ -177,19 +176,19 @@ RemoteFS Adapter 必须提供：
 
 ### 8.1 Table: `entries`
 
-| Field           | Type    | Notes          |
-| --------------- | ------- | -------------- |
-| relPath         | TEXT PK | 规范化路径     |
-| type            | ENUM    | file / folder  |
-| localMtimeMs    | INTEGER |                |
-| localSize       | INTEGER |                |
-| localHash       | TEXT    | sha256，可懒算 |
-| remoteId        | TEXT    | node uid       |
-| remoteRev       | TEXT    | revision uid   |
-| syncedLocalHash | TEXT    | 同步基线       |
-| syncedRemoteRev | TEXT    | 同步基线       |
-| tombstone       | BOOLEAN | 删除标记       |
-| lastSyncAt      | INTEGER |                |
+| Field           | Type    | Notes                   |
+| --------------- | ------- | ----------------------- |
+| relPath         | TEXT PK | Normalized path         |
+| type            | ENUM    | file / folder           |
+| localMtimeMs    | INTEGER |                         |
+| localSize       | INTEGER |                         |
+| localHash       | TEXT    | sha256, lazily computed |
+| remoteId        | TEXT    | node uid                |
+| remoteRev       | TEXT    | revision uid            |
+| syncedLocalHash | TEXT    | sync baseline           |
+| syncedRemoteRev | TEXT    | sync baseline           |
+| tombstone       | BOOLEAN | deletion marker         |
+| lastSyncAt      | INTEGER |                         |
 
 ### 8.2 Table: `jobs`
 
@@ -209,22 +208,22 @@ RemoteFS Adapter 必须提供：
 
 - IndexedDB via Dexie (browser-safe, Obsidian-compatible).
 - Settings remain in Obsidian plugin data; sync state lives in IndexedDB.
-- Schema migrations are handled via Dexie versioning (see 8.4).
+- Schema migrations are handled through Dexie versioning (see 8.4).
 
 ### 8.4 IndexedDB schema migrations
 
 Migration rules:
 
 - Every schema change increments `SYNC_STATE_DB_VERSION` and adds a new Dexie `.version(n).stores(...)`.
-- Use `modify`/`add`/`delete` in Dexie to transform data when required.
-- Keep at least one backward-compatible reader for one release (N-1) to allow safe upgrades.
-- For breaking changes, implement a reindex path (clear + rebuild) with a user-visible warning.
-- Avoid dropping tables silently; log and preserve critical records when possible.
+- Use `modify`/`add`/`delete` in Dexie when data transformation is needed.
+- Keep at least one backward-compatible reader for one release (N-1).
+- For breaking changes, provide reindex path (clear + rebuild) with user-visible warning.
+- Avoid silent table drops; preserve critical records when possible.
 
 Planned changes (placeholders to keep versioning consistent):
 
-- v3: Add `status` index to jobs (already in schema) and migration guard to backfill missing fields.
-- v4: Add `runtimeMetrics` extended fields (if needed) without changing entry/job keys.
+- v3: Add `status` index to jobs (already in schema) and migration guard for missing field backfill.
+- v4: Add extended `runtimeMetrics` fields (if needed) without changing entry/job keys.
 
 ---
 
@@ -256,29 +255,30 @@ Planned changes (placeholders to keep versioning consistent):
 
 ### 10.1 Detection Rule
 
-```
+```text
 localChanged  = localHash  != syncedLocalHash
 remoteChanged = remoteRev != syncedRemoteRev
 
-if localChanged && remoteChanged → Conflict
+if localChanged && remoteChanged -> Conflict
 ```
 
 ### 10.2 Default Resolution Strategy
 
-- 本地版本保留为主
-- 远端版本下载为：
+- Keep one canonical editable file.
+- Save the opposite-side version as a conflict copy:
 
-    ```
-    filename (Proton conflicted YYYY-MM-DD HHmm).ext
-    ```
+```text
+<filename> (conflicted <source> YYYY-MM-DD HHmm).<ext>
+```
 
-- 两者均写入 Index
+- `<source>` values: `local` / `remote`
+- Persist result in index and mark conflict state.
 
 ### 10.3 Configurable Strategies
 
-- Local wins (default)
-- Remote wins
-- Manual (pause + notify)
+- `bidirectional` (default)
+- `local_win`
+- `remote_win`
 
 ---
 
@@ -288,29 +288,29 @@ if localChanged && remoteChanged → Conflict
 
 - `upload`
 - `download`
-- `deleteRemote`
-- `deleteLocal`
-- `moveRemote`
-- `moveLocal`
-- `mkdirRemote`
-- `mkdirLocal`
+- `delete-remote`
+- `delete-local`
+- `move-remote`
+- `move-local`
+- `create-remote-folder`
+- `create-local-folder`
 
 ### 11.2 Execution Rules
 
-- 同一路径串行
-- move/delete 优先于 content
-- priority-aware scheduling（高优先级先执行）
-- 并发上限：2（内置，不可配置）
-- 所有 job 必须 **幂等**
-- Queue 状态机：pending / processing / blocked
-- retryAt 调度与可视化
+- Serialize execution on same path.
+- Prioritize move/delete over content jobs.
+- Priority-aware scheduling (higher priority first).
+- Concurrency cap: 2 (built-in, not configurable).
+- All jobs must be **idempotent**.
+- Queue state machine: pending / processing / blocked.
+- Retry scheduling (`retryAt`) must be visible.
 
 ### 11.3 Retry Policy
 
-- 网络 / 5xx：指数退避
-- Auth error：暂停并要求重新登录
-- 按错误类别区分退避（rate/network/404 等）
-- 超过最大重试（内置 5 次）→ Error 状态
+- Network / 5xx: exponential backoff.
+- Auth error: pause and require re-login.
+- Error-class-specific backoff (rate/network/404, etc.).
+- Exceeding max retries (built-in 5) -> `Error` state.
 
 ---
 
@@ -320,17 +320,17 @@ if localChanged && remoteChanged → Conflict
 
 1. Load Index DB
 2. Restore session
-3. Local quick scan（mtime/size）
+3. Quick local scan (mtime/size)
 4. Pull remote changes
-5. Reconcile → enqueue jobs
+5. Reconcile -> enqueue jobs
 6. Start workers
 
 ### 12.2 Crash Recovery
 
-- 未完成 job 继续执行
-- tombstone 保留，避免重复创建/删除
-- 支持 “Rebuild Index” 命令
-- 启动清理 stale processing job 与 orphaned state
+- Continue unfinished jobs.
+- Keep tombstones to avoid repeated create/delete churn.
+- Support "Rebuild Index" command.
+- Cleanup stale processing jobs and orphaned state during startup.
 
 ---
 
@@ -340,7 +340,7 @@ if localChanged && remoteChanged → Conflict
 
 - Account login/logout
 - Remote Root selector
-- Exclude rules（支持 `*`/`**`，包含校验与预览）
+- Exclude rules (supports `*`/`**`, includes validation and preview)
 - Conflict strategy
 - Auto sync on/off
 
@@ -351,7 +351,7 @@ if localChanged && remoteChanged → Conflict
 - In-flight job + next retry time
 - Last error
 - Manual sync / pause / resume
-- Conflicts summary
+- Conflict summary
 - Recent logs
 
 ### 13.3 Commands
@@ -366,62 +366,62 @@ if localChanged && remoteChanged → Conflict
 
 ## 14. Performance Requirements
 
-- Vault ≤ 50k files 可启动
-- 不阻塞 Obsidian 主线程
-- Hash 计算懒执行
-- 远端遍历分页 + 限流
-- 预同步检查（作业数量、大小估算、确认/取消）
-- 背景 reconciliation + 扫描节流
+- Vault up to 50k files can start.
+- Must not block Obsidian main thread.
+- Lazy hash computation.
+- Paginated remote traversal + rate limiting.
+- Pre-sync check (job count, size estimate, confirm/cancel).
+- Background reconciliation + throttled scanning.
 
 ---
 
 ## 15. Observability
 
-- Structured logs（不含敏感信息）
+- Structured logs (no sensitive fields)
 - Job-level error tracking
-- 可导出诊断包（脱敏）
-- 日志查看（状态视图）
-- 运行指标（耗时、吞吐、失败率、队列峰值）
+- Exportable diagnostics bundle (redacted)
+- Log viewer (status view)
+- Runtime metrics (duration, throughput, failure rate, queue peaks)
 
 ---
 
 ## 16. Risks & Mitigations
 
-| Risk              | Mitigation               |
-| ----------------- | ------------------------ |
-| Proton SDK 不稳定 | RemoteFS Facade 隔离     |
-| 无远端 cursor     | 快照 diff + 优化         |
-| 大 Vault 性能     | 分层扫描 + 限流          |
-| 外部 rename       | rename 推断窗口（后续）  |
-| 事件 cursor 抖动  | 持久化 cursor + 回退快照 |
-| 移动端差异        | 降级路径 + 运行时检测    |
+| Risk                            | Mitigation                            |
+| ------------------------------- | ------------------------------------- |
+| Remote provider SDK instability | Isolate with RemoteFS facade          |
+| No remote cursor                | Snapshot diff + optimization          |
+| Large vault performance         | Layered scanning + throttling         |
+| External rename complexity      | Rename inference window (future)      |
+| Cursor jitter                   | Persistent cursor + snapshot fallback |
+| Mobile differences              | Degraded path + runtime detection     |
 
 ---
 
 ## 17. Milestones
 
-### Phase 0 – Feasibility
+### Phase 0 - Feasibility
 
-- SDK 登录 + list/upload/download 验证
+- Validate SDK login + list/upload/download.
 
-### Phase 1 – MVP
+### Phase 1 - MVP
 
-- 双向同步（手动触发）
-- Index + Job Queue
-- 基础冲突处理
+- Two-way sync (manual trigger).
+- Index + job queue.
+- Basic conflict handling.
 
-### Phase 2 – GA
+### Phase 2 - GA
 
-- 自动同步
-- 远端增量
-- 完整恢复与诊断
+- Auto sync.
+- Remote incremental processing.
+- Complete recovery and diagnostics.
 
 ---
 
 ## 18. Open Questions
 
-- 是否存在官方 change feed / cursor
-- 是否能在 SDK 公共 API 中获得更强的远端变更指纹（etag/mtime/size 组合）
+- Is there an official change feed / cursor?
+- Can stronger remote change fingerprints be derived from SDK public APIs (etag/mtime/size combination)?
 
 ---
 
@@ -429,9 +429,9 @@ if localChanged && remoteChanged → Conflict
 
 ### 19.1 Goals
 
-- 将插件入口与同步编排解耦：`main.ts` 保持“壳层”职责，运行时逻辑下沉至 `runtime/*`。
-- 保持同步内核语义不变：`reconciler + queue + executor` 作为稳定内核，不在本轮重构改写算法。
-- 提升可测试性：调度、会话、单轮执行可独立测试。
+- Decouple plugin entrypoint from sync orchestration: keep `main.ts` as thin facade and move runtime logic to `runtime/*`.
+- Preserve sync-kernel semantics: `reconciler + queue + executor` remain stable; no algorithm rewrite in this refactor.
+- Improve testability: scheduler, session, and one-cycle execution should be independently testable.
 
 ### 19.2 Target layering
 
@@ -454,18 +454,18 @@ if localChanged && remoteChanged → Conflict
     - `state/*`: state store and in-memory index model
     - `support/*`: shared helpers
     - `use-cases/*`: provider-agnostic one-cycle sync execution
-    - keeps conflict/retry/state semantics unchanged
+    - keep conflict/retry/state semantics unchanged
 
-- **Provider remote file system strategy boundary (`provider/strategy/*`)**
+- **Provider remote filesystem strategy boundary (`provider/strategy/*`)**
     - shared, composable `RemoteFileSystem` decorators/strategies
     - provider-owned composition (runtime does not inject decorators)
-    - layering constraints are enforced by lint (`no-restricted-imports` overrides)
+    - layering constraints enforced by lint (`no-restricted-imports` overrides)
 
 ### 19.3 Non-goals for this refactor
 
-- 不引入新的冲突策略。
-- 不改变任务优先级和重试策略语义。
-- 不切换存储后端（继续使用 Dexie IndexedDB + plugin data settings）。
+- Do not introduce new conflict strategies.
+- Do not change job priority and retry semantics.
+- Do not switch storage backend (stay on Dexie IndexedDB + plugin data settings).
 
 ### 19.4 Rollout phases
 
@@ -494,9 +494,9 @@ if localChanged && remoteChanged → Conflict
 
 ### 20.1 Goals
 
-- 将“远端文件操作”与“认证/连接/作用域校验”统一抽象为 provider 层。
-- 在不改 sync kernel 算法的前提下，支持未来接入非 Proton 的远端 provider。
-- 保持默认体验不变（默认 provider 仍为 `proton-drive`）。
+- Unify remote file operations and auth/connect/scope validation under provider layer.
+- Support future remote providers without changing sync-kernel algorithms.
+- Keep default behavior unchanged (default provider remains `proton-drive`).
 
 ### 20.2 New abstractions
 
@@ -528,36 +528,36 @@ if localChanged && remoteChanged → Conflict
     - `remoteHasAuthSession`
 
 - Compatibility policy:
-    - run one-time migration on load from legacy Proton fields (`protonSession`, `remoteFolderId`, etc.) to provider fields
-    - persist provider-only settings after migration (no dual-write back-compat fields)
+    - one-time migration from legacy brand-specific fields (`protonSession`, `remoteFolderId`, etc.) to provider fields on load
+    - persist provider-only settings after migration (no dual-write compatibility fields)
     - remove legacy settings paths from runtime reads/writes
 
 ### 20.4 Rollout phases
 
 1. **Phase A**
-    - add provider contracts/registry and Proton provider implementation
+    - add provider contracts/registry and default remote provider implementation
 
 2. **Phase B**
     - migrate runtime session/sync runner to provider interfaces
 
 3. **Phase C**
-    - migrate settings/login/commands/modals from direct Proton services to provider APIs
+    - migrate settings/login/commands/modals from direct provider services to provider APIs
 
 4. **Phase D**
-    - delete unused Proton-only helper modules and keep provider use-cases as the only sync entrypoints
+    - delete unused provider-specific helpers and keep provider use-cases as only sync entrypoints
 
 ### 20.5 Acceptance criteria
 
-- Providerized runtime works with existing Proton data/state.
-- No behavior regression in login restore, token refresh, auto-sync, manual sync.
+- Providerized runtime works with existing provider data/state.
+- No behavior regression in login restore, token refresh, auto-sync, and manual sync.
 - Lint/test/build remain green after each phase.
 
 ### 20.6 Implementation status (2026-03-06)
 
-- Phase A/B/C 已完成（provider contracts/registry、runtime、settings/login/commands/modals）。
-- 新增 provider session helper，统一 restore/refresh/connect 的会话处理路径。
-- 为 provider 增加 `getRootScope(...)`，remote folder selector 不再依赖 Proton SDK 细节。
-- 已移除 legacy settings 双写回兼容路径，改为一次性迁移后仅保存 provider 字段。
-- 当前验证结果：`pnpm run lint`、`pnpm run test`、`pnpm run build` 全部通过。
+- Phase A/B/C completed (provider contracts/registry, runtime, settings/login/commands/modals).
+- Added provider session helper to unify restore/refresh/connect session paths.
+- Added `getRootScope(...)` in provider so remote folder selector no longer depends on concrete SDK details.
+- Removed legacy dual-write settings compatibility path; now one-time migration then provider-only persistence.
+- Verification result at that point: `pnpm run lint`, `pnpm run test`, and `pnpm run build` all passed.
 
 ---
