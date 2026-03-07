@@ -1,14 +1,10 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { buildActiveRemoteSession } from "../provider/session";
-import { now } from "../sync/support/utils";
 import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
 import { PluginDataStateStore } from "../sync/state/state-store";
-import { SyncEngine } from "../sync/engine/sync-engine";
 
 type ConflictItem = {
 	path: string;
-	remoteId?: string;
 	remoteRev?: string;
 	localMtimeMs?: number;
 };
@@ -38,7 +34,6 @@ export class SyncConflictModal extends Modal {
 			.filter((entry) => entry.conflict)
 			.map((entry) => ({
 				path: entry.relPath,
-				remoteId: entry.remoteId ?? entry.conflict?.remoteId,
 				remoteRev: entry.remoteRev ?? entry.conflict?.remoteRev,
 				localMtimeMs: entry.localMtimeMs ?? entry.conflict?.localMtimeMs,
 			}));
@@ -66,6 +61,10 @@ export class SyncConflictModal extends Modal {
 			return;
 		}
 
+		contentEl.createEl("p", {
+			text: "Conflicts are resolved via conflict copies. Merge manually, then clear marker.",
+		});
+
 		for (const item of this.conflicts) {
 			const section = contentEl.createDiv({
 				cls: "drive-sync-conflict-row",
@@ -90,21 +89,9 @@ export class SyncConflictModal extends Modal {
 
 			const actions = new Setting(section);
 			actions.addButton((button) => {
-				button.setButtonText("Keep local");
+				button.setButtonText("Clear marker");
 				button.onClick(async () => {
-					await this.resolveConflict(item, "local");
-				});
-			});
-			actions.addButton((button) => {
-				button.setButtonText("Use remote");
-				button.onClick(async () => {
-					await this.resolveConflict(item, "remote");
-				});
-			});
-			actions.addButton((button) => {
-				button.setButtonText("Clear");
-				button.onClick(async () => {
-					await this.resolveConflict(item, "skip");
+					await this.clearConflict(item.path, true);
 				});
 			});
 		}
@@ -143,93 +130,6 @@ export class SyncConflictModal extends Modal {
 		});
 	}
 
-	private async resolveConflict(
-		item: ConflictItem,
-		strategy: "local" | "remote" | "skip",
-	): Promise<void> {
-		try {
-			if (strategy === "skip") {
-				await this.clearConflict(item.path, false);
-				return;
-			}
-
-			const scopeId = this.plugin.getRemoteScopeId();
-			if (!scopeId) {
-				new Notice("Select a remote folder in settings first.");
-				return;
-			}
-
-			const provider = this.plugin.getRemoteProvider();
-			if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
-				new Notice(`Sign in to ${provider.label} first.`);
-				return;
-			}
-
-			const activeSession = await buildActiveRemoteSession(this.plugin);
-			if (!activeSession) {
-				new Notice(`Sign in to ${provider.label} first.`);
-				return;
-			}
-
-			const client = await provider.connect(activeSession);
-			if (!client) {
-				new Notice(`Unable to connect to ${provider.label}.`);
-				return;
-			}
-			this.plugin.handleAuthRecovered(false);
-
-			const localFileSystem = this.plugin.getLocalProvider().createLocalFileSystem(this.app);
-			const remoteFileSystem = provider.createRemoteFileSystem(client, scopeId);
-			const stateStore = new PluginDataStateStore();
-			const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
-				conflictStrategy: this.plugin.settings.conflictStrategy,
-			});
-			await engine.load();
-
-			if (strategy === "local") {
-				engine.enqueue({
-					id: `upload:${item.path}:${now()}`,
-					op: "upload",
-					path: item.path,
-					entryType: "file",
-					priority: 5,
-					attempt: 0,
-					nextRunAt: now(),
-					reason: "conflict-local",
-				});
-			} else if (item.remoteId) {
-				engine.enqueue({
-					id: `download:${item.remoteId}:resolve`,
-					op: "download",
-					path: item.path,
-					remoteId: item.remoteId,
-					remoteRev: item.remoteRev,
-					entryType: "file",
-					priority: 5,
-					attempt: 0,
-					nextRunAt: now(),
-					reason: "conflict-remote",
-				});
-			} else {
-				new Notice("Remote file is missing for this conflict.");
-				return;
-			}
-
-			await engine.runOnce();
-			await this.clearConflict(item.path, false);
-			if (this.plugin.settings.autoSyncEnabled && this.plugin.isAutoSyncPaused()) {
-				this.plugin.resumeAutoSync();
-				new Notice("Auto sync resumed.");
-			}
-			new Notice("Conflict resolved.");
-			await this.loadConflicts();
-			this.render();
-		} catch (resolveError) {
-			console.warn("Failed to resolve conflict.", resolveError);
-			new Notice("Failed to resolve conflict.");
-		}
-	}
-
 	private async clearConflict(path: string, announce = true): Promise<void> {
 		const stateStore = new PluginDataStateStore();
 		const state = await stateStore.load();
@@ -238,6 +138,7 @@ export class SyncConflictModal extends Modal {
 			return;
 		}
 		entry.conflict = undefined;
+		entry.conflictPending = undefined;
 		state.entries[path] = entry;
 		await stateStore.save(state);
 		if (announce) {

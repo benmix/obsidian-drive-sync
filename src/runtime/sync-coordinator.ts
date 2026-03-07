@@ -26,7 +26,7 @@ export class SyncCoordinator {
 		await this.syncRunner.run(request, {
 			localFileSystem,
 			remoteFileSystem,
-			conflictStrategy: this.plugin.settings.conflictStrategy,
+			syncStrategy: this.plugin.settings.syncStrategy,
 			onAuthError: (message) => {
 				this.sessionManager.pauseAuth(message);
 			},

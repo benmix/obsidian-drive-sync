@@ -1,3 +1,4 @@
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../contracts/strategy";
 import {
 	evaluateRemoteMissingConfirmation,
 	resolveBothPresentDecision,
@@ -9,9 +10,8 @@ import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem/contrac
 import type { SyncEntry, SyncJob } from "../../data/sync-schema";
 import { normalizePath } from "../../filesystem/path";
 import { now } from "../support/utils";
+import { shouldPreferRemoteSeed } from "./initialization";
 import type { SyncState } from "../state/index-store";
-
-type ConflictStrategy = "local-wins" | "remote-wins" | "manual";
 
 export type ReconcileResult = {
 	jobs: SyncJob[];
@@ -38,14 +38,17 @@ export async function reconcileSnapshot(
 	localFileSystem: LocalFileSystem,
 	remoteFileSystem: RemoteFileSystem,
 	state?: SyncState,
-	options?: { conflictStrategy?: ConflictStrategy },
+	options?: { syncStrategy?: SyncStrategy; preferRemoteSeed?: boolean },
 ): Promise<ReconcileResult> {
 	const localEntries = await localFileSystem.listEntries();
 	const remoteEntries = await remoteFileSystem.listEntries();
 	const jobs: SyncJob[] = [];
 	const snapshot: SyncEntry[] = [];
 	const nowTs = now();
-	const conflictStrategy = options?.conflictStrategy ?? "local-wins";
+	const syncStrategy = options?.syncStrategy ?? DEFAULT_SYNC_STRATEGY;
+	const preferRemoteSeed =
+		options?.preferRemoteSeed ??
+		shouldPreferRemoteSeed(state, localEntries.length, remoteEntries.length);
 	const seen = new Set<string>();
 
 	const byPath: Record<string, EntrySnapshot> = {};
@@ -95,6 +98,9 @@ export async function reconcileSnapshot(
 		if (prior?.conflict) {
 			base.conflict = prior.conflict;
 		}
+		if (prior?.conflictPending) {
+			base.conflictPending = true;
+		}
 		snapshot.push(base);
 
 		const effectivePrior = prior?.tombstone ? undefined : prior;
@@ -112,8 +118,9 @@ export async function reconcileSnapshot(
 					path: entry.path,
 					entryType: "folder",
 					nowTs,
-					conflictStrategy,
+					syncStrategy,
 					prior,
+					preferRemoteSeed,
 				});
 				if (decision.job) {
 					jobs.push(decision.job);
@@ -123,10 +130,11 @@ export async function reconcileSnapshot(
 					path: entry.path,
 					entryType: "folder",
 					nowTs,
-					conflictStrategy,
+					syncStrategy,
 					prior,
 					remoteId: entry.remote.id,
 					remoteRev: entry.remote.revisionId,
+					preferRemoteSeed,
 				});
 				if (decision.job) {
 					if (decision.job.op === "delete-remote") {
@@ -167,8 +175,9 @@ export async function reconcileSnapshot(
 				path: entry.path,
 				entryType: "file",
 				nowTs,
-				conflictStrategy,
+				syncStrategy,
 				prior,
+				preferRemoteSeed,
 			});
 			if (decision.job) {
 				jobs.push(decision.job);
@@ -178,10 +187,11 @@ export async function reconcileSnapshot(
 				path: entry.path,
 				entryType: "file",
 				nowTs,
-				conflictStrategy,
+				syncStrategy,
 				prior,
 				remoteId: entry.remote.id,
 				remoteRev: entry.remote.revisionId,
+				preferRemoteSeed,
 			});
 			if (decision.job) {
 				if (decision.job.op === "delete-remote") {
@@ -193,15 +203,19 @@ export async function reconcileSnapshot(
 			const decision = resolveBothPresentDecision({
 				path: entry.path,
 				nowTs,
-				conflictStrategy,
+				syncStrategy,
 				remoteId: entry.remote.id,
 				remoteRev: entry.remote.revisionId,
 				localMtimeMs: entry.local?.mtimeMs,
 				localChanged,
 				remoteChanged,
+				prior,
 			});
 			if (decision.conflict) {
 				base.conflict = decision.conflict;
+			}
+			if (decision.conflictPending !== undefined) {
+				base.conflictPending = decision.conflictPending;
 			}
 			jobs.push(...decision.jobs);
 		}

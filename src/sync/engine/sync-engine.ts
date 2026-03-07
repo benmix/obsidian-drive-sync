@@ -1,4 +1,5 @@
 import { backoffMs, now } from "../support/utils";
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../contracts/strategy";
 import { type ExcludeRule, getBuiltInExcludeRules } from "../planner/exclude";
 import { executeJobs, type ExecuteResult } from "./executor";
 import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../../internal-config";
@@ -12,7 +13,7 @@ import { SyncJobQueue } from "./job-queue";
 import type { SyncState } from "../state/index-store";
 
 type SyncEngineOptions = {
-	conflictStrategy?: "local-wins" | "remote-wins" | "manual";
+	syncStrategy?: SyncStrategy;
 	onAuthError?: (message: string) => void;
 };
 
@@ -72,13 +73,16 @@ export class SyncEngine {
 		await this.stateStore.save(state);
 	}
 
-	async plan(): Promise<{ jobsPlanned: number; entries: number }> {
+	async plan(options?: {
+		preferRemoteSeed?: boolean;
+	}): Promise<{ jobsPlanned: number; entries: number }> {
 		const result = await reconcileSnapshot(
 			this.localFileSystem,
 			this.remoteFileSystem,
 			this.index.toJSON(),
 			{
-				conflictStrategy: this.options.conflictStrategy,
+				syncStrategy: this.options.syncStrategy ?? DEFAULT_SYNC_STRATEGY,
+				preferRemoteSeed: options?.preferRemoteSeed,
 			},
 		);
 		for (const entry of result.snapshot) {
@@ -480,6 +484,9 @@ export class SyncEngine {
 			return false;
 		}
 		if (job.op === "move-local" && (!job.fromPath || !job.toPath)) {
+			return false;
+		}
+		if (job.op === "copy-local" && (!job.fromPath || !job.toPath)) {
 			return false;
 		}
 		if (job.op === "move-remote" && (!job.remoteId || !job.toPath)) {

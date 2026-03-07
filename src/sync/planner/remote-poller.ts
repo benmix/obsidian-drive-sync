@@ -1,5 +1,7 @@
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../contracts/strategy";
 import {
 	evaluateRemoteMissingConfirmation,
+	resolveBothPresentDecision,
 	resolveLocalOnlyDecision,
 	resolveRemoteOnlyDecision,
 } from "./presence-policy";
@@ -8,8 +10,6 @@ import type { SyncEntry, SyncJob } from "../../data/sync-schema";
 import { normalizePath } from "../../filesystem/path";
 import { now } from "../support/utils";
 import type { SyncState } from "../state/index-store";
-
-type ConflictStrategy = "local-wins" | "remote-wins" | "manual";
 
 export type RemotePollResult = {
 	jobs: SyncJob[];
@@ -21,15 +21,21 @@ export type RemotePollResult = {
 export async function pollRemoteChanges(
 	remoteFileSystem: RemoteFileSystem,
 	state: SyncState,
-	options?: { conflictStrategy?: ConflictStrategy },
+	options?: { syncStrategy?: SyncStrategy; preferRemoteSeed?: boolean },
 ): Promise<RemotePollResult> {
-	const conflictStrategy = options?.conflictStrategy ?? "local-wins";
-	const cursorPlan = await pollRemoteCursor(remoteFileSystem, state, conflictStrategy);
+	const syncStrategy = options?.syncStrategy ?? DEFAULT_SYNC_STRATEGY;
+	const cursorPlan = await pollRemoteCursor(
+		remoteFileSystem,
+		state,
+		syncStrategy,
+		Boolean(options?.preferRemoteSeed),
+	);
 	if (cursorPlan) {
 		return cursorPlan;
 	}
 
 	const remoteEntries = await remoteFileSystem.listEntries();
+	const preferRemoteSeed = Boolean(options?.preferRemoteSeed) && remoteEntries.length > 0;
 	const jobs: SyncJob[] = [];
 	const snapshot: SyncEntry[] = [];
 	const removedPaths: string[] = [];
@@ -37,30 +43,28 @@ export async function pollRemoteChanges(
 	const seen = new Set<string>();
 	const movedFromPaths = new Set<string>();
 	const movedToPaths = new Set<string>();
-	const priorByRemoteId = new Map<string, { path: string; entry: SyncEntry }>();
-
-	for (const [path, entry] of Object.entries(state.entries)) {
-		if (entry.remoteId && !entry.tombstone) {
-			priorByRemoteId.set(entry.remoteId, { path, entry });
-		}
-	}
+	const priorByRemoteId = buildPriorByRemoteId(state);
 
 	for (const entry of remoteEntries) {
 		const relPath = normalizePath(entry.path ?? entry.name);
 		seen.add(relPath);
-		const prior = state.entries[relPath] ?? priorByRemoteId.get(entry.id)?.entry;
-		const priorPath = priorByRemoteId.get(entry.id)?.path;
-		const remoteOnlyDecision = prior?.tombstone
+		const priorInfo = priorByRemoteId.get(entry.id);
+		const priorPath = priorInfo?.path;
+		const prior = state.entries[relPath] ?? priorInfo?.entry;
+		const applyRemoteOnlyDecision = !prior || prior.tombstone === true;
+		const remoteOnlyDecision = applyRemoteOnlyDecision
 			? resolveRemoteOnlyDecision({
 					path: relPath,
 					entryType: entry.type,
 					nowTs,
-					conflictStrategy,
+					syncStrategy,
 					prior,
 					remoteId: entry.id,
 					remoteRev: entry.revisionId,
+					preferRemoteSeed,
 				})
 			: undefined;
+
 		if (remoteOnlyDecision?.job?.op === "delete-remote") {
 			jobs.push(remoteOnlyDecision.job);
 			continue;
@@ -86,7 +90,7 @@ export async function pollRemoteChanges(
 			removedPaths.push(priorPath);
 		}
 
-		snapshot.push({
+		const nextEntry: SyncEntry = {
 			relPath,
 			type: entry.type,
 			remoteId: entry.id,
@@ -97,46 +101,48 @@ export async function pollRemoteChanges(
 			remoteMissingCount: undefined,
 			remoteMissingSinceMs: undefined,
 			lastSyncAt: nowTs,
-		});
+		};
+		if (prior?.conflict) {
+			nextEntry.conflict = prior.conflict;
+		}
+		if (prior?.conflictPending) {
+			nextEntry.conflictPending = true;
+		}
+		snapshot.push(nextEntry);
+
 		if (remoteOnlyDecision?.job) {
 			jobs.push(remoteOnlyDecision.job);
 			continue;
 		}
 
 		if (entry.type === "folder") {
-			if (!prior && entry.path) {
-				jobs.push({
-					id: `create-local-folder:${relPath}`,
-					op: "create-local-folder",
-					path: relPath,
-					entryType: "folder",
-					remoteId: entry.id,
-					priority: 2,
-					attempt: 0,
-					nextRunAt: nowTs,
-					reason: "remote-folder",
-				});
-			}
 			continue;
 		}
 
 		const changed =
 			!prior?.remoteRev || (entry.revisionId && entry.revisionId !== prior.remoteRev);
 
-		if (changed) {
-			jobs.push({
-				id: `download:${entry.id}`,
-				op: "download",
-				path: relPath,
-				remoteId: entry.id,
-				remoteRev: entry.revisionId,
-				entryType: "file",
-				priority: 10,
-				attempt: 0,
-				nextRunAt: nowTs,
-				reason: "remote-change",
-			});
+		if (!changed) {
+			continue;
 		}
+
+		const decision = resolveBothPresentDecision({
+			path: relPath,
+			nowTs,
+			syncStrategy,
+			remoteId: entry.id,
+			remoteRev: entry.revisionId,
+			localChanged: false,
+			remoteChanged: true,
+			prior,
+		});
+		if (decision.conflict) {
+			nextEntry.conflict = decision.conflict;
+		}
+		if (decision.conflictPending !== undefined) {
+			nextEntry.conflictPending = decision.conflictPending;
+		}
+		jobs.push(...decision.jobs);
 	}
 
 	for (const priorPath of Object.keys(state.entries)) {
@@ -157,7 +163,7 @@ export async function pollRemoteChanges(
 				path: priorPath,
 				entryType: prior.type,
 				nowTs,
-				conflictStrategy,
+				syncStrategy,
 				prior,
 			});
 			if (decision.job) {
@@ -175,7 +181,8 @@ export async function pollRemoteChanges(
 async function pollRemoteCursor(
 	remoteFileSystem: RemoteFileSystem,
 	state: SyncState,
-	conflictStrategy: ConflictStrategy,
+	syncStrategy: SyncStrategy,
+	preferRemoteSeed: boolean,
 ): Promise<RemotePollResult | null> {
 	if (!remoteFileSystem.getRootFolder || !remoteFileSystem.subscribeToTreeEvents) {
 		return null;
@@ -208,6 +215,7 @@ async function pollRemoteCursor(
 	const snapshot: SyncEntry[] = [];
 	const removedPaths: string[] = [];
 	let latestEventId: string | undefined = state.remoteEventCursor;
+	const priorByRemoteId = buildPriorByRemoteId(state);
 
 	const remoteIds = new Set<string>();
 	for (const entry of Object.values(state.entries ?? {})) {
@@ -242,40 +250,73 @@ async function pollRemoteCursor(
 	for (const id of remoteIds) {
 		const node = await remoteFileSystem.getNode?.(id);
 		if (!node) {
-			const priorPath = Object.keys(state.entries).find(
-				(key) => state.entries[key]?.remoteId === id,
-			);
-			if (priorPath) {
-				const prior = state.entries[priorPath];
-				if (prior) {
-					const missing = evaluateRemoteMissingConfirmation(prior, nowTs);
-					if (!missing.confirmed) {
-						snapshot.push(
-							buildRemoteMissingTrackingEntry(priorPath, prior, missing, nowTs),
-						);
-						continue;
-					}
-					const decision = resolveLocalOnlyDecision({
-						path: priorPath,
-						entryType: prior.type,
-						nowTs,
-						conflictStrategy,
-						prior,
-					});
-					if (decision.job) {
-						remoteJobs.push(decision.job);
-					}
-					if (decision.removePriorPath) {
-						removedPaths.push(priorPath);
-					}
+			const priorInfo = priorByRemoteId.get(id);
+			const priorPath = priorInfo?.path;
+			const prior = priorInfo?.entry;
+			if (priorPath && prior) {
+				const missing = evaluateRemoteMissingConfirmation(prior, nowTs);
+				if (!missing.confirmed) {
+					snapshot.push(
+						buildRemoteMissingTrackingEntry(priorPath, prior, missing, nowTs),
+					);
+					continue;
+				}
+				const decision = resolveLocalOnlyDecision({
+					path: priorPath,
+					entryType: prior.type,
+					nowTs,
+					syncStrategy,
+					prior,
+				});
+				if (decision.job) {
+					remoteJobs.push(decision.job);
+				}
+				if (decision.removePriorPath) {
+					removedPaths.push(priorPath);
 				}
 			}
 			continue;
 		}
 		const relPath = normalizePath(node.path ?? node.name);
-		const prior = state.entries[relPath];
-		const changed =
-			!prior?.remoteRev || (node.revisionId && node.revisionId !== prior.remoteRev);
+		const priorInfo = priorByRemoteId.get(node.id);
+		const priorPath = priorInfo?.path;
+		const prior = state.entries[relPath] ?? priorInfo?.entry;
+		const applyRemoteOnlyDecision = !prior || prior.tombstone === true;
+		const remoteOnlyDecision = applyRemoteOnlyDecision
+			? resolveRemoteOnlyDecision({
+					path: relPath,
+					entryType: node.type,
+					nowTs,
+					syncStrategy,
+					prior,
+					remoteId: node.id,
+					remoteRev: node.revisionId,
+					preferRemoteSeed,
+				})
+			: undefined;
+
+		if (remoteOnlyDecision?.job?.op === "delete-remote") {
+			remoteJobs.push(remoteOnlyDecision.job);
+			continue;
+		}
+		if (priorPath && priorPath !== relPath) {
+			remoteJobs.push({
+				id: `move-local:${priorPath}:${relPath}`,
+				op: "move-local",
+				path: relPath,
+				fromPath: priorPath,
+				toPath: relPath,
+				entryType: node.type,
+				remoteId: node.id,
+				remoteRev: node.revisionId,
+				priority: 5,
+				attempt: 0,
+				nextRunAt: nowTs,
+				reason: "remote-rename",
+			});
+			removedPaths.push(priorPath);
+		}
+
 		const nextEntry: SyncEntry = {
 			relPath,
 			type: node.type,
@@ -291,37 +332,43 @@ async function pollRemoteCursor(
 		if (prior?.conflict) {
 			nextEntry.conflict = prior.conflict;
 		}
+		if (prior?.conflictPending) {
+			nextEntry.conflictPending = true;
+		}
 		snapshot.push(nextEntry);
-		if (node.type === "folder") {
-			if (!prior) {
-				remoteJobs.push({
-					id: `create-local-folder:${relPath}`,
-					op: "create-local-folder",
-					path: relPath,
-					entryType: "folder",
-					remoteId: node.id,
-					priority: 2,
-					attempt: 0,
-					nextRunAt: nowTs,
-					reason: "remote-folder",
-				});
-			}
+
+		if (remoteOnlyDecision?.job) {
+			remoteJobs.push(remoteOnlyDecision.job);
 			continue;
 		}
-		if (changed) {
-			remoteJobs.push({
-				id: `download:${node.id}`,
-				op: "download",
-				path: relPath,
-				remoteId: node.id,
-				remoteRev: node.revisionId,
-				entryType: "file",
-				priority: 10,
-				attempt: 0,
-				nextRunAt: nowTs,
-				reason: "remote-change",
-			});
+
+		if (node.type === "folder") {
+			continue;
 		}
+
+		const changed =
+			!prior?.remoteRev || (node.revisionId && node.revisionId !== prior.remoteRev);
+		if (!changed) {
+			continue;
+		}
+
+		const decision = resolveBothPresentDecision({
+			path: relPath,
+			nowTs,
+			syncStrategy,
+			remoteId: node.id,
+			remoteRev: node.revisionId,
+			localChanged: false,
+			remoteChanged: true,
+			prior,
+		});
+		if (decision.conflict) {
+			nextEntry.conflict = decision.conflict;
+		}
+		if (decision.conflictPending !== undefined) {
+			nextEntry.conflictPending = decision.conflictPending;
+		}
+		remoteJobs.push(...decision.jobs);
 	}
 
 	return {
@@ -330,6 +377,16 @@ async function pollRemoteCursor(
 		removedPaths,
 		remoteEventCursor: latestEventId,
 	};
+}
+
+function buildPriorByRemoteId(state: SyncState): Map<string, { path: string; entry: SyncEntry }> {
+	const priorByRemoteId = new Map<string, { path: string; entry: SyncEntry }>();
+	for (const [path, entry] of Object.entries(state.entries)) {
+		if (entry.remoteId && !entry.tombstone) {
+			priorByRemoteId.set(entry.remoteId, { path, entry });
+		}
+	}
+	return priorByRemoteId;
 }
 
 function buildRemoteMissingTrackingEntry(

@@ -42,6 +42,7 @@ export async function executeJobs(
 				syncedRemoteRev: uploaded.revisionId,
 				tombstone: false,
 				conflict: undefined,
+				conflictPending: undefined,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
@@ -66,10 +67,35 @@ export async function executeJobs(
 				syncedRemoteRev: job.remoteRev,
 				tombstone: false,
 				conflict: undefined,
+				conflictPending: undefined,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
 			downloadBytes += data.byteLength;
+		} else if (job.op === "copy-local") {
+			if (!job.fromPath || !job.toPath) {
+				throw new Error(`Missing copy-local paths for ${job.path}`);
+			}
+			const data = await localFileSystem.readFile(job.fromPath);
+			await localFileSystem.writeFile(job.toPath, data);
+			const stats = await localFileSystem.stat(job.toPath);
+			const localHash = await hashBytes(data);
+			entries.push({
+				relPath: job.toPath,
+				type: "file",
+				localMtimeMs: stats?.mtimeMs,
+				localSize: stats?.size ?? data.byteLength,
+				localHash,
+				syncedLocalHash: undefined,
+				remoteId: undefined,
+				remoteRev: undefined,
+				syncedRemoteRev: undefined,
+				tombstone: false,
+				conflict: undefined,
+				conflictPending: undefined,
+				lastSyncAt: now(),
+			});
+			jobsExecuted += 1;
 		} else if (job.op === "delete-local") {
 			await localFileSystem.deletePath(job.path);
 			entries.push({
@@ -84,6 +110,7 @@ export async function executeJobs(
 				remoteRev: undefined,
 				syncedRemoteRev: undefined,
 				conflict: undefined,
+				conflictPending: undefined,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
@@ -104,6 +131,7 @@ export async function executeJobs(
 				localHash: undefined,
 				syncedLocalHash: undefined,
 				conflict: undefined,
+				conflictPending: undefined,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
@@ -121,6 +149,7 @@ export async function executeJobs(
 				localHash: undefined,
 				syncedLocalHash: undefined,
 				conflict: undefined,
+				conflictPending: undefined,
 				lastSyncAt: now(),
 			});
 			entries.push({
@@ -135,6 +164,7 @@ export async function executeJobs(
 				syncedLocalHash: undefined,
 				tombstone: false,
 				conflict: undefined,
+				conflictPending: undefined,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
@@ -153,6 +183,7 @@ export async function executeJobs(
 					localHash: undefined,
 					syncedLocalHash: undefined,
 					conflict: undefined,
+					conflictPending: undefined,
 					lastSyncAt: now(),
 				});
 			}
@@ -168,6 +199,7 @@ export async function executeJobs(
 				syncedLocalHash: undefined,
 				tombstone: false,
 				conflict: undefined,
+				conflictPending: undefined,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
@@ -183,6 +215,7 @@ export async function executeJobs(
 				syncedLocalHash: undefined,
 				tombstone: false,
 				conflict: undefined,
+				conflictPending: undefined,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
@@ -201,6 +234,7 @@ export async function executeJobs(
 				syncedLocalHash: undefined,
 				tombstone: false,
 				conflict: undefined,
+				conflictPending: undefined,
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;

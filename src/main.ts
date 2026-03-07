@@ -12,57 +12,35 @@ import {
 import { DEFAULT_SETTINGS, type ProtonDriveSettings, ProtonDriveSettingTab } from "./settings";
 import { loadPluginData, mergePluginData, savePluginData } from "./data/plugin-data";
 import { LocalProviderRegistry, RemoteProviderRegistry } from "./provider/registry";
+import { normalizeSyncStrategy } from "./sync/contracts/strategy";
 import type { ObsidianDriveSyncPluginApi } from "./plugin/contracts";
 import { Plugin } from "obsidian";
 import { PluginRuntime } from "./runtime/plugin-runtime";
 import { registerCommands } from "./commands";
 
-type LegacySettingsSnapshot = {
-	remoteFolderId?: string;
-	remoteFolderPath?: string;
-	protonSession?: unknown;
-	accountEmail?: string;
-	hasAuthSession?: boolean;
-	// Legacy persisted keys from previous versions; kept only for migration.
-	enableRateLimitedRemoteFileSystem?: boolean;
-	enableRateLimitedRemoteFs?: boolean;
-};
-
 function normalizeString(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";
-}
-
-function hasLegacySettings(snapshot: LegacySettingsSnapshot): boolean {
-	return Boolean(
-		snapshot.remoteFolderId ||
-		snapshot.remoteFolderPath ||
-		snapshot.protonSession ||
-		snapshot.accountEmail ||
-		typeof snapshot.hasAuthSession === "boolean" ||
-		typeof snapshot.enableRateLimitedRemoteFileSystem === "boolean" ||
-		typeof snapshot.enableRateLimitedRemoteFs === "boolean",
-	);
 }
 
 function migrateLoadedSettings(loaded: ProtonDriveSettings): {
 	settings: ProtonDriveSettings;
 	migrated: boolean;
 } {
-	const legacy = loaded as ProtonDriveSettings & LegacySettingsSnapshot;
 	const loadedProviderId = normalizeString(loaded.remoteProviderId);
 	const loadedScopeId = normalizeString(loaded.remoteScopeId);
 	const loadedScopePath = normalizeString(loaded.remoteScopePath);
 	const loadedAccountEmail = normalizeString(loaded.remoteAccountEmail);
+	const normalizedSyncStrategy = normalizeSyncStrategy(loaded.syncStrategy);
 
 	const providerId = loadedProviderId || DEFAULT_REMOTE_PROVIDER_ID;
-	const scopeId = loadedScopeId || normalizeString(legacy.remoteFolderId);
-	const scopePath = loadedScopePath || normalizeString(legacy.remoteFolderPath);
-	const credentials = loaded.remoteProviderCredentials ?? legacy.protonSession;
-	const accountEmail = loadedAccountEmail || normalizeString(legacy.accountEmail);
+	const scopeId = loadedScopeId;
+	const scopePath = loadedScopePath;
+	const credentials = loaded.remoteProviderCredentials;
+	const accountEmail = loadedAccountEmail;
 	const hasAuthSession =
 		typeof loaded.remoteHasAuthSession === "boolean"
 			? loaded.remoteHasAuthSession
-			: Boolean(legacy.hasAuthSession);
+			: DEFAULT_SETTINGS.remoteHasAuthSession;
 
 	const settings: ProtonDriveSettings = {
 		...DEFAULT_SETTINGS,
@@ -72,19 +50,19 @@ function migrateLoadedSettings(loaded: ProtonDriveSettings): {
 		remoteProviderCredentials: credentials,
 		remoteAccountEmail: accountEmail,
 		remoteHasAuthSession: hasAuthSession,
-		conflictStrategy: loaded.conflictStrategy ?? DEFAULT_SETTINGS.conflictStrategy,
+		syncStrategy: normalizedSyncStrategy ?? DEFAULT_SETTINGS.syncStrategy,
 		autoSyncEnabled: loaded.autoSyncEnabled ?? DEFAULT_SETTINGS.autoSyncEnabled,
 		enableNetworkPolicy: loaded.enableNetworkPolicy ?? DEFAULT_SETTINGS.enableNetworkPolicy,
 	};
 
 	const migrated =
-		hasLegacySettings(legacy) ||
 		providerId !== loadedProviderId ||
 		scopeId !== loadedScopeId ||
 		scopePath !== loadedScopePath ||
 		accountEmail !== loadedAccountEmail ||
 		hasAuthSession !== loaded.remoteHasAuthSession ||
-		credentials !== loaded.remoteProviderCredentials;
+		credentials !== loaded.remoteProviderCredentials ||
+		normalizedSyncStrategy !== loaded.syncStrategy;
 
 	return { settings, migrated };
 }
@@ -186,7 +164,7 @@ export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianD
 			remoteProviderCredentials: this.settings.remoteProviderCredentials,
 			remoteAccountEmail: this.settings.remoteAccountEmail,
 			remoteHasAuthSession: this.settings.remoteHasAuthSession,
-			conflictStrategy: this.settings.conflictStrategy,
+			syncStrategy: this.settings.syncStrategy,
 			autoSyncEnabled: this.settings.autoSyncEnabled,
 			enableNetworkPolicy: this.settings.enableNetworkPolicy,
 		};

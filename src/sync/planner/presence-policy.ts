@@ -1,19 +1,18 @@
 import type { EntryType, SyncEntry, SyncJob } from "../../data/sync-schema";
 import { buildConflictName } from "../support/utils";
+import type { SyncStrategy } from "../contracts/strategy";
 
-export type ConflictStrategy = "local-wins" | "remote-wins" | "manual";
-
-const MANUAL_CONFLICT_HOLD_MS = 1000 * 60 * 60 * 24 * 365;
 export const REMOTE_MISSING_CONFIRM_ROUNDS = 2;
 
 type DecisionInput = {
 	path: string;
 	entryType: EntryType;
 	nowTs: number;
-	conflictStrategy: ConflictStrategy;
+	syncStrategy: SyncStrategy;
 	prior?: SyncEntry;
 	remoteId?: string;
 	remoteRev?: string;
+	preferRemoteSeed?: boolean;
 };
 
 export type PresenceDecision = {
@@ -25,26 +24,29 @@ export type PresenceDecision = {
 type BothChangedInput = {
 	path: string;
 	nowTs: number;
-	conflictStrategy: ConflictStrategy;
+	syncStrategy: SyncStrategy;
 	remoteId?: string;
 	remoteRev?: string;
 	localMtimeMs?: number;
+	prior?: SyncEntry;
 };
 
 export type BothChangedDecision = {
 	jobs: SyncJob[];
 	conflict?: SyncEntry["conflict"];
+	conflictPending?: boolean;
 };
 
 type BothPresentInput = {
 	path: string;
 	nowTs: number;
-	conflictStrategy: ConflictStrategy;
+	syncStrategy: SyncStrategy;
 	remoteId?: string;
 	remoteRev?: string;
 	localMtimeMs?: number;
 	localChanged: boolean;
 	remoteChanged: boolean;
+	prior?: SyncEntry;
 };
 
 type TrackedMissingInput = {
@@ -61,7 +63,11 @@ export type RemoteMissingConfirmation = {
 
 export function resolveLocalOnlyDecision(input: DecisionInput): PresenceDecision {
 	const hadRemoteBefore = Boolean(input.prior?.remoteId);
-	if (hadRemoteBefore && input.conflictStrategy === "remote-wins") {
+	if (input.prior?.conflictPending) {
+		return {};
+	}
+
+	if (hadRemoteBefore && input.syncStrategy === "remote_win") {
 		return {
 			job: buildDeleteLocalJob(
 				input.path,
@@ -106,7 +112,10 @@ export function resolveLocalOnlyDecision(input: DecisionInput): PresenceDecision
 
 export function resolveRemoteOnlyDecision(input: DecisionInput): PresenceDecision {
 	const remoteId = input.remoteId ?? input.prior?.remoteId;
-	if (input.prior?.tombstone && remoteId && input.conflictStrategy !== "remote-wins") {
+	if (input.prior?.conflictPending) {
+		return {};
+	}
+	if (input.prior?.tombstone && remoteId && input.syncStrategy !== "remote_win") {
 		return {
 			job: {
 				id: `delete-remote:${input.path}`,
@@ -122,47 +131,105 @@ export function resolveRemoteOnlyDecision(input: DecisionInput): PresenceDecisio
 		};
 	}
 
-	if (input.entryType === "folder") {
-		if (!remoteId) {
-			return {};
-		}
-		return {
-			job: {
-				id: `create-local-folder:${input.path}`,
-				op: "create-local-folder",
-				path: input.path,
-				entryType: "folder",
-				remoteId,
-				priority: 2,
-				attempt: 0,
-				nextRunAt: input.nowTs,
-				reason: "remote-folder",
-			},
-		};
-	}
-
 	if (!remoteId) {
 		return {};
 	}
 
-	return {
-		job: {
-			id: `download:${remoteId}`,
-			op: "download",
-			path: input.path,
+	if (input.preferRemoteSeed) {
+		return buildRemoteToLocalJob(
+			input.path,
+			input.entryType,
+			input.nowTs,
 			remoteId,
-			remoteRev: input.remoteRev,
-			entryType: "file",
-			priority: 10,
-			attempt: 0,
-			nextRunAt: input.nowTs,
-			reason: "remote-only",
-		},
-	};
+			input.remoteRev,
+			"initial-remote-seed",
+		);
+	}
+
+	if (input.syncStrategy === "local_win") {
+		return {
+			job: {
+				id: `delete-remote:${input.path}`,
+				op: "delete-remote",
+				path: input.path,
+				remoteId,
+				entryType: input.entryType,
+				priority: input.entryType === "folder" ? 25 : 20,
+				attempt: 0,
+				nextRunAt: input.nowTs,
+				reason: input.entryType === "folder" ? "local-folder-missing" : "local-missing",
+			},
+		};
+	}
+
+	return buildRemoteToLocalJob(
+		input.path,
+		input.entryType,
+		input.nowTs,
+		remoteId,
+		input.remoteRev,
+		input.entryType === "folder" ? "remote-folder" : "remote-only",
+	);
 }
 
 export function resolveBothChangedDecision(input: BothChangedInput): BothChangedDecision {
-	if (input.conflictStrategy === "manual") {
+	if (input.prior?.conflictPending) {
+		return {
+			jobs: [],
+			conflict: input.prior.conflict,
+			conflictPending: true,
+		};
+	}
+
+	if (input.syncStrategy === "remote_win") {
+		const jobs: SyncJob[] = [];
+		const localBackupPath = buildConflictName(input.path, input.nowTs, "local");
+		jobs.push({
+			id: `copy-local:${input.path}:${input.nowTs}`,
+			op: "copy-local",
+			path: input.path,
+			fromPath: input.path,
+			toPath: localBackupPath,
+			entryType: "file",
+			priority: 11,
+			attempt: 0,
+			nextRunAt: input.nowTs,
+			reason: "conflict-backup-local",
+		});
+		if (input.remoteId) {
+			jobs.push({
+				id: `download:${input.remoteId}`,
+				op: "download",
+				path: input.path,
+				remoteId: input.remoteId,
+				remoteRev: input.remoteRev,
+				entryType: "file",
+				priority: 10,
+				attempt: 0,
+				nextRunAt: input.nowTs,
+				reason: "conflict-remote-win",
+			});
+		}
+		return { jobs };
+	}
+
+	if (input.syncStrategy === "bidirectional") {
+		const jobs: SyncJob[] = [];
+		if (input.remoteId) {
+			const conflictPath = buildConflictName(input.path, input.nowTs, "remote");
+			jobs.push({
+				id: `download:${input.remoteId}:conflict`,
+				op: "download",
+				path: conflictPath,
+				remoteId: input.remoteId,
+				remoteRev: input.remoteRev,
+				entryType: "file",
+				priority: 1,
+				attempt: 0,
+				nextRunAt: input.nowTs,
+				reason: "conflict-copy",
+			});
+		}
 		return {
 			conflict: {
 				localMtimeMs: input.localMtimeMs,
@@ -170,46 +237,14 @@ export function resolveBothChangedDecision(input: BothChangedInput): BothChanged
 				remoteId: input.remoteId,
 				detectedAt: input.nowTs,
 			},
-			jobs: [
-				{
-					id: `conflict:${input.path}:${input.nowTs}`,
-					op: "download",
-					path: input.path,
-					entryType: "file",
-					priority: 1,
-					attempt: 0,
-					nextRunAt: input.nowTs + MANUAL_CONFLICT_HOLD_MS,
-					reason: "conflict-manual",
-				},
-			],
-		};
-	}
-
-	if (input.conflictStrategy === "remote-wins") {
-		if (!input.remoteId) {
-			return { jobs: [] };
-		}
-		return {
-			jobs: [
-				{
-					id: `download:${input.remoteId}`,
-					op: "download",
-					path: input.path,
-					remoteId: input.remoteId,
-					remoteRev: input.remoteRev,
-					entryType: "file",
-					priority: 5,
-					attempt: 0,
-					nextRunAt: input.nowTs,
-					reason: "conflict-remote-wins",
-				},
-			],
+			conflictPending: true,
+			jobs,
 		};
 	}
 
 	const jobs: SyncJob[] = [];
 	if (input.remoteId) {
-		const conflictPath = buildConflictName(input.path, input.nowTs);
+		const conflictPath = buildConflictName(input.path, input.nowTs, "remote");
 		jobs.push({
 			id: `download:${input.remoteId}:conflict`,
 			op: "download",
@@ -220,7 +255,7 @@ export function resolveBothChangedDecision(input: BothChangedInput): BothChanged
 			priority: 1,
 			attempt: 0,
 			nextRunAt: input.nowTs,
-			reason: "conflict",
+			reason: "conflict-copy",
 		});
 	}
 	jobs.push({
@@ -231,24 +266,51 @@ export function resolveBothChangedDecision(input: BothChangedInput): BothChanged
 		priority: 5,
 		attempt: 0,
 		nextRunAt: input.nowTs,
-		reason: "conflict-local-wins",
+		reason: "conflict-local-win",
 	});
 	return { jobs };
 }
 
 export function resolveBothPresentDecision(input: BothPresentInput): BothChangedDecision {
+	if (input.prior?.conflictPending) {
+		return {
+			jobs: [],
+			conflict: input.prior.conflict,
+			conflictPending: true,
+		};
+	}
+
 	if (input.localChanged && input.remoteChanged) {
 		return resolveBothChangedDecision({
 			path: input.path,
 			nowTs: input.nowTs,
-			conflictStrategy: input.conflictStrategy,
+			syncStrategy: input.syncStrategy,
 			remoteId: input.remoteId,
 			remoteRev: input.remoteRev,
 			localMtimeMs: input.localMtimeMs,
+			prior: input.prior,
 		});
 	}
 
 	if (input.localChanged) {
+		if (input.syncStrategy === "remote_win" && input.remoteId) {
+			return {
+				jobs: [
+					{
+						id: `download:${input.remoteId}`,
+						op: "download",
+						path: input.path,
+						remoteId: input.remoteId,
+						remoteRev: input.remoteRev,
+						entryType: "file",
+						priority: 10,
+						attempt: 0,
+						nextRunAt: input.nowTs,
+						reason: "remote-authority",
+					},
+				],
+			};
+		}
 		return {
 			jobs: [
 				{
@@ -259,27 +321,47 @@ export function resolveBothPresentDecision(input: BothPresentInput): BothChanged
 					priority: 5,
 					attempt: 0,
 					nextRunAt: input.nowTs,
+					reason: "local-change",
 				},
 			],
 		};
 	}
 
-	if (input.remoteChanged && input.remoteId) {
-		return {
-			jobs: [
-				{
-					id: `download:${input.remoteId}`,
-					op: "download",
-					path: input.path,
-					remoteId: input.remoteId,
-					remoteRev: input.remoteRev,
-					entryType: "file",
-					priority: 10,
-					attempt: 0,
-					nextRunAt: input.nowTs,
-				},
-			],
-		};
+	if (input.remoteChanged) {
+		if (input.syncStrategy === "local_win") {
+			return {
+				jobs: [
+					{
+						id: `upload:${input.path}`,
+						op: "upload",
+						path: input.path,
+						entryType: "file",
+						priority: 5,
+						attempt: 0,
+						nextRunAt: input.nowTs,
+						reason: "local-authority",
+					},
+				],
+			};
+		}
+		if (input.remoteId) {
+			return {
+				jobs: [
+					{
+						id: `download:${input.remoteId}`,
+						op: "download",
+						path: input.path,
+						remoteId: input.remoteId,
+						remoteRev: input.remoteRev,
+						entryType: "file",
+						priority: 10,
+						attempt: 0,
+						nextRunAt: input.nowTs,
+						reason: "remote-change",
+					},
+				],
+			};
+		}
 	}
 
 	return { jobs: [] };
@@ -343,5 +425,45 @@ function buildDeleteLocalJob(
 		attempt: 0,
 		nextRunAt: nowTs,
 		reason,
+	};
+}
+
+function buildRemoteToLocalJob(
+	path: string,
+	entryType: EntryType,
+	nowTs: number,
+	remoteId: string,
+	remoteRev: string | undefined,
+	reason: string,
+): PresenceDecision {
+	if (entryType === "folder") {
+		return {
+			job: {
+				id: `create-local-folder:${path}`,
+				op: "create-local-folder",
+				path,
+				entryType: "folder",
+				remoteId,
+				priority: 2,
+				attempt: 0,
+				nextRunAt: nowTs,
+				reason,
+			},
+		};
+	}
+
+	return {
+		job: {
+			id: `download:${remoteId}`,
+			op: "download",
+			path,
+			remoteId,
+			remoteRev,
+			entryType: "file",
+			priority: 10,
+			attempt: 0,
+			nextRunAt: nowTs,
+			reason,
+		},
 	};
 }

@@ -19,7 +19,7 @@ type DiagnosticsReport = {
 		hasSession: boolean;
 		hasAuthSession: boolean;
 		builtInExcludePatterns: string[];
-		conflictStrategy: string;
+		syncStrategy: string;
 		maxConcurrentJobs: number;
 		maxRetryAttempts: number;
 		autoSyncEnabled: boolean;
@@ -88,7 +88,7 @@ export async function exportDiagnostics(
 			hasSession: Boolean(credentials),
 			hasAuthSession,
 			builtInExcludePatterns: getBuiltInExcludePatterns(),
-			conflictStrategy: data.settings.conflictStrategy,
+			syncStrategy: data.settings.syncStrategy,
 			maxConcurrentJobs: INTERNAL_MAX_CONCURRENT_JOBS,
 			maxRetryAttempts: INTERNAL_MAX_RETRY_ATTEMPTS,
 			autoSyncEnabled: data.settings.autoSyncEnabled,

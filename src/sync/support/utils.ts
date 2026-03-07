@@ -1,6 +1,10 @@
 import { splitPath } from "../../filesystem/path";
 
-export function buildConflictName(path: string, timestampMs: number): string {
+export function buildConflictName(
+	path: string,
+	timestampMs: number,
+	source: "local" | "remote",
+): string {
 	const parts = splitPath(path);
 	if (parts.length === 0) {
 		return "conflicted";
@@ -17,7 +21,7 @@ export function buildConflictName(path: string, timestampMs: number): string {
 		2,
 		"0",
 	)}${String(dt.getMinutes()).padStart(2, "0")}`;
-	const conflictName = `${base} (Proton conflicted ${formatted})${ext}`;
+	const conflictName = `${base} (conflicted ${source} ${formatted})${ext}`;
 	const parent = parts.join("/");
 	return parent ? `${parent}/${conflictName}` : conflictName;
 }

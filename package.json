@@ -13,14 +13,12 @@
 		"link:obsidian": "node scripts/link-obsidian-plugin.mjs",
 		"fix:imports": "node scripts/fix-sort-imports.mjs",
 		"version": "node scripts/version-bump.mjs && git add manifest.json versions.json",
-		"lint": "oxlint --config .oxlintrc.json .",
-		"lint-fix": "oxlint --config .oxlintrc.json . --fix",
+		"lint": "oxlint --config .oxlintrc.json . --fix",
+		"lint-staged": "lint-staged",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:unit": "vitest run tests/sync",
-		"test:strategy": "vitest run tests/sync/presence-policy.test.ts",
-		"lint-staged": "lint-staged",
-		"format": "oxfmt --config .oxfmtrc.json .",
+		"format": "oxfmt --config .oxfmtrc.json . --write",
 		"prepare": "husky install"
 	},
 	"dependencies": {
@@ -32,6 +30,7 @@
 		"openpgp": "^6.3.0"
 	},
 	"devDependencies": {
+		"@types/mime-types": "^3.0.1",
 		"@types/node": "^25.0.9",
 		"husky": "^9.1.7",
 		"lint-staged": "^16.2.7",

@@ -81,12 +81,12 @@ export function registerCommands(plugin: ObsidianDriveSyncPluginApi) {
 					client,
 					scopeId,
 					{
-						conflictStrategy: plugin.settings.conflictStrategy,
+						syncStrategy: plugin.settings.syncStrategy,
 					},
 				);
 				new SyncPreflightModal(plugin.app, estimate, async () => {
 					await planSync(plugin.app, localProvider, provider, client, scopeId, {
-						conflictStrategy: plugin.settings.conflictStrategy,
+						syncStrategy: plugin.settings.syncStrategy,
 					});
 					const result = await runPlannedSync(
 						plugin.app,
@@ -95,7 +95,7 @@ export function registerCommands(plugin: ObsidianDriveSyncPluginApi) {
 						client,
 						scopeId,
 						{
-							conflictStrategy: plugin.settings.conflictStrategy,
+							syncStrategy: plugin.settings.syncStrategy,
 						},
 					);
 					new Notice(
@@ -206,7 +206,7 @@ export function registerCommands(plugin: ObsidianDriveSyncPluginApi) {
 					client,
 					scopeId,
 					{
-						conflictStrategy: plugin.settings.conflictStrategy,
+						syncStrategy: plugin.settings.syncStrategy,
 					},
 				);
 				new Notice(`Planned ${result.jobsPlanned} jobs across ${result.entries} entries.`);
@@ -240,7 +240,7 @@ export function registerCommands(plugin: ObsidianDriveSyncPluginApi) {
 					client,
 					scopeId,
 					{
-						conflictStrategy: plugin.settings.conflictStrategy,
+						syncStrategy: plugin.settings.syncStrategy,
 					},
 				);
 				new Notice(`Remote poll queued ${result.jobsPlanned} jobs.`);
@@ -274,7 +274,7 @@ export function registerCommands(plugin: ObsidianDriveSyncPluginApi) {
 					client,
 					scopeId,
 					{
-						conflictStrategy: plugin.settings.conflictStrategy,
+						syncStrategy: plugin.settings.syncStrategy,
 					},
 				);
 				new Notice(
@@ -413,7 +413,7 @@ export function registerCommands(plugin: ObsidianDriveSyncPluginApi) {
 				const remoteFileSystem = provider.createRemoteFileSystem(client, scopeId);
 				const stateStore = new PluginDataStateStore();
 				const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
-					conflictStrategy: plugin.settings.conflictStrategy,
+					syncStrategy: plugin.settings.syncStrategy,
 				});
 				await engine.load();
 				await engine.rebuildIndex();

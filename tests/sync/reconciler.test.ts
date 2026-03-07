@@ -53,7 +53,7 @@ describe("reconcileSnapshot", () => {
 			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 200, size: 10 }]),
 			createRemoteFileSystem([]),
 			state,
-			{ conflictStrategy: "remote-wins" },
+			{ syncStrategy: "remote_win" },
 		);
 
 		expect(result.jobs).toEqual([]);
@@ -67,7 +67,7 @@ describe("reconcileSnapshot", () => {
 		);
 	});
 
-	test("deletes local file on confirmed missing remote with remote-wins", async () => {
+	test("deletes local file on confirmed missing remote with remote_win", async () => {
 		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
 		const state = createState([
 			createEntry({
@@ -83,7 +83,7 @@ describe("reconcileSnapshot", () => {
 			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 200, size: 10 }]),
 			createRemoteFileSystem([]),
 			state,
-			{ conflictStrategy: "remote-wins" },
+			{ syncStrategy: "remote_win" },
 		);
 
 		expect(result.jobs).toEqual([
@@ -118,7 +118,7 @@ describe("reconcileSnapshot", () => {
 				},
 			]),
 			state,
-			{ conflictStrategy: "local-wins" },
+			{ syncStrategy: "local_win" },
 		);
 
 		expect(result.jobs).toEqual([
@@ -131,7 +131,7 @@ describe("reconcileSnapshot", () => {
 		expect(result.snapshot[0]?.tombstone).toBe(true);
 	});
 
-	test("marks conflict and defers work in manual strategy when both sides changed", async () => {
+	test("bidirectional both-changed marks conflict pending and creates conflict copy", async () => {
 		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
 		const state = createState([
 			createEntry({
@@ -157,19 +157,77 @@ describe("reconcileSnapshot", () => {
 				},
 			]),
 			state,
-			{ conflictStrategy: "manual" },
+			{ syncStrategy: "bidirectional" },
 		);
 
 		expect(result.jobs).toHaveLength(1);
 		expect(result.jobs[0]).toMatchObject({
 			op: "download",
-			reason: "conflict-manual",
+			reason: "conflict-copy",
 		});
+		expect(result.snapshot[0]?.conflictPending).toBe(true);
 		expect(result.snapshot[0]?.conflict).toMatchObject({
 			remoteId: "remote-a",
 			remoteRev: "rev-b",
 			detectedAt: FIXED_NOW,
 		});
+	});
+
+	test("initialization remote seed overrides local_win remote-only delete", async () => {
+		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
+		const state = createState();
+
+		const result = await reconcileSnapshot(
+			createLocalFileSystem([]),
+			createRemoteFileSystem([
+				{
+					id: "remote-a",
+					name: "a.md",
+					path: "notes/a.md",
+					type: "file",
+					revisionId: "rev-a",
+				},
+			]),
+			state,
+			{ syncStrategy: "local_win" },
+		);
+
+		expect(result.jobs).toEqual([
+			expect.objectContaining({
+				op: "download",
+				path: "notes/a.md",
+				reason: "initial-remote-seed",
+			}),
+		]);
+	});
+
+	test("after initialization local_win handles remote-only as delete-remote", async () => {
+		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
+		const state = createState();
+		state.lastSyncAt = FIXED_NOW - 1_000;
+
+		const result = await reconcileSnapshot(
+			createLocalFileSystem([]),
+			createRemoteFileSystem([
+				{
+					id: "remote-a",
+					name: "a.md",
+					path: "notes/a.md",
+					type: "file",
+					revisionId: "rev-a",
+				},
+			]),
+			state,
+			{ syncStrategy: "local_win" },
+		);
+
+		expect(result.jobs).toEqual([
+			expect.objectContaining({
+				op: "delete-remote",
+				path: "notes/a.md",
+				reason: "local-missing",
+			}),
+		]);
 	});
 
 	test("enqueues cleanup for tracked paths missing on both sides", async () => {

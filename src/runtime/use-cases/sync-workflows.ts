@@ -1,9 +1,11 @@
 import { type LocalProvider, type RemoteProvider } from "../../provider/contracts";
 import { syncLocalToRemote, syncRemoteToLocal } from "./manual-sync";
 import { type App } from "obsidian";
+import { isInitializationPhase } from "../../sync/planner/initialization";
 import { PluginDataStateStore } from "../../sync/state/state-store";
 import { pollRemoteChanges } from "../../sync/planner/remote-poller";
 import { SyncEngine } from "../../sync/engine/sync-engine";
+import { type SyncStrategy } from "../../sync/contracts/strategy";
 
 export async function syncVaultToRemote(
 	app: App,
@@ -36,17 +38,20 @@ export async function planSync(
 	client: unknown,
 	scopeId: string,
 	settings?: {
-		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
+		syncStrategy?: SyncStrategy;
 	},
 ): Promise<{ jobsPlanned: number; entries: number }> {
 	const localFileSystem = localProvider.createLocalFileSystem(app);
 	const remoteFileSystem = remoteProvider.createRemoteFileSystem(client, scopeId);
 	const stateStore = new PluginDataStateStore();
 	const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
-		conflictStrategy: settings?.conflictStrategy,
+		syncStrategy: settings?.syncStrategy,
 	});
 	await engine.load();
-	return await engine.plan();
+	const preferRemoteSeed =
+		isInitializationPhase(engine.getStateSnapshot()) &&
+		(await localFileSystem.listEntries()).length === 0;
+	return await engine.plan({ preferRemoteSeed });
 }
 
 export async function runPlannedSync(
@@ -56,14 +61,14 @@ export async function runPlannedSync(
 	client: unknown,
 	scopeId: string,
 	settings?: {
-		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
+		syncStrategy?: SyncStrategy;
 	},
 ): Promise<{ jobsExecuted: number; entriesUpdated: number }> {
 	const localFileSystem = localProvider.createLocalFileSystem(app);
 	const remoteFileSystem = remoteProvider.createRemoteFileSystem(client, scopeId);
 	const stateStore = new PluginDataStateStore();
 	const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
-		conflictStrategy: settings?.conflictStrategy,
+		syncStrategy: settings?.syncStrategy,
 	});
 	await engine.load();
 	return await engine.runOnce();
@@ -76,22 +81,22 @@ export async function pollRemoteSync(
 	client: unknown,
 	scopeId: string,
 	settings?: {
-		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
+		syncStrategy?: SyncStrategy;
 	},
 ): Promise<{ jobsPlanned: number; entries: number }> {
+	const localFileSystem = localProvider.createLocalFileSystem(app);
 	const remoteFileSystem = remoteProvider.createRemoteFileSystem(client, scopeId);
 	const stateStore = new PluginDataStateStore();
-	const engine = new SyncEngine(
-		localProvider.createLocalFileSystem(app),
-		remoteFileSystem,
-		stateStore,
-		{
-			conflictStrategy: settings?.conflictStrategy,
-		},
-	);
+	const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
+		syncStrategy: settings?.syncStrategy,
+	});
 	await engine.load();
+	const preferRemoteSeed =
+		isInitializationPhase(engine.getStateSnapshot()) &&
+		(await localFileSystem.listEntries()).length === 0;
 	const result = await pollRemoteChanges(remoteFileSystem, engine.getStateSnapshot(), {
-		conflictStrategy: settings?.conflictStrategy,
+		syncStrategy: settings?.syncStrategy,
+		preferRemoteSeed,
 	});
 	engine.applyEntries(result.snapshot);
 	engine.removeEntries(result.removedPaths);
@@ -109,7 +114,7 @@ export async function estimateSyncPlan(
 	client: unknown,
 	scopeId: string,
 	settings?: {
-		conflictStrategy?: "local-wins" | "remote-wins" | "manual";
+		syncStrategy?: SyncStrategy;
 	},
 ): Promise<{
 	jobsPlanned: number;
@@ -122,11 +127,14 @@ export async function estimateSyncPlan(
 	const stateStore = new PluginDataStateStore();
 	const originalState = await stateStore.load();
 	const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
-		conflictStrategy: settings?.conflictStrategy,
+		syncStrategy: settings?.syncStrategy,
 	});
 	try {
 		await engine.load();
-		const plan = await engine.plan();
+		const preferRemoteSeed =
+			isInitializationPhase(engine.getStateSnapshot()) &&
+			(await localFileSystem.listEntries()).length === 0;
+		const plan = await engine.plan({ preferRemoteSeed });
 		const jobs = engine.listJobs();
 
 		let uploadBytes = 0;

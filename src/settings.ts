@@ -1,3 +1,4 @@
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "./sync/contracts/strategy";
 import { PluginSettingTab, Setting } from "obsidian";
 import type { App } from "obsidian";
 import { buildActiveRemoteSession } from "./provider/session";
@@ -14,7 +15,7 @@ export interface ProtonDriveSettings {
 	remoteProviderCredentials?: unknown;
 	remoteAccountEmail: string;
 	remoteHasAuthSession: boolean;
-	conflictStrategy: "local-wins" | "remote-wins" | "manual";
+	syncStrategy: SyncStrategy;
 	autoSyncEnabled: boolean;
 	enableNetworkPolicy: boolean;
 }
@@ -26,7 +27,7 @@ export const DEFAULT_SETTINGS: ProtonDriveSettings = {
 	remoteProviderCredentials: undefined,
 	remoteAccountEmail: "",
 	remoteHasAuthSession: false,
-	conflictStrategy: "local-wins",
+	syncStrategy: DEFAULT_SYNC_STRATEGY,
 	autoSyncEnabled: false,
 	enableNetworkPolicy: false,
 };
@@ -113,17 +114,17 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Conflict strategy")
-			.setDesc("Choose how to resolve changes when both sides changed.")
+			.setName("Sync strategy")
+			.setDesc("Choose direction/authority for automatic sync decisions.")
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOption("local-wins", "Local wins (default)")
-					.addOption("remote-wins", "Remote wins")
-					.addOption("manual", "Manual (pause and notify)")
-					.setValue(this.plugin.settings.conflictStrategy)
+					.addOption("bidirectional", "Bidirectional (default)")
+					.addOption("local_win", "Local authority")
+					.addOption("remote_win", "Remote authority")
+					.setValue(this.plugin.settings.syncStrategy)
 					.onChange(async (value) => {
-						this.plugin.settings.conflictStrategy =
-							value as ProtonDriveSettings["conflictStrategy"];
+						this.plugin.settings.syncStrategy =
+							value as ProtonDriveSettings["syncStrategy"];
 						await this.plugin.saveSettings();
 					}),
 			);

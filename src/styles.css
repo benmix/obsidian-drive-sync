@@ -100,10 +100,7 @@ If your plugin does not need CSS, delete this file.
 
 .drive-sync-queue-row {
 	display: grid;
-	grid-template-columns: minmax(90px, 130px) 1fr minmax(80px, 120px) minmax(
-			180px,
-			260px
-		);
+	grid-template-columns: minmax(90px, 130px) 1fr minmax(80px, 120px) minmax(180px, 260px);
 	gap: 8px;
 	padding: 6px;
 	border: 1px solid var(--background-modifier-border);

@@ -67,6 +67,7 @@ export class SyncStatusModal extends Modal {
 		const rows: Array<[string, string]> = [
 			["Last sync", state.lastSyncAt ? new Date(state.lastSyncAt).toLocaleString() : "Never"],
 			["Sync activity", this.plugin.isSyncRunning() ? "In progress" : "Idle"],
+			["Sync strategy", data.settings.syncStrategy],
 			["Auto sync", autoSyncStatus],
 			["Auth status", authStatus],
 			["Last error", state.lastError ?? "None"],

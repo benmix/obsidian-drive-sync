@@ -1,4 +1,6 @@
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../contracts/strategy";
 import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem/contracts";
+import { isInitializationPhase } from "../planner/initialization";
 import { now } from "../support/utils";
 import { planLocalChanges } from "../planner/local-change-planner";
 import { pollRemoteChanges } from "../planner/remote-poller";
@@ -8,12 +10,10 @@ import { type SyncRunRequest } from "../contracts/types";
 
 const BACKGROUND_RECONCILE_INTERVAL_MS = 15 * 60 * 1000;
 
-type ConflictStrategy = "local-wins" | "remote-wins" | "manual";
-
 type SyncRunContext = {
 	localFileSystem: LocalFileSystem;
 	remoteFileSystem: RemoteFileSystem;
-	conflictStrategy: ConflictStrategy;
+	syncStrategy: SyncStrategy;
 	onAuthError?: (message: string) => void;
 };
 
@@ -46,11 +46,26 @@ export class SyncRunner {
 			context.remoteFileSystem,
 			this.stateStore,
 			{
-				conflictStrategy: context.conflictStrategy,
+				syncStrategy: context.syncStrategy ?? DEFAULT_SYNC_STRATEGY,
 				onAuthError: context.onAuthError,
 			},
 		);
 		await engine.load();
+		let localEntryCount: number | null = null;
+		const getLocalEntryCount = async (): Promise<number> => {
+			if (localEntryCount !== null) {
+				return localEntryCount;
+			}
+			localEntryCount = (await context.localFileSystem.listEntries()).length;
+			return localEntryCount;
+		};
+		const shouldPreferRemoteSeed = async (): Promise<boolean> => {
+			const state = engine.getStateSnapshot();
+			if (!isInitializationPhase(state)) {
+				return false;
+			}
+			return (await getLocalEntryCount()) === 0;
+		};
 
 		if (request.localChanges.length > 0) {
 			const plan = planLocalChanges(request.localChanges, engine.getStateSnapshot());
@@ -69,7 +84,8 @@ export class SyncRunner {
 				context.remoteFileSystem,
 				engine.getStateSnapshot(),
 				{
-					conflictStrategy: context.conflictStrategy,
+					syncStrategy: context.syncStrategy,
+					preferRemoteSeed: await shouldPreferRemoteSeed(),
 				},
 			);
 			engine.applyEntries(remotePlan.snapshot);
@@ -85,7 +101,9 @@ export class SyncRunner {
 		}
 
 		if (shouldReconcile) {
-			const reconcile = await engine.plan();
+			const reconcile = await engine.plan({
+				preferRemoteSeed: await shouldPreferRemoteSeed(),
+			});
 			if (reconcile.jobsPlanned > 0) {
 				this.lastBackgroundReconcileAt = nowTs;
 			}

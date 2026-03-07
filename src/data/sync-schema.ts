@@ -22,12 +22,14 @@ export type SyncEntry = {
 		remoteId?: string;
 		detectedAt: number;
 	};
+	conflictPending?: boolean;
 	lastSyncAt?: number;
 };
 
 export type JobOp =
 	| "upload"
 	| "download"
+	| "copy-local"
 	| "delete-local"
 	| "delete-remote"
 	| "move-local"
