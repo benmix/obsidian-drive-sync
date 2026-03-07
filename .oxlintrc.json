@@ -76,6 +76,12 @@
 									"../runtime/**",
 									"../../runtime/**",
 									"../../../runtime/**",
+									"../sync/**",
+									"../../sync/**",
+									"../../../sync/**",
+									"../data/**",
+									"../../data/**",
+									"../../../data/**",
 									"../provider/providers/**",
 									"../../provider/providers/**",
 									"../../../provider/providers/**",
@@ -102,6 +108,12 @@
 						"patterns": [
 							{
 								"group": [
+									"../sync/**",
+									"../../sync/**",
+									"../../../sync/**",
+									"../data/**",
+									"../../data/**",
+									"../../../data/**",
 									"../provider/providers/**",
 									"../../provider/providers/**",
 									"../main",

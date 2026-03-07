@@ -66,7 +66,7 @@ type DiagnosticsReport = {
 export async function exportDiagnostics(
 	app: App,
 	plugin: Plugin,
-	targetPath = "protondrive-sync-diagnostics.json",
+	targetPath = "drive-sync-diagnostics.json",
 ): Promise<string> {
 	const data = await loadPluginData(plugin);
 	const syncState = await new PluginDataStateStore().load();

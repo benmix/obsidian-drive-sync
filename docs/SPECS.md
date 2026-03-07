@@ -1,6 +1,6 @@
 ---
 
-# Obsidian Proton Drive Sync
+# Obsidian Drive Sync
 
 **Technical Specification (Specs v1.0)**
 
@@ -10,17 +10,17 @@
 
 ### 1.1 Product Name
 
-**Obsidian Proton Drive Sync Plugin**
+**Obsidian Drive Sync Plugin**
 
 ### 1.2 Purpose
 
-为 Obsidian 提供一个插件，使本地 Vault 与 Proton Drive 上指定目录实现**可靠的双向同步**，具备冲突检测、失败恢复与可观测性。
+为 Obsidian 提供一个插件，使本地 Vault 与远端 Provider 上指定目录实现**可靠的双向同步**，具备冲突检测、失败恢复与可观测性。
 
 ### 1.3 Non-Goals
 
 - 不替换 Obsidian 原生 Vault Adapter
 - 不实现多人实时协同编辑
-- 不实现 Proton Drive API 之外的自建后端
+- 不实现远端 Provider API 之外的自建后端
 - 不保证与 Obsidian Sync 的状态一致性
 
 ---
@@ -29,7 +29,7 @@
 
 ### 2.1 In Scope
 
-- 本地 Vault ↔ Proton Drive 目录的双向同步
+- 本地 Vault ↔ 远端 Provider 目录的双向同步
 - 文件/目录的 create / modify / delete / rename
 - 冲突检测与自动解决（默认策略）
 - 会话恢复、失败重试、断点续跑
@@ -44,15 +44,15 @@
 
 ## 3. Terminology
 
-| Term            | Definition                      |
-| --------------- | ------------------------------- |
-| Vault           | Obsidian 管理的本地文件目录     |
-| Remote Root     | Proton Drive 上作为同步根的目录 |
-| relPath         | 相对于 Vault 根目录的规范化路径 |
-| node uid        | Proton Drive 节点稳定标识       |
-| Index           | 本地维护的同步状态数据库        |
-| Job             | 一个可幂等执行的同步任务        |
-| Synced Baseline | 上一次成功同步时的本地/远端指纹 |
+| Term            | Definition                       |
+| --------------- | -------------------------------- |
+| Vault           | Obsidian 管理的本地文件目录      |
+| Remote Root     | 远端 Provider 上作为同步根的目录 |
+| relPath         | 相对于 Vault 根目录的规范化路径  |
+| node uid        | 远端节点稳定标识                 |
+| Index           | 本地维护的同步状态数据库         |
+| Job             | 一个可幂等执行的同步任务         |
+| Synced Baseline | 上一次成功同步时的本地/远端指纹  |
 
 ---
 
@@ -79,7 +79,7 @@
     - 提供事件流与文件操作能力
 
 - **RemoteFS Adapter**
-    - Proton Drive SDK 的唯一依赖层
+    - 远端 Provider SDK 的唯一依赖层
     - 提供统一的远端文件系统抽象
 
 - **Persistence Layer**
@@ -456,7 +456,7 @@ if localChanged && remoteChanged → Conflict
     - `use-cases/*`: provider-agnostic one-cycle sync execution
     - keeps conflict/retry/state semantics unchanged
 
-- **Provider remote file system strategy boundary (`provider/remote-file-system/*`)**
+- **Provider remote file system strategy boundary (`provider/strategy/*`)**
     - shared, composable `RemoteFileSystem` decorators/strategies
     - provider-owned composition (runtime does not inject decorators)
     - layering constraints are enforced by lint (`no-restricted-imports` overrides)

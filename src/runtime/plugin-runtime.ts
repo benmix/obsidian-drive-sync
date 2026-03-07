@@ -4,6 +4,7 @@ import { Notice } from "obsidian";
 import { now } from "../sync/support/utils";
 import { type ObsidianDriveSyncPluginApi } from "../plugin/contracts";
 import { PluginDataStateStore } from "../sync/state/state-store";
+import type { RemoteProviderSession } from "../provider/contracts";
 import { SessionManager } from "./session-manager";
 import { SyncCoordinator } from "./sync-coordinator";
 import { type SyncRunRequest } from "../sync/contracts/types";
@@ -46,6 +47,18 @@ export class PluginRuntime {
 
 	async restoreSession(): Promise<void> {
 		await this.sessionManager.restoreSession();
+	}
+
+	async buildActiveRemoteSession(): Promise<RemoteProviderSession | null> {
+		return await this.sessionManager.buildActiveRemoteSession();
+	}
+
+	async connectRemoteClient(): Promise<unknown | null> {
+		try {
+			return await this.sessionManager.connectClient();
+		} catch {
+			return null;
+		}
 	}
 
 	refreshAutoSync(): void {

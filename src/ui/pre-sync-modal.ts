@@ -1,6 +1,6 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { formatBytes } from "../sync/support/utils";
+import { formatBytes } from "./format";
 
 export type PreSyncEstimate = {
 	jobsPlanned: number;

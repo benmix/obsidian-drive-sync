@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from "../settings";
-import type { ProtonDriveSettings } from "../settings";
+import type { DriveSyncSettings } from "../contracts/settings";
 
 export type PluginDataStore = {
 	loadData: () => Promise<unknown>;
@@ -7,7 +7,7 @@ export type PluginDataStore = {
 };
 
 export type PluginData = {
-	settings: ProtonDriveSettings;
+	settings: DriveSyncSettings;
 };
 
 export function buildDefaultData(): PluginData {
@@ -38,7 +38,7 @@ export async function loadPluginData(store: PluginDataStore): Promise<PluginData
 		}
 		return mergePluginData(raw);
 	} catch (error) {
-		console.warn("Failed to load Proton Drive plugin data.", error);
+		console.warn("Failed to load plugin data.", error);
 		return buildDefaultData();
 	}
 }

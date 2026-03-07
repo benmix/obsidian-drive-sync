@@ -74,6 +74,26 @@ export async function runPlannedSync(
 	return await engine.runOnce();
 }
 
+export async function rebuildSyncIndex(
+	app: App,
+	localProvider: LocalProvider,
+	remoteProvider: RemoteProvider,
+	client: unknown,
+	scopeId: string,
+	settings?: {
+		syncStrategy?: SyncStrategy;
+	},
+): Promise<void> {
+	const localFileSystem = localProvider.createLocalFileSystem(app);
+	const remoteFileSystem = remoteProvider.createRemoteFileSystem(client, scopeId);
+	const stateStore = new PluginDataStateStore();
+	const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
+		syncStrategy: settings?.syncStrategy,
+	});
+	await engine.load();
+	await engine.rebuildIndex();
+}
+
 export async function pollRemoteSync(
 	app: App,
 	localProvider: LocalProvider,

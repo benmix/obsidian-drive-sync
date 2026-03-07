@@ -6,7 +6,7 @@
 
 - [x] Define SDK initialization requirements (httpClient/account/crypto/srp/cache/telemetry).
 - [x] Build internal httpClient adapter with auth headers and refresh handling.
-- [x] Refactor ProtonDriveService to construct client internally (no user SDK JSON).
+- [x] Refactor remote provider service to construct client internally (no user SDK JSON).
 
 ### Authentication and session lifecycle
 
@@ -104,7 +104,7 @@
 
 ### Phase C - resilience extension points
 
-- [x] Add provider-scoped `RateLimitedRemoteFileSystem` strategy chain (`provider/remote-file-system/strategies/*`).
+- [x] Add provider-scoped `RateLimitedRemoteFileSystem` strategy chain (`provider/strategy/*`).
 - [x] Add optional `runtime/network-policy.ts` to centralize network gating decisions.
 
 ### Phase D - sync module layout hygiene

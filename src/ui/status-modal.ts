@@ -1,9 +1,7 @@
-import { formatBytes, now } from "../sync/support/utils";
 import { Modal, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { loadPluginData } from "../data/plugin-data";
+import { formatBytes } from "./format";
 import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
-import { PluginDataStateStore } from "../sync/state/state-store";
 
 export class SyncStatusModal extends Modal {
 	private plugin: ObsidianDriveSyncPluginApi;
@@ -19,11 +17,10 @@ export class SyncStatusModal extends Modal {
 		const provider = this.plugin.getRemoteProvider();
 		contentEl.createEl("h2", { text: `${provider.label} sync status` });
 
-		const data = await loadPluginData(this.plugin);
-		const state = await new PluginDataStateStore().load();
+		const state = await this.plugin.loadSyncState();
 		const conflicts = Object.values(state.entries ?? {}).filter((entry) => entry.conflict);
 		const logs = state.logs ?? [];
-		const autoSyncStatus = data.settings.autoSyncEnabled
+		const autoSyncStatus = this.plugin.settings.autoSyncEnabled
 			? this.plugin.isAutoSyncPaused()
 				? "Paused"
 				: "Running"
@@ -41,7 +38,7 @@ export class SyncStatusModal extends Modal {
 			processing: 0,
 			blocked: 0,
 		};
-		const nowTs = now();
+		const nowTs = Date.now();
 		let nextRetryAt: number | null = null;
 		let nextRetryCount = 0;
 		let inFlightJob: string | null = null;
@@ -67,7 +64,7 @@ export class SyncStatusModal extends Modal {
 		const rows: Array<[string, string]> = [
 			["Last sync", state.lastSyncAt ? new Date(state.lastSyncAt).toLocaleString() : "Never"],
 			["Sync activity", this.plugin.isSyncRunning() ? "In progress" : "Idle"],
-			["Sync strategy", data.settings.syncStrategy],
+			["Sync strategy", this.plugin.settings.syncStrategy],
 			["Auto sync", autoSyncStatus],
 			["Auth status", authStatus],
 			["Last error", state.lastError ?? "None"],
@@ -122,7 +119,7 @@ export class SyncStatusModal extends Modal {
 			list.createEl("dd", { text: value });
 		}
 
-		if (data.settings.autoSyncEnabled) {
+		if (this.plugin.settings.autoSyncEnabled) {
 			const control = new Setting(contentEl);
 			control.addButton((button) => {
 				button.setButtonText(

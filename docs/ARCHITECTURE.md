@@ -32,7 +32,7 @@ Provider Abstraction (provider/contracts + registry)
       +-- Local Provider impl (provider/providers/obsidian/*)
       +-- Remote Provider impl (provider/providers/proton-drive/*)
              |
-             +-- RemoteFileSystem Strategy Chain (provider/remote-file-system/*)
+             +-- RemoteFileSystem Strategy Chain (provider/strategy/*)
 
 Data Layer
   - Plugin settings: Obsidian plugin data (data/plugin-data.ts)
@@ -59,7 +59,7 @@ Data Layer
     - 屏蔽具体 SDK 与平台 API 差异。
 - 关键点：
     - `default-registry.ts` 按激活 ID 只注册需要的 Provider。
-    - `remote-file-system/*` 提供 Provider 侧可插拔策略链。
+    - `strategy/*` 提供 Provider 侧可插拔策略链。
 
 ### 3.3 Sync Kernel（同步内核）
 
@@ -109,8 +109,8 @@ Data Layer
 ### 4.3 RemoteFileSystem Strategy Chain
 
 - 目录：
-    - `src/provider/remote-file-system/contracts.ts`
-    - `src/provider/remote-file-system/strategies/*`
+    - `src/provider/strategy/contracts.ts`
+    - `src/provider/strategy/*`
 - 作用：
     - 在 Provider 内部装配跨 Provider 可复用策略（例如 rate limit）。
     - Runtime 不注入策略，不暴露外部配置开关。
@@ -183,14 +183,14 @@ Data Layer
 1. 在 `provider/providers/<new-provider>/` 实现认证与 remote file system 适配。
 2. 实现 `RemoteProvider` 契约。
 3. 在 `default-registry.ts` 增加 provider factory 映射。
-4. 复用 `provider/remote-file-system/strategies/*` 中的通用策略（按需组合）。
+4. 复用 `provider/strategy/*` 中的通用策略（按需组合）。
 5. 保持 `sync/*` 无改动；必要时仅在 UI 增加 provider-specific 文案。
 
 ### 8.2 新增 RemoteFileSystem 策略
 
 推荐步骤：
 
-1. 在 `provider/remote-file-system/strategies/` 新建策略实现。
+1. 在 `provider/strategy/` 新建策略实现。
 2. 保持输入输出都是 `RemoteFileSystem -> RemoteFileSystem`。
 3. 在目标 provider 的 `createRemoteFileSystem` 中注入策略。
 4. 为策略增加独立单测，避免影响 sync kernel 测试。
@@ -204,7 +204,7 @@ Data Layer
 
 ## 10. 后续演进建议
 
-- 将 `ProtonDriveSettings` 进行命名去品牌化（语义已泛化）。
+- `DriveSyncSettings` 已完成去品牌化命名，后续保持 provider-neutral 语义。
 - provider registry 支持多 provider 并行可见（当前为按激活 ID 单注册）。
 - 增加策略链运行指标（等待时长、命中次数、错误分类分布）。
 - 增加架构回归检查（例如按目录自动校验 import graph）。

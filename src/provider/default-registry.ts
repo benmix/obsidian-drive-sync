@@ -1,6 +1,4 @@
 import {
-	DEFAULT_LOCAL_PROVIDER_ID,
-	DEFAULT_REMOTE_PROVIDER_ID,
 	type LocalProvider,
 	type LocalProviderId,
 	type RemoteProvider,
@@ -14,10 +12,11 @@ type RemoteProviderFactory = () => RemoteProvider;
 type LocalProviderFactory = () => LocalProvider;
 
 const REMOTE_PROVIDER_FACTORIES: Record<RemoteProviderId, RemoteProviderFactory> = {
-	[DEFAULT_REMOTE_PROVIDER_ID]: () => createProtonDriveRemoteProvider(),
+	["proton-drive"]: () => createProtonDriveRemoteProvider(),
 };
+
 const LOCAL_PROVIDER_FACTORIES: Record<LocalProviderId, LocalProviderFactory> = {
-	[DEFAULT_LOCAL_PROVIDER_ID]: () => createObsidianLocalProvider(),
+	["obsidian-local"]: () => createObsidianLocalProvider(),
 };
 
 export function createRemoteProviderRegistry(

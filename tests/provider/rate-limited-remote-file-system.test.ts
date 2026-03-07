@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { RateLimitedRemoteFileSystem } from "../../src/provider/remote-file-system/strategies/rate-limited-remote-file-system";
+import { RateLimitedRemoteFileSystem } from "../../src/provider/strategy/rate-limited-remote-file-system-strategy";
 import type { RemoteFileSystem } from "../../src/filesystem/contracts";
 
 function delay(ms: number): Promise<void> {

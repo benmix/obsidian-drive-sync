@@ -3,12 +3,14 @@ import type {
 	LocalProvider,
 	RemoteProvider,
 	RemoteProviderCredentials,
+	RemoteProviderSession,
 } from "../provider/contracts";
-import type { ProtonDriveSettings } from "../settings";
+import type { DriveSyncSettings } from "../contracts/settings";
+import type { SyncState } from "../sync/state/index-store";
 
 export interface ObsidianDriveSyncPluginApi extends Plugin {
 	readonly app: App;
-	settings: ProtonDriveSettings;
+	settings: DriveSyncSettings;
 
 	getRemoteProviderId(): string;
 	getRemoteProvider(): RemoteProvider;
@@ -37,7 +39,11 @@ export interface ObsidianDriveSyncPluginApi extends Plugin {
 
 	isAuthPaused(): boolean;
 	getLastAuthError(): string | undefined;
+	buildActiveRemoteSession(): Promise<RemoteProviderSession | null>;
+	connectRemoteClient(): Promise<unknown | null>;
 	runAutoSync(force?: boolean): Promise<void>;
 	isSyncRunning(): boolean;
 	handleAuthRecovered(scheduleSync?: boolean): void;
+	loadSyncState(): Promise<SyncState>;
+	clearConflictMarker(path: string): Promise<boolean>;
 }

@@ -1,7 +1,6 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
 import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
-import { PluginDataStateStore } from "../sync/state/state-store";
 
 type ConflictItem = {
 	path: string;
@@ -29,7 +28,7 @@ export class SyncConflictModal extends Modal {
 		this.loading = true;
 		this.error = null;
 		this.conflicts = [];
-		const state = await new PluginDataStateStore().load();
+		const state = await this.plugin.loadSyncState();
 		this.conflicts = Object.values(state.entries ?? {})
 			.filter((entry) => entry.conflict)
 			.map((entry) => ({
@@ -131,16 +130,10 @@ export class SyncConflictModal extends Modal {
 	}
 
 	private async clearConflict(path: string, announce = true): Promise<void> {
-		const stateStore = new PluginDataStateStore();
-		const state = await stateStore.load();
-		const entry = state.entries[path];
-		if (!entry) {
+		const cleared = await this.plugin.clearConflictMarker(path);
+		if (!cleared) {
 			return;
 		}
-		entry.conflict = undefined;
-		entry.conflictPending = undefined;
-		state.entries[path] = entry;
-		await stateStore.save(state);
 		if (announce) {
 			new Notice("Conflict cleared.");
 		}

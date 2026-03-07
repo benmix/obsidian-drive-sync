@@ -2,17 +2,17 @@
 
 ## Authentication and session lifecycle
 
-1. In Obsidian, run the command **Sign in to Proton Drive**.
-2. Enter your Proton credentials (and 2FA/mailbox password if prompted).
-3. Confirm a success notice appears and **Show Proton Drive sync status** reports Auth status as OK.
+1. In Obsidian, run the command **Sign in to remote provider**.
+2. Enter your provider credentials (and 2FA/mailbox password if prompted).
+3. Confirm a success notice appears and **Show sync status** reports Auth status as OK.
 4. Close and reopen Obsidian.
-5. Run **Connect to Proton Drive** to confirm session restore works without re-auth.
-6. Run **Sign out of Proton Drive** and confirm status shows session cleared.
+5. Run **Connect remote provider** to confirm session restore works without re-auth.
+6. Run **Sign out of remote provider** and confirm status shows session cleared.
 
 ## Remote operations (CRUD) and UID stability
 
 1. Ensure a **Remote folder** is set.
-2. Run **Validate Proton Drive remote operations**.
+2. Run **Validate remote operations**.
 3. Confirm a success notice appears.
 4. If validation fails, open the dev console to review the failed step.
 

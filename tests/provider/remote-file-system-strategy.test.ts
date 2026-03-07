@@ -3,11 +3,11 @@ import { describe, expect, test } from "vitest";
 import {
 	applyRemoteFileSystemStrategies,
 	type RemoteFileSystemStrategy,
-} from "../../src/provider/remote-file-system/contracts";
+} from "../../src/provider/strategy/contracts";
 import {
 	createRateLimitedRemoteFileSystemStrategy,
 	RateLimitedRemoteFileSystem,
-} from "../../src/provider/remote-file-system/strategies/rate-limited-remote-file-system";
+} from "../../src/provider/strategy/rate-limited-remote-file-system-strategy";
 
 import type { RemoteFileSystem } from "../../src/filesystem/contracts";
 

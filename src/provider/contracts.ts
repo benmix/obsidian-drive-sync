@@ -7,9 +7,11 @@ export const DEFAULT_LOCAL_PROVIDER_ID = "obsidian-local";
 export type RemoteProviderId = string;
 export type RemoteProviderCredentials = unknown;
 
-export type RemoteProviderSession = {
+export type RemoteProviderSession = Record<string, unknown>;
+
+export type RemoteProviderConnectOptions = {
 	onTokenRefresh?: () => Promise<void>;
-} & Record<string, unknown>;
+};
 
 export type RemoteProviderLoginInput = {
 	username: string;
@@ -60,7 +62,10 @@ export interface RemoteProvider {
 	logout(): Promise<void>;
 	isSessionValidated(): boolean;
 
-	connect(session: RemoteProviderSession): Promise<unknown | null>;
+	connect(
+		session: RemoteProviderSession,
+		options?: RemoteProviderConnectOptions,
+	): Promise<unknown | null>;
 	disconnect(): void;
 	getRootScope(client: unknown): Promise<RemoteScopeRoot>;
 

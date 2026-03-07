@@ -1,6 +1,6 @@
+import { ensureSyncStateDbReady, syncStateDb } from "../../data/sync-db";
 import type { SyncEntry, SyncLog } from "../../data/sync-schema";
 import type { SyncRuntimeMetrics, SyncState } from "./index-store";
-import { syncStateDb } from "../../data/sync-db";
 
 export type StateStore = {
 	load(): Promise<SyncState>;
@@ -9,6 +9,7 @@ export type StateStore = {
 
 export class PluginDataStateStore implements StateStore {
 	async load(): Promise<SyncState> {
+		await ensureSyncStateDbReady();
 		const [entries, jobs, meta, logs] = await Promise.all([
 			syncStateDb.entries.toArray(),
 			syncStateDb.jobs.toArray(),
@@ -33,6 +34,7 @@ export class PluginDataStateStore implements StateStore {
 	}
 
 	async save(state: SyncState): Promise<void> {
+		await ensureSyncStateDbReady();
 		const entries = Object.values(state.entries ?? {});
 		const jobs = state.jobs ?? [];
 		const logs = (state.logs ?? []).map(toLog);

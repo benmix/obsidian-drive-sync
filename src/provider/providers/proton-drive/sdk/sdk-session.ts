@@ -16,9 +16,7 @@ import { createSdkTelemetry } from "./telemetry";
 import { OpenPGPCryptoWithCryptoProxy } from "@protontech/drive-sdk";
 import type { Session } from "./proton-auth/types";
 
-export type ProtonSession = Session & {
-	onTokenRefresh?: () => Promise<void>;
-};
+export type ProtonSession = Session;
 
 export type SdkSessionBundle = {
 	httpClient: ProtonDriveHTTPClient;

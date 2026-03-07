@@ -15,7 +15,7 @@
    `RemoteFileSystemStrategy` + `applyRemoteFileSystemStrategies`
 
 2. 将限流实现迁到 provider 可复用策略目录  
-   `src/provider/remote-file-system/strategies/rate-limited-remote-file-system.ts`
+   `src/provider/strategy/rate-limited-remote-file-system-strategy.ts`
 
 3. 由 remote provider 在 `createRemoteFileSystem` 内部组装策略链  
    `proton-drive` 默认启用限流策略
@@ -33,10 +33,10 @@
 ## Implemented Changes
 
 - 新增 provider 策略抽象：
-    - `src/provider/remote-file-system/contracts.ts`
+    - `src/provider/strategy/contracts.ts`
 - 新增共享限流策略：
-    - `src/provider/remote-file-system/strategies/rate-limited-remote-file-system.ts`
-- `ProtonDriveRemoteProvider` 内部组合策略链：
+    - `src/provider/strategy/rate-limited-remote-file-system-strategy.ts`
+- 远端 provider 实现内部组合策略链：
     - `src/provider/providers/proton-drive/provider.ts`
 - runtime 去除限流注入：
     - `src/runtime/sync-coordinator.ts`

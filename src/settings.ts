@@ -1,26 +1,16 @@
-import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "./sync/contracts/strategy";
 import { PluginSettingTab, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { buildActiveRemoteSession } from "./provider/session";
 import { DEFAULT_REMOTE_PROVIDER_ID } from "./provider/contracts";
+import { DEFAULT_SYNC_STRATEGY } from "./sync/contracts/strategy";
+import type { DriveSyncSettings } from "./contracts/settings";
 import { getBuiltInExcludePatterns } from "./sync/planner/exclude";
 import type { ObsidianDriveSyncPluginApi } from "./plugin/contracts";
 import { RemoteFolderPickerModal } from "./ui/remote-root-modal";
 import { RemoteProviderLoginModal } from "./ui/login-modal";
 
-export interface ProtonDriveSettings {
-	remoteProviderId: string;
-	remoteScopeId: string;
-	remoteScopePath: string;
-	remoteProviderCredentials?: unknown;
-	remoteAccountEmail: string;
-	remoteHasAuthSession: boolean;
-	syncStrategy: SyncStrategy;
-	autoSyncEnabled: boolean;
-	enableNetworkPolicy: boolean;
-}
+export type { DriveSyncSettings } from "./contracts/settings";
 
-export const DEFAULT_SETTINGS: ProtonDriveSettings = {
+export const DEFAULT_SETTINGS: DriveSyncSettings = {
 	remoteProviderId: DEFAULT_REMOTE_PROVIDER_ID,
 	remoteScopeId: "",
 	remoteScopePath: "",
@@ -32,7 +22,7 @@ export const DEFAULT_SETTINGS: ProtonDriveSettings = {
 	enableNetworkPolicy: false,
 };
 
-export class ProtonDriveSettingTab extends PluginSettingTab {
+export class DriveSyncSettingTab extends PluginSettingTab {
 	plugin: ObsidianDriveSyncPluginApi;
 	private remoteValidationSequence = 0;
 
@@ -124,7 +114,7 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.syncStrategy)
 					.onChange(async (value) => {
 						this.plugin.settings.syncStrategy =
-							value as ProtonDriveSettings["syncStrategy"];
+							value as DriveSyncSettings["syncStrategy"];
 						await this.plugin.saveSettings();
 					}),
 			);
@@ -202,14 +192,7 @@ export class ProtonDriveSettingTab extends PluginSettingTab {
 			};
 		}
 
-		const activeSession = await buildActiveRemoteSession(this.plugin);
-		if (!activeSession) {
-			return {
-				ok: false,
-				message: `Sign in to ${provider.label} first.`,
-			};
-		}
-		const client = await provider.connect(activeSession);
+		const client = await this.plugin.connectRemoteClient();
 		if (!client) {
 			return {
 				ok: false,

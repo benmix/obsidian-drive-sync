@@ -49,10 +49,44 @@ export class SessionManager {
 		this.lastAuthError = message;
 	}
 
+	async buildActiveRemoteSession(): Promise<RemoteProviderSession | null> {
+		const provider = this.plugin.getRemoteProvider();
+		const credentials = this.plugin.getStoredProviderCredentials();
+		let session = provider.getSession();
+
+		if (!session && credentials) {
+			try {
+				session = await provider.restore(credentials);
+				this.plugin.setStoredProviderCredentials(provider.getReusableCredentials());
+				this.plugin.setRemoteAuthSession(true);
+				await this.plugin.saveSettings();
+				this.handleAuthRecovered();
+			} catch (error) {
+				console.warn("Failed to restore remote session.", error);
+				this.plugin.clearStoredRemoteSession();
+				await this.plugin.saveSettings();
+				return null;
+			}
+		}
+
+		if (!session) {
+			return null;
+		}
+
+		return { ...session };
+	}
+
 	async connectClient(): Promise<unknown> {
 		const provider = this.plugin.getRemoteProvider();
-		const session = await this.createActiveSession();
-		const client = await provider.connect(session);
+		const session = await this.buildActiveRemoteSession();
+		if (!session) {
+			throw new Error(`Sign in to ${provider.label} first.`);
+		}
+		const client = await provider.connect(session, {
+			onTokenRefresh: async () => {
+				await this.refreshAndPersistSession();
+			},
+		});
 		if (!client) {
 			throw new Error(`Unable to connect to ${provider.label}.`);
 		}
@@ -60,39 +94,24 @@ export class SessionManager {
 		return client;
 	}
 
-	private async createActiveSession(): Promise<RemoteProviderSession> {
+	private async refreshAndPersistSession(): Promise<void> {
 		const provider = this.plugin.getRemoteProvider();
-		const session = provider.getSession();
-		if (!session) {
-			throw new Error(`Sign in to ${provider.label} first.`);
+		try {
+			await provider.refreshToken();
+			this.plugin.setStoredProviderCredentials(provider.getReusableCredentials());
+			this.plugin.setRemoteAuthSession(true);
+			await this.plugin.saveSettings();
+			this.handleAuthRecovered();
+		} catch (refreshError) {
+			console.warn("Failed to refresh remote session.", refreshError);
+			this.plugin.setRemoteAuthSession(false);
+			this.authPaused = true;
+			this.lastAuthError =
+				refreshError instanceof Error
+					? refreshError.message
+					: "Failed to refresh remote session.";
+			await this.plugin.saveSettings();
+			throw refreshError;
 		}
-
-		const activeSession: RemoteProviderSession = {
-			...session,
-		};
-		activeSession.onTokenRefresh = async () => {
-			try {
-				await provider.refreshToken();
-				const refreshedSession = provider.getSession();
-				if (refreshedSession) {
-					Object.assign(activeSession, refreshedSession);
-				}
-				this.plugin.setStoredProviderCredentials(provider.getReusableCredentials());
-				this.plugin.setRemoteAuthSession(true);
-				await this.plugin.saveSettings();
-				this.handleAuthRecovered();
-			} catch (refreshError) {
-				console.warn("Failed to refresh remote session.", refreshError);
-				this.plugin.setRemoteAuthSession(false);
-				this.authPaused = true;
-				this.lastAuthError =
-					refreshError instanceof Error
-						? refreshError.message
-						: "Failed to refresh remote session.";
-				await this.plugin.saveSettings();
-			}
-		};
-
-		return activeSession;
 	}
 }

@@ -1,16 +1,17 @@
 import {
 	applyRemoteFileSystemStrategies,
 	type RemoteFileSystemStrategy,
-} from "../../remote-file-system/contracts";
+} from "../../strategy/contracts";
 import type {
 	RemoteProvider,
+	RemoteProviderConnectOptions,
 	RemoteProviderCredentials,
 	RemoteProviderLoginInput,
 	RemoteProviderLoginResult,
 	RemoteProviderSession,
 	RemoteScopeRoot,
 } from "../../contracts";
-import { createRateLimitedRemoteFileSystemStrategy } from "../../remote-file-system/strategies/rate-limited-remote-file-system";
+import { createRateLimitedRemoteFileSystemStrategy } from "../../strategy/rate-limited-remote-file-system-strategy";
 import { ProtonDriveAuthService } from "./sdk/auth";
 import type { ProtonDriveClient } from "@protontech/drive-sdk";
 import { ProtonDriveRemoteFileSystem } from "./remote-file-system";
@@ -68,8 +69,14 @@ export class ProtonDriveRemoteProvider implements RemoteProvider {
 		return this.authService.isSessionValidated();
 	}
 
-	async connect(session: RemoteProviderSession): Promise<unknown | null> {
-		return await this.driveService.connect(session as unknown as ProtonSession);
+	async connect(
+		session: RemoteProviderSession,
+		options?: RemoteProviderConnectOptions,
+	): Promise<unknown | null> {
+		return await this.driveService.connect(
+			session as unknown as ProtonSession,
+			options?.onTokenRefresh,
+		);
 	}
 
 	disconnect(): void {

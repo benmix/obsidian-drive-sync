@@ -8,22 +8,26 @@ import {
 	type LocalProvider,
 	type RemoteProvider,
 	type RemoteProviderCredentials,
+	type RemoteProviderSession,
 } from "./provider/contracts";
-import { DEFAULT_SETTINGS, type ProtonDriveSettings, ProtonDriveSettingTab } from "./settings";
+import { DEFAULT_SETTINGS, DriveSyncSettingTab } from "./settings";
 import { loadPluginData, mergePluginData, savePluginData } from "./data/plugin-data";
 import { LocalProviderRegistry, RemoteProviderRegistry } from "./provider/registry";
+import type { DriveSyncSettings } from "./contracts/settings";
 import { normalizeSyncStrategy } from "./sync/contracts/strategy";
 import type { ObsidianDriveSyncPluginApi } from "./plugin/contracts";
 import { Plugin } from "obsidian";
+import { PluginDataStateStore } from "./sync/state/state-store";
 import { PluginRuntime } from "./runtime/plugin-runtime";
 import { registerCommands } from "./commands";
+import type { SyncState } from "./sync/state/index-store";
 
 function normalizeString(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";
 }
 
-function migrateLoadedSettings(loaded: ProtonDriveSettings): {
-	settings: ProtonDriveSettings;
+function migrateLoadedSettings(loaded: DriveSyncSettings): {
+	settings: DriveSyncSettings;
 	migrated: boolean;
 } {
 	const loadedProviderId = normalizeString(loaded.remoteProviderId);
@@ -42,7 +46,7 @@ function migrateLoadedSettings(loaded: ProtonDriveSettings): {
 			? loaded.remoteHasAuthSession
 			: DEFAULT_SETTINGS.remoteHasAuthSession;
 
-	const settings: ProtonDriveSettings = {
+	const settings: DriveSyncSettings = {
 		...DEFAULT_SETTINGS,
 		remoteProviderId: providerId,
 		remoteScopeId: scopeId,
@@ -68,7 +72,7 @@ function migrateLoadedSettings(loaded: ProtonDriveSettings): {
 }
 
 export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianDriveSyncPluginApi {
-	settings: ProtonDriveSettings = DEFAULT_SETTINGS;
+	settings: DriveSyncSettings = DEFAULT_SETTINGS;
 	private localProviderRegistry: LocalProviderRegistry = new LocalProviderRegistry();
 	private remoteProviderRegistry: RemoteProviderRegistry = new RemoteProviderRegistry();
 	private runtime: PluginRuntime | null = null;
@@ -86,7 +90,7 @@ export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianD
 		this.runtime = new PluginRuntime(this);
 		await this.runtime.restoreSession();
 
-		this.addSettingTab(new ProtonDriveSettingTab(this.app, this));
+		this.addSettingTab(new DriveSyncSettingTab(this.app, this));
 		registerCommands(this);
 		this.refreshAutoSync();
 	}
@@ -195,6 +199,14 @@ export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianD
 		return this.runtime?.getLastAuthError();
 	}
 
+	async buildActiveRemoteSession(): Promise<RemoteProviderSession | null> {
+		return (await this.runtime?.buildActiveRemoteSession()) ?? null;
+	}
+
+	async connectRemoteClient(): Promise<unknown | null> {
+		return (await this.runtime?.connectRemoteClient()) ?? null;
+	}
+
 	async runAutoSync(force = false): Promise<void> {
 		if (!this.runtime) {
 			return;
@@ -208,5 +220,23 @@ export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianD
 
 	handleAuthRecovered(scheduleSync = true): void {
 		this.runtime?.handleAuthRecovered(scheduleSync);
+	}
+
+	async loadSyncState(): Promise<SyncState> {
+		return await new PluginDataStateStore().load();
+	}
+
+	async clearConflictMarker(path: string): Promise<boolean> {
+		const stateStore = new PluginDataStateStore();
+		const state = await stateStore.load();
+		const entry = state.entries[path];
+		if (!entry) {
+			return false;
+		}
+		entry.conflict = undefined;
+		entry.conflictPending = undefined;
+		state.entries[path] = entry;
+		await stateStore.save(state);
+		return true;
 	}
 }

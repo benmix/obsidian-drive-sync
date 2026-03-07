@@ -1,6 +1,6 @@
-# Obsidian Proton Drive Sync
+# Obsidian Drive Sync
 
-Sync an Obsidian vault with a Proton Drive folder. This plugin is a work in progress and focuses on safe, observable, and reversible sync operations.
+Sync an Obsidian vault with a remote folder. This plugin is a work in progress and focuses on safe, observable, and reversible sync operations.
 
 ## Status
 
@@ -20,15 +20,15 @@ Recent updates:
 - Runtime refactor Phase C landed (`network-policy` remains optional; remote rate limiting moved to provider-scoped strategy chain).
 - Sync module reorganized by responsibility (`contracts/planner/engine/state/support/use-cases`).
 - Added `oxlint` import-boundary guards for sync layer dependency direction.
-- Remote provider abstraction Phase C landed (commands + conflict/root modals migrated to provider interfaces; Proton remains default).
+- Remote provider abstraction Phase C landed (commands + conflict/root modals migrated to provider interfaces; current default provider remains enabled).
 - Legacy settings compatibility layer removed (one-time migration to provider fields, provider-only persistence).
 - Proton SDK/auth implementation moved under provider tree (`provider/providers/proton-drive/sdk`).
-- Provider layering tightened: Proton/Obsidian file-system implementations now live under `provider/providers/*`; `sync/` keeps provider-agnostic kernel logic.
+- Provider layering tightened: provider-specific/Obsidian file-system implementations now live under `provider/providers/*`; `sync/` keeps provider-agnostic kernel logic.
 - FileSystem contracts extracted to `src/filesystem/`; `sync/` and `provider/` now both depend on this lower-level module.
 
 ## Goals
 
-- Two-way sync between a vault and a single Proton Drive folder.
+- Two-way sync between a vault and a single remote folder.
 - Conflict detection with deterministic resolution.
 - Crash recovery and resumable jobs.
 - Minimal, explicit network usage with clear user controls.
@@ -37,7 +37,7 @@ Recent updates:
 
 - Replacing the Obsidian vault adapter.
 - Real-time multi-user collaboration.
-- Any server-side components beyond Proton Drive.
+- Any server-side components beyond the selected remote provider.
 
 ## Development
 
@@ -91,7 +91,7 @@ src/
   settings.ts                   # settings + defaults
   filesystem/                   # shared file-system contracts (local/remote)
   provider/                     # local/remote provider contracts + implementations
-    remote-file-system/         # provider-side remote file system strategy chain
+    strategy/                 # provider-side remote file system strategy chain
     providers/obsidian/         # Obsidian local file system + watcher
     providers/proton-drive/     # Proton auth/service + remote file system
   commands/                     # command handlers
@@ -120,6 +120,7 @@ src/
 - `ARCHITECTURE.md` — implementation-oriented architecture design
 - `SYNC_STRATEGY.md` — runtime sync strategy baseline (post-initialization)
 - `SYNC_INITIALIZATION_STRATEGY.md` — first-sync initialization strategy baseline
+- `COMMANDS.md` — command module structure and command catalog
 - `TASKS.md` — development tasks
 - `REMOTE_RATE_LIMITING.md` — provider-scoped remote rate limiting design
 - `AGENTS.md` — agents rules

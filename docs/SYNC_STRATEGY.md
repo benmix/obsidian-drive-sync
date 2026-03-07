@@ -14,7 +14,7 @@
 ## 2. 术语定义
 
 - `local`: Obsidian Vault 本地文件系统视图。
-- `remote`: 远端存储（当前默认 Proton Drive）文件系统视图。
+- `remote`: 远端存储文件系统视图。
 - `tracked`: 已存在同步状态映射（`SyncEntry`）的路径。
 - `tombstone`: 本地已删除、等待远端收敛的删除标记。
 - `conflict_pending`: 路径处于冲突待人工合并状态。

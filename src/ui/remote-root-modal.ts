@@ -1,7 +1,6 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { RemoteFileEntry, RemoteFileSystem } from "../filesystem/contracts";
 import type { App } from "obsidian";
-import { buildActiveRemoteSession } from "../provider/session";
 import { normalizePath } from "../filesystem/path";
 import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
 
@@ -47,14 +46,7 @@ export class RemoteFolderPickerModal extends Modal {
 			return;
 		}
 
-		const activeSession = await buildActiveRemoteSession(this.plugin);
-		if (!activeSession) {
-			this.error = `Sign in to ${provider.label} first.`;
-			this.loading = false;
-			return;
-		}
-
-		const client = await provider.connect(activeSession);
+		const client = await this.plugin.connectRemoteClient();
 		if (!client) {
 			this.error = `Unable to connect to ${provider.label}.`;
 			this.loading = false;
