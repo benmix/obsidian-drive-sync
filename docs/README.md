@@ -118,6 +118,7 @@ src/
 
 - `SPECS.md` — technical specification
 - `ARCHITECTURE.md` — implementation-oriented architecture design
+- `SYNC_STRATEGY.md` — unified sync strategy doc (current behavior + redesign plan)
 - `TASKS.md` — development tasks
 - `REMOTE_RATE_LIMITING.md` — provider-scoped remote rate limiting design
 - `AGENTS.md` — agents rules
