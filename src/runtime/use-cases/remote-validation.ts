@@ -1,16 +1,8 @@
-import type { RemoteFileSystem } from "../../filesystem";
-
-export type ValidationStep = {
-	name: string;
-	ok: boolean;
-	detail?: string;
-};
-
-export type RemoteValidationReport = {
-	ok: boolean;
-	rootFolderId?: string;
-	steps: ValidationStep[];
-};
+import type {
+	RemoteValidationReport,
+	ValidationStep,
+} from "../../contracts/provider/remote-validation";
+import type { RemoteFileSystem } from "../../contracts/filesystem/file-system";
 
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
 	if (a.byteLength !== b.byteLength) {
@@ -57,9 +49,9 @@ export async function validateRemoteOperations(
 			});
 		}
 
-		if (!remoteFileSystem.createFolder) {
+		if (!remoteFileSystem.ensureFolder) {
 			steps.push({
-				name: "create folder",
+				name: "ensure folder",
 				ok: false,
 				detail: "Remote provider does not support folder creation.",
 			});
@@ -67,17 +59,17 @@ export async function validateRemoteOperations(
 		}
 
 		try {
-			const created = await remoteFileSystem.createFolder(sourcePath);
-			await remoteFileSystem.createFolder(destPath);
+			const created = await remoteFileSystem.ensureFolder(sourcePath);
+			await remoteFileSystem.ensureFolder(destPath);
 			rootFolderId = created.id;
 			steps.push({
-				name: "create folder",
+				name: "ensure folder",
 				ok: Boolean(rootFolderId),
 				detail: rootFolderId ? `id=${rootFolderId}` : "no id returned",
 			});
 		} catch (error) {
 			steps.push({
-				name: "create folder",
+				name: "ensure folder",
 				ok: false,
 				detail: error instanceof Error ? error.message : "unknown error",
 			});
@@ -86,20 +78,20 @@ export async function validateRemoteOperations(
 
 		try {
 			const payload = encoder.encode(`validation-${suffix}-v1`);
-			const upload = await remoteFileSystem.uploadFile(filePath, payload, {
+			const upload = await remoteFileSystem.writeFile(filePath, payload, {
 				mtimeMs: Date.now(),
 				size: payload.byteLength,
 			});
 			fileId = upload.id;
 			fileRevisionId = upload.revisionId;
 			steps.push({
-				name: "upload file",
+				name: "write file",
 				ok: Boolean(fileId),
 				detail: fileId ? `id=${fileId}` : "no id returned",
 			});
 		} catch (error) {
 			steps.push({
-				name: "upload file",
+				name: "write file",
 				ok: false,
 				detail: error instanceof Error ? error.message : "unknown error",
 			});
@@ -127,17 +119,17 @@ export async function validateRemoteOperations(
 			if (!fileId) {
 				throw new Error("missing file id");
 			}
-			const downloaded = await remoteFileSystem.downloadFile(fileId);
+			const downloaded = await remoteFileSystem.readFile(fileId);
 			const expected = encoder.encode(`validation-${suffix}-v1`);
 			const ok = sameBytes(downloaded, expected);
 			steps.push({
-				name: "download file",
+				name: "read file",
 				ok,
 				detail: ok ? "content matches" : "content mismatch",
 			});
 		} catch (error) {
 			steps.push({
-				name: "download file",
+				name: "read file",
 				ok: false,
 				detail: error instanceof Error ? error.message : "unknown error",
 			});
@@ -145,7 +137,7 @@ export async function validateRemoteOperations(
 
 		try {
 			const payload = encoder.encode(`validation-${suffix}-v2`);
-			const upload = await remoteFileSystem.uploadFile(filePath, payload, {
+			const upload = await remoteFileSystem.writeFile(filePath, payload, {
 				mtimeMs: Date.now(),
 				size: payload.byteLength,
 			});
@@ -155,7 +147,7 @@ export async function validateRemoteOperations(
 					? upload.revisionId !== fileRevisionId
 					: undefined;
 			steps.push({
-				name: "upload new revision",
+				name: "write new revision",
 				ok,
 				detail:
 					revisionChanged === undefined
@@ -164,13 +156,13 @@ export async function validateRemoteOperations(
 			});
 		} catch (error) {
 			steps.push({
-				name: "upload new revision",
+				name: "write new revision",
 				ok: false,
 				detail: error instanceof Error ? error.message : "unknown error",
 			});
 		}
 
-		if (!remoteFileSystem.movePath) {
+		if (!remoteFileSystem.moveEntry) {
 			steps.push({
 				name: "move/rename file",
 				ok: false,
@@ -181,7 +173,7 @@ export async function validateRemoteOperations(
 				if (!fileId) {
 					throw new Error("missing file id");
 				}
-				await remoteFileSystem.movePath(fileId, movedPath);
+				await remoteFileSystem.moveEntry(fileId, movedPath);
 				const entries = await remoteFileSystem.listEntries();
 				const match = entries.find((entry) => entry.path === movedPath);
 				const ok = Boolean(match?.id && match.id === fileId);
@@ -199,7 +191,7 @@ export async function validateRemoteOperations(
 			}
 		}
 
-		if (!remoteFileSystem.deletePath) {
+		if (!remoteFileSystem.deleteEntry) {
 			steps.push({
 				name: "delete file",
 				ok: false,
@@ -210,7 +202,7 @@ export async function validateRemoteOperations(
 				if (!fileId) {
 					throw new Error("missing file id");
 				}
-				await remoteFileSystem.deletePath(fileId);
+				await remoteFileSystem.deleteEntry(fileId);
 				const entries = await remoteFileSystem.listEntries();
 				const match = entries.find((entry) => entry.id === fileId);
 				const ok = !match;
@@ -228,9 +220,9 @@ export async function validateRemoteOperations(
 			}
 		}
 	} finally {
-		if (rootFolderId && remoteFileSystem.deletePath) {
+		if (rootFolderId && remoteFileSystem.deleteEntry) {
 			try {
-				await remoteFileSystem.deletePath(rootFolderId);
+				await remoteFileSystem.deleteEntry(rootFolderId);
 				steps.push({
 					name: "cleanup folder",
 					ok: true,

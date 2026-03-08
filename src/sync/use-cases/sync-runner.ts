@@ -1,12 +1,12 @@
-import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../contracts/strategy";
-import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem";
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
+import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
 import { isInitializationPhase } from "../planner/initialization";
 import { now } from "../support/utils";
 import { planLocalChanges } from "../planner/local-change-planner";
 import { pollRemoteChanges } from "../planner/remote-poller";
-import { type StateStore } from "../state/state-store";
+import { type StateStore } from "../../contracts/sync/state-store";
 import { SyncEngine } from "../engine/sync-engine";
-import { type SyncRunRequest } from "../contracts/types";
+import { type SyncRunRequest } from "../../contracts/sync/run-request";
 
 const BACKGROUND_RECONCILE_INTERVAL_MS = 15 * 60 * 1000;
 

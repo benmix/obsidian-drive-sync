@@ -135,6 +135,8 @@ Follow Obsidian's **Developer Policies** and **Plugin Guidelines**. In particula
 ## Coding conventions
 
 - TypeScript with `"strict": true` preferred.
+- **No re-exports allowed**: do not use `export * from ...` or `export { ... } from ...`. Import from and export within the defining module directly.
+- **No compatibility/migration-by-default**: do not add backward-compatibility shims, alias exports, or migration glue unless explicitly requested.
 - **Keep `main.ts` minimal**: Focus only on plugin lifecycle (onload, onunload, addCommand calls). Delegate all feature logic to separate modules.
 - **Split large files**: If any file exceeds ~200-300 lines, consider breaking it into smaller, focused modules.
 - **Use clear module boundaries**: Each file should have a single, well-defined responsibility.

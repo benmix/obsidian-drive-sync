@@ -1,6 +1,17 @@
 import * as openpgp from "openpgp";
-import type { AddressKeyInfo, ApiResponse, AuthInfo, Session, SrpResult } from "./types";
-import { API_BASE_URL, APP_VERSION, AUTH_VERSION, SRP_LEN } from "./types";
+import type {
+	AddressKeyInfo,
+	ApiResponse,
+	AuthInfo,
+	Session,
+	SrpResult,
+} from "../../../../../contracts/provider/proton/auth-types";
+import {
+	API_BASE_URL,
+	APP_VERSION,
+	AUTH_VERSION,
+	SRP_LEN,
+} from "../../../../../contracts/provider/proton/auth-types";
 import {
 	base64Encode,
 	bigIntToUint8ArrayLE,
@@ -12,9 +23,13 @@ import {
 } from "./crypto-utils";
 import { getSrp, verifyAndGetModulus } from "./srp";
 import type { ProtonDriveAccount, ProtonDriveAccountAddress } from "@protontech/drive-sdk";
+import type {
+	SRPModuleInterface,
+	SRPVerifier,
+} from "../../../../../contracts/provider/proton/srp-module";
 import { apiRequest } from "./api";
 import type { PublicKey as DrivePublicKey } from "@protontech/drive-sdk/dist/crypto/interface";
-import type { OpenPGPCryptoInterface } from "./openpgp";
+import type { OpenPGPCryptoInterface } from "../../../../../contracts/provider/proton/openpgp";
 import { requestHttp } from "./http";
 
 // ============================================================================
@@ -43,25 +58,6 @@ type DrivePrivateKey = {
 };
 
 type OwnAddress = ProtonDriveAccountAddress;
-
-interface SRPVerifier {
-	modulusId: string;
-	version: number;
-	salt: string;
-	verifier: string;
-}
-
-export interface SRPModuleInterface {
-	getSrp(
-		version: number,
-		modulus: string,
-		serverEphemeral: string,
-		salt: string,
-		password: string,
-	): Promise<SrpResult>;
-	getSrpVerifier(password: string): Promise<SRPVerifier>;
-	computeKeyPassword(password: string, salt: string): Promise<string>;
-}
 
 /**
  * Create an HTTP client for the Proton Drive SDK

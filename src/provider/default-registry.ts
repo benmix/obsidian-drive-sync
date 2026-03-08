@@ -1,12 +1,9 @@
-import {
-	type LocalProvider,
-	type LocalProviderId,
-	type RemoteProvider,
-	type RemoteProviderId,
-} from "./contracts";
+import { type LocalProviderId, type RemoteProviderId } from "../contracts/provider/provider-ids";
 import { LocalProviderRegistry, RemoteProviderRegistry } from "./registry";
 import { createObsidianLocalProvider } from "./providers/obsidian/provider";
 import { createProtonDriveRemoteProvider } from "./providers/proton-drive/provider";
+import type { LocalProvider } from "../contracts/provider/local-provider";
+import type { RemoteProvider } from "../contracts/provider/remote-provider";
 
 type RemoteProviderFactory = () => RemoteProvider;
 type LocalProviderFactory = () => LocalProvider;

@@ -1,4 +1,6 @@
-import type { LocalProvider, LocalProviderId, RemoteProvider, RemoteProviderId } from "./contracts";
+import type { LocalProviderId, RemoteProviderId } from "../contracts/provider/provider-ids";
+import type { LocalProvider } from "../contracts/provider/local-provider";
+import type { RemoteProvider } from "../contracts/provider/remote-provider";
 
 export class RemoteProviderRegistry {
 	private readonly providers = new Map<RemoteProviderId, RemoteProvider>();

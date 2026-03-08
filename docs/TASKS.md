@@ -104,7 +104,6 @@
 
 ### Phase C - resilience extension points
 
-- [x] Add provider-scoped `RateLimitedRemoteFileSystem` strategy chain (`provider/strategy/*`).
 - [x] Add optional `runtime/network-policy.ts` to centralize network gating decisions.
 
 ### Phase D - sync module layout hygiene
@@ -148,18 +147,15 @@
 
 ## Filesystem contract extraction
 
-- [x] Extract shared file-system contracts from `sync/contracts/types.ts` into `src/filesystem/contracts.ts`.
-- [x] Migrate `provider/` imports from `sync/contracts` to `filesystem/contracts`.
-- [x] Migrate `sync/runtime/ui/tests` imports for file-system types to `filesystem/contracts`.
-- [x] Keep `sync/contracts/types.ts` focused on sync-run contracts (`SyncRunTrigger` / `SyncRunRequest`).
+- [x] Extract shared file-system contracts out of the old sync-local type bundle into `src/contracts/filesystem/*`.
+- [x] Migrate `provider/` imports from sync-local type definitions to `src/contracts/filesystem/*`.
+- [x] Migrate `sync/runtime/ui/tests` imports for file-system types to `src/contracts/filesystem/*`.
+- [x] Keep sync-run contracts under `src/contracts/sync/*`.
 - [x] Add lint boundaries to enforce `provider` cannot import `sync/**` and `filesystem` stays dependency-light.
 - [x] Verification: `pnpm run lint` + `pnpm run test` + `pnpm run build`.
 
 ## Remote rate limiting evolution
 
-- [x] Document necessity/trade-offs and alternatives (`docs/REMOTE_RATE_LIMITING.md`).
-- [x] Keep throttling and add adaptive cooldown behavior for rate-limit/transient failures.
-- [x] Support `retryAfterMs`/`Retry-After` hints when available.
-- [x] Move rate limiting to provider strategy chain and remove runtime/settings coupling.
-- [x] Remove external toggle (`enableRateLimitedRemoteFileSystem`) and keep provider-internal defaults.
-- [x] Extend unit tests for adaptive cooldown and strategy composition behavior.
+- [x] Documented and prototyped provider-owned remote rate limiting.
+- [x] Re-evaluated the maintenance cost of the extra strategy/middleware layer.
+- [x] Removed the provider-side rate-limit strategy/middleware implementation and its related tests/contracts from the current codebase.

@@ -1,11 +1,12 @@
-import { type LocalProvider, type RemoteProvider } from "../../provider/contracts";
 import { syncLocalToRemote, syncRemoteToLocal } from "./manual-sync";
 import { type App } from "obsidian";
 import { isInitializationPhase } from "../../sync/planner/initialization";
+import type { LocalProvider } from "../../contracts/provider/local-provider";
 import { PluginDataStateStore } from "../../sync/state/state-store";
 import { pollRemoteChanges } from "../../sync/planner/remote-poller";
+import type { RemoteProvider } from "../../contracts/provider/remote-provider";
 import { SyncEngine } from "../../sync/engine/sync-engine";
-import { type SyncStrategy } from "../../sync/contracts";
+import { type SyncStrategy } from "../../contracts/sync/strategy";
 
 export async function syncVaultToRemote(
 	app: App,
@@ -168,8 +169,8 @@ export async function estimateSyncPlan(
 					uploadBytes += entry.size;
 				}
 			}
-			if (job.op === "download" && job.remoteId && remoteFileSystem.getNode) {
-				const node = await remoteFileSystem.getNode(job.remoteId);
+			if (job.op === "download" && job.remoteId && remoteFileSystem.getEntry) {
+				const node = await remoteFileSystem.getEntry(job.remoteId);
 				if (node?.size) {
 					downloadBytes += node.size;
 				}

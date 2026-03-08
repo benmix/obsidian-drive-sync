@@ -1,9 +1,6 @@
 import { type App, type EventRef } from "obsidian";
-import {
-	DEFAULT_LOCAL_PROVIDER_ID,
-	type LocalChangeHandler,
-	type LocalProvider,
-} from "../../contracts";
+import type { LocalChangeHandler, LocalProvider } from "../../../contracts/provider/local-provider";
+import { DEFAULT_LOCAL_PROVIDER_ID } from "../../../contracts/provider/provider-ids";
 import { ObsidianLocalFileSystem } from "./local-file-system";
 import { ObsidianLocalFileSystemWatcher } from "./local-watcher";
 

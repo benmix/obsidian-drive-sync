@@ -13,8 +13,13 @@ import type {
 	ReusableCredentials,
 	Session,
 	User,
-} from "./types";
-import { API_BASE_URL, APP_VERSION, CHILD_CLIENT_ID, INVALID_REFRESH_TOKEN_CODE } from "./types";
+} from "../../../../../contracts/provider/proton/auth-types";
+import {
+	API_BASE_URL,
+	APP_VERSION,
+	CHILD_CLIENT_ID,
+	INVALID_REFRESH_TOKEN_CODE,
+} from "../../../../../contracts/provider/proton/auth-types";
 import { apiRequest, createHeaders } from "./api";
 import {
 	computeKeyPassword,

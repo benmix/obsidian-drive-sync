@@ -1,15 +1,9 @@
 import { dirname, normalizePath } from "../../filesystem/path";
-import type { SyncEntry, SyncJob } from "../../data/sync-schema";
-import type { LocalChange } from "../../filesystem";
+import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
+import type { LocalChange } from "../../contracts/filesystem/file-system";
+import type { LocalChangePlan } from "../../contracts/sync/local-change-plan";
 import { now } from "../support/utils";
-import type { SyncState } from "../state/index-store";
-
-export type LocalChangePlan = {
-	jobs: SyncJob[];
-	entries: SyncEntry[];
-	removedPaths: string[];
-	rewritePrefixes: Array<{ from: string; to: string }>;
-};
+import type { SyncState } from "../../contracts/sync/state";
 
 export function planLocalChanges(changes: LocalChange[], state: SyncState): LocalChangePlan {
 	const jobs: SyncJob[] = [];

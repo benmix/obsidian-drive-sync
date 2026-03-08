@@ -1,4 +1,4 @@
-import type { EntryType } from "../contracts/entry";
+import type { EntryType } from "../filesystem/entry";
 
 export type SyncEntry = {
 	relPath: string;

@@ -8,7 +8,7 @@ import {
 	resolveTrackedMissingDecision,
 } from "../../src/sync/planner/presence-policy";
 import { expect, test } from "vitest";
-import type { SyncEntry } from "../../src/data/sync-schema";
+import type { SyncEntry } from "../../src/contracts/data/sync-schema";
 
 function trackedFile(overrides: Partial<SyncEntry> = {}): SyncEntry {
 	return createEntry(overrides);

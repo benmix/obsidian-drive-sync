@@ -6,7 +6,7 @@ import {
 	runPlannedSync,
 	syncVaultToRemote,
 } from "../runtime/use-cases/sync-workflows";
-import type { CommandContext } from "./context";
+import type { CommandContext } from "../contracts/plugin/command-context";
 import { Notice } from "obsidian";
 import { SyncPreflightModal } from "../ui/pre-sync-modal";
 

@@ -1,12 +1,12 @@
 import type { App, Plugin } from "obsidian";
 import type {
-	LocalProvider,
 	RemoteProvider,
 	RemoteProviderCredentials,
 	RemoteProviderSession,
-} from "../provider/contracts";
-import type { DriveSyncSettings } from "../contracts/settings";
-import type { SyncState } from "../sync/state/index-store";
+} from "../provider/remote-provider";
+import type { DriveSyncSettings } from "./settings";
+import type { LocalProvider } from "../provider/local-provider";
+import type { SyncState } from "../sync/state";
 
 export interface ObsidianDriveSyncPluginApi extends Plugin {
 	readonly app: App;

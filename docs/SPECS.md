@@ -369,7 +369,7 @@ if localChanged && remoteChanged -> Conflict
 - Vault up to 50k files can start.
 - Must not block Obsidian main thread.
 - Lazy hash computation.
-- Paginated remote traversal + rate limiting.
+- Paginated remote traversal with provider/SDK-appropriate pacing.
 - Pre-sync check (job count, size estimate, confirm/cancel).
 - Background reconciliation + throttled scanning.
 
@@ -448,18 +448,18 @@ if localChanged && remoteChanged -> Conflict
     - `use-cases/*`: manual sync and diagnostics orchestration
 
 - **Sync Kernel (`sync/*`)**
-    - `contracts/*`: stable file system contracts and event types
     - `planner/*`: local/remote planning + reconciliation policies
     - `engine/*`: execution engine and queue
     - `state/*`: state store and in-memory index model
     - `support/*`: shared helpers
     - `use-cases/*`: provider-agnostic one-cycle sync execution
+    - shared contracts live under `src/contracts/sync/*` and `src/contracts/filesystem/*`
     - keep conflict/retry/state semantics unchanged
 
-- **Provider remote filesystem strategy boundary (`provider/strategy/*`)**
-    - shared, composable `RemoteFileSystem` decorators/strategies
-    - provider-owned composition (runtime does not inject decorators)
-    - layering constraints enforced by lint (`no-restricted-imports` overrides)
+- **Provider remote filesystem adapter boundary (`provider/providers/*`)**
+    - provider-owned `RemoteFileSystem` adapters
+    - no shared provider-side decorator/strategy layer by default
+    - introduce a shared abstraction only after a concrete cross-provider need appears
 
 ### 19.3 Non-goals for this refactor
 
@@ -478,8 +478,7 @@ if localChanged && remoteChanged -> Conflict
 
 3. **Phase C (resilience extensions)**
     - add `NetworkPolicy` runtime module (feature-flagged)
-    - add provider-scoped `RateLimitedRemoteFileSystem` strategy chain (provider default)
-    - evolve remote rate limiter to adaptive cooldown on 429/transient failures
+    - keep provider-specific IO behavior inside provider adapters unless a shared abstraction is justified
 
 ### 19.5 Acceptance criteria
 

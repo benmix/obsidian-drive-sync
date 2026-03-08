@@ -1,9 +1,5 @@
+import type { ExcludeRule } from "../../contracts/sync/exclude";
 import { normalizePath } from "../../filesystem/path";
-
-export type ExcludeRule = {
-	pattern: string;
-	regex: RegExp;
-};
 
 const BUILTIN_EXCLUDE_PATTERNS = [".obsidian/cache/", ".obsidian/workspace*.json"];
 const BUILTIN_EXCLUDE_RULES = compileExcludeRules(BUILTIN_EXCLUDE_PATTERNS.join("\n"));

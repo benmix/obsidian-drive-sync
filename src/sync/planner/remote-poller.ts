@@ -1,22 +1,19 @@
-import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../contracts/strategy";
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
 import {
 	evaluateRemoteMissingConfirmation,
 	resolveBothPresentDecision,
 	resolveLocalOnlyDecision,
 	resolveRemoteOnlyDecision,
 } from "./presence-policy";
-import type { RemoteFileSystem, RemoteTreeEvent } from "../../filesystem";
-import type { SyncEntry, SyncJob } from "../../data/sync-schema";
+import type {
+	RemoteEntryChangeEvent,
+	RemoteFileSystem,
+} from "../../contracts/filesystem/file-system";
+import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
 import { normalizePath } from "../../filesystem/path";
 import { now } from "../support/utils";
-import type { SyncState } from "../state/index-store";
-
-export type RemotePollResult = {
-	jobs: SyncJob[];
-	snapshot: SyncEntry[];
-	removedPaths: string[];
-	remoteEventCursor?: string;
-};
+import type { RemotePollResult } from "../../contracts/sync/remote-poller";
+import type { SyncState } from "../../contracts/sync/state";
 
 export async function pollRemoteChanges(
 	remoteFileSystem: RemoteFileSystem,
@@ -184,7 +181,7 @@ async function pollRemoteCursor(
 	syncStrategy: SyncStrategy,
 	preferRemoteSeed: boolean,
 ): Promise<RemotePollResult | null> {
-	if (!remoteFileSystem.getRootFolder || !remoteFileSystem.subscribeToTreeEvents) {
+	if (!remoteFileSystem.getRootEntry || !remoteFileSystem.subscribeToEntryChanges) {
 		return null;
 	}
 
@@ -192,14 +189,14 @@ async function pollRemoteCursor(
 		return null;
 	}
 
-	const root = await remoteFileSystem.getRootFolder();
-	const scope = root?.treeEventScopeId;
+	const root = await remoteFileSystem.getRootEntry();
+	const scope = root?.eventScopeId;
 	if (!scope) {
 		return null;
 	}
 
-	const events: RemoteTreeEvent[] = [];
-	const subscription = await remoteFileSystem.subscribeToTreeEvents(scope, async (event) => {
+	const events: RemoteEntryChangeEvent[] = [];
+	const subscription = await remoteFileSystem.subscribeToEntryChanges(scope, async (event) => {
 		events.push(event);
 	});
 
@@ -236,8 +233,8 @@ async function pollRemoteCursor(
 			event.type === "node_updated" ||
 			event.type === "node_deleted"
 		) {
-			if (event.nodeUid) {
-				remoteIds.add(event.nodeUid);
+			if (event.entryId) {
+				remoteIds.add(event.entryId);
 			}
 		}
 	}
@@ -248,7 +245,7 @@ async function pollRemoteCursor(
 
 	const nowTs = now();
 	for (const id of remoteIds) {
-		const node = await remoteFileSystem.getNode?.(id);
+		const node = await remoteFileSystem.getEntry?.(id);
 		if (!node) {
 			const priorInfo = priorByRemoteId.get(id);
 			const priorPath = priorInfo?.path;

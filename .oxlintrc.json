@@ -1,17 +1,7 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
 	"plugins": ["typescript", "unicorn"],
-	"ignorePatterns": [
-		".test-dist",
-		"example_repo",
-		"node_modules",
-		"dist",
-		"vite.config.ts",
-		"eslint.config.js",
-		"version-bump.mjs",
-		"versions.json",
-		"main.js"
-	],
+	"ignorePatterns": ["node_modules", "dist"],
 	"env": {
 		"browser": true
 	},
@@ -26,6 +16,213 @@
 		]
 	},
 	"overrides": [
+		{
+			"files": ["src/contracts/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../../commands/**",
+									"../../../commands/**",
+									"../../../../commands/**",
+									"../../data/**",
+									"../../../data/**",
+									"../../../../data/**",
+									"../../filesystem/**",
+									"../../../filesystem/**",
+									"../../../../filesystem/**",
+									"../../main",
+									"../../main.ts",
+									"../../../main",
+									"../../../main.ts",
+									"../../../../main",
+									"../../../../main.ts",
+									"../../plugin/**",
+									"../../../plugin/**",
+									"../../../../plugin/**",
+									"../../provider/**",
+									"../../../provider/**",
+									"../../../../provider/**",
+									"../../runtime/**",
+									"../../../runtime/**",
+									"../../../../runtime/**",
+									"../../settings",
+									"../../settings.ts",
+									"../../../settings",
+									"../../../settings.ts",
+									"../../../../settings",
+									"../../../../settings.ts",
+									"../../sync/**",
+									"../../../sync/**",
+									"../../../../sync/**",
+									"../../ui/**",
+									"../../../ui/**",
+									"../../../../ui/**"
+								],
+								"message": "Contracts must not import implementation-layer modules from src/."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/contracts/plugin/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../data/**",
+									"../filesystem/**",
+									"../runtime/**",
+									"../ui/**"
+								],
+								"message": "Plugin contracts may only depend on plugin, provider, and sync contracts."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/contracts/sync/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../plugin/**",
+									"../provider/**",
+									"../runtime/**",
+									"../ui/**"
+								],
+								"message": "Sync contracts may only depend on sync, data, and filesystem contracts."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/contracts/provider/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../data/**",
+									"../plugin/**",
+									"../runtime/**",
+									"../sync/**",
+									"../ui/**"
+								],
+								"message": "Provider contracts may only depend on provider and filesystem contracts."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/contracts/filesystem/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../data/**",
+									"../plugin/**",
+									"../provider/**",
+									"../runtime/**",
+									"../sync/**",
+									"../ui/**"
+								],
+								"message": "Filesystem contracts must stay isolated from other contract domains."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/contracts/data/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../provider/**",
+									"../runtime/**",
+									"../sync/**",
+									"../ui/**"
+								],
+								"message": "Data contracts may only depend on data, filesystem, and plugin contracts."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/contracts/runtime/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../data/**",
+									"../filesystem/**",
+									"../plugin/**",
+									"../provider/**",
+									"../sync/**",
+									"../ui/**"
+								],
+								"message": "Runtime contracts must stay isolated from other contract domains."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/contracts/ui/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"../data/**",
+									"../filesystem/**",
+									"../plugin/**",
+									"../provider/**",
+									"../runtime/**",
+									"../sync/**"
+								],
+								"message": "UI contracts must stay isolated from other contract domains."
+							}
+						]
+					}
+				]
+			}
+		},
 		{
 			"files": ["src/runtime/**/*.ts"],
 			"rules": {

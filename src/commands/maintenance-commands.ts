@@ -1,4 +1,4 @@
-import type { CommandContext } from "./context";
+import type { CommandContext } from "../contracts/plugin/command-context";
 import { exportDiagnostics } from "../runtime/use-cases/diagnostics";
 import { Notice } from "obsidian";
 import { rebuildSyncIndex } from "../runtime/use-cases/sync-workflows";

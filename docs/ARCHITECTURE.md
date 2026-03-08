@@ -7,7 +7,7 @@ This document describes the architecture that corresponds to the current codebas
 - How modules are layered and where boundaries are defined.
 - How the sync flow enters from UI/commands and is eventually executed.
 - How Provider and Sync Kernel are decoupled.
-- Where future extensions (new providers / new strategies) should be implemented.
+- Where future extensions (new providers / provider-specific behavior) should be implemented.
 
 This is an implementation-oriented engineering document and does not repeat product requirement details. For product scope and functional specification, see `docs/SPECS.md`.
 
@@ -24,15 +24,13 @@ Runtime Orchestration (runtime/*)
       |                        \
       |                         \-- Session / Policy / Scheduling
       v
-Sync Kernel (sync/*)  <---->  Filesystem Contracts (filesystem/*)
+Sync Kernel (sync/*)  <---->  Filesystem Contracts (contracts/filesystem/*)
       ^
       |
-Provider Abstraction (provider/contracts + registry)
+Provider Abstraction (contracts/provider/* + provider/registry)
       |
       +-- Local Provider impl (provider/providers/obsidian/*)
       +-- Remote Provider impl (provider/providers/proton-drive/*)
-             |
-             +-- RemoteFileSystem Strategy Chain (provider/strategy/*)
 
 Data Layer
   - Plugin settings: Obsidian plugin data (data/plugin-data.ts)
@@ -43,7 +41,9 @@ Data Layer
 
 ### 3.1 Filesystem Contracts (Shared Foundational Contracts)
 
-- Directory: `src/filesystem/*`
+- Directories:
+    - `src/contracts/filesystem/*`
+    - `src/filesystem/path.ts`
 - Responsibilities:
     - Define shared IO contracts such as `LocalFileSystem`, `RemoteFileSystem`, and `LocalChange`.
     - Provide path utilities (`path.ts`) as reusable cross-layer primitives.
@@ -59,7 +59,8 @@ Data Layer
     - Isolate SDK and platform API differences.
 - Key points:
     - `default-registry.ts` registers only the providers needed for the active ID.
-    - `strategy/*` provides provider-side pluggable strategy chains.
+    - Remote providers return concrete `RemoteFileSystem` adapters directly.
+    - No shared provider-side strategy or middleware layer is currently enabled.
 
 ### 3.3 Sync Kernel
 
@@ -70,7 +71,7 @@ Data Layer
     - `state/*`: sync state persistence abstraction.
     - `use-cases/sync-runner.ts`: entry point for one sync cycle.
 - Design principle:
-    - Provider-agnostic; depends only on `filesystem/contracts` abstractions.
+    - Provider-agnostic; depends only on shared contracts under `src/contracts/*`.
 
 ### 3.4 Runtime Layer (Orchestration)
 
@@ -95,25 +96,24 @@ Data Layer
 
 ### 4.1 `ObsidianDriveSyncPluginApi`
 
-- Location: `src/plugin/contracts.ts`
+- Location: `src/contracts/plugin/plugin-api.ts`
 - Purpose:
     - A shared interface for Runtime/UI/Commands, preventing reverse dependency on `main.ts` implementation details.
 
 ### 4.2 `RemoteProvider` / `LocalProvider`
 
-- Location: `src/provider/contracts/`
+- Location: `src/contracts/provider/`
 - Purpose:
     - Consolidate auth, connectivity, scope handling, and file system creation into providers.
     - Keep Sync Kernel focused on `RemoteFileSystem` / `LocalFileSystem` without SDK awareness.
 
-### 4.3 RemoteFileSystem Strategy Chain
+### 4.3 `RemoteFileSystem` Adapter Ownership
 
-- Locations:
-    - `src/provider/strategy/contracts.ts`
-    - `src/provider/strategy/*`
+- Location:
+    - `src/provider/providers/<provider>/remote-file-system.ts`
 - Purpose:
-    - Compose cross-provider reusable strategies within providers (for example, rate limiting).
-    - Runtime does not inject strategies and does not expose external strategy toggles.
+    - Keep provider-specific remote IO behavior inside the provider adapter itself.
+    - Avoid keeping an extra abstraction layer unless at least two providers need the same cross-provider behavior.
 
 ## 5. Key Sequences
 
@@ -133,7 +133,7 @@ Data Layer
 3. `SyncCoordinator`:
     - Builds active remote client via `SessionManager`.
     - Creates local file system from `LocalProvider`.
-    - Creates remote file system from `RemoteProvider` (including provider-internal strategy chain).
+    - Creates remote file system from `RemoteProvider`.
 4. `SyncRunner` executes:
     - Apply local change plan.
     - Poll remote changes and generate jobs.
@@ -183,28 +183,28 @@ Recommended steps:
 1. Implement auth and remote file system adapter in `provider/providers/<new-provider>/`.
 2. Implement the `RemoteProvider` contract.
 3. Add a provider factory mapping in `default-registry.ts`.
-4. Reuse shared strategies from `provider/strategy/*` as needed.
+4. Keep provider-specific remote behavior inside the provider adapter unless there is a proven shared need.
 5. Keep `sync/*` unchanged; if needed, only add provider-specific UX text in UI.
 
-### 8.2 Add a New RemoteFileSystem Strategy
+### 8.2 Add Shared Provider-Side Behavior
 
 Recommended steps:
 
-1. Create a strategy implementation under `provider/strategy/`.
-2. Keep input/output as `RemoteFileSystem -> RemoteFileSystem`.
-3. Inject strategy in the target provider’s `createRemoteFileSystem`.
-4. Add standalone unit tests for the strategy to avoid affecting sync kernel tests.
+1. First implement behavior directly in the target provider adapter and confirm it is genuinely cross-provider.
+2. Only introduce a shared provider-side abstraction after at least two providers need the same behavior.
+3. Keep the sync kernel and runtime unaware of provider-specific mechanics.
+4. Add standalone unit tests around the extracted provider behavior before reusing it elsewhere.
 
 ## 9. Architecture Decision Summary
 
 - Uses layered "Provider Abstraction + Sync Kernel" to reduce SDK coupling.
 - Uses `main.ts` as facade with runtime orchestration to avoid entrypoint bloat.
-- Moves path/filesystem foundational capability to `filesystem` to avoid cross-layer utility leakage.
-- Uses provider-owned strategy chain for remote rate limiting to avoid external configuration drift.
+- Centralizes contracts under `src/contracts/*` and keeps path utilities separate in `src/filesystem/path.ts`.
+- Keeps remote provider behavior in concrete provider adapters instead of maintaining an extra strategy layer by default.
 
 ## 10. Future Evolution Suggestions
 
 - `DriveSyncSettings` has been renamed to be provider-neutral; keep this neutral semantic direction.
 - Evolve provider registry to support multiple providers visible in parallel (current model is active-ID scoped registration).
-- Add strategy-chain runtime metrics (wait time, hit counts, error category distribution).
+- If shared provider-side behavior returns in the future, require a concrete second provider use case before extracting a new abstraction.
 - Add architecture regression checks (for example, automatic import-graph boundary validation).

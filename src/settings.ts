@@ -1,14 +1,10 @@
 import { PluginSettingTab, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { DEFAULT_SETTINGS } from "./contracts/default-settings";
-import type { DriveSyncSettings } from "./contracts/settings";
+import type { DriveSyncSettings } from "./contracts/plugin/settings";
 import { getBuiltInExcludePatterns } from "./sync/planner/exclude";
-import type { ObsidianDriveSyncPluginApi } from "./plugin/contracts";
+import type { ObsidianDriveSyncPluginApi } from "./contracts/plugin/plugin-api";
 import { RemoteFolderPickerModal } from "./ui/remote-root-modal";
 import { RemoteProviderLoginModal } from "./ui/login-modal";
-
-export type { DriveSyncSettings } from "./contracts/settings";
-export { DEFAULT_SETTINGS } from "./contracts/default-settings";
 
 export class DriveSyncSettingTab extends PluginSettingTab {
 	plugin: ObsidianDriveSyncPluginApi;

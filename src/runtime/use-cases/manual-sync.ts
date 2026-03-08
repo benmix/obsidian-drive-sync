@@ -1,11 +1,11 @@
 import { getBuiltInExcludeRules, isExcluded } from "../../sync/planner/exclude";
-import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem";
+import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
 
 export async function syncLocalToRemote(
 	localFileSystem: LocalFileSystem,
 	remoteFileSystem: RemoteFileSystem,
 ): Promise<{ uploaded: number }> {
-	const files = await localFileSystem.listFiles();
+	const files = await localFileSystem.listFileEntries();
 	let uploaded = 0;
 	const rules = getBuiltInExcludeRules();
 
@@ -17,7 +17,7 @@ export async function syncLocalToRemote(
 			continue;
 		}
 		const data = await localFileSystem.readFile(file.path);
-		await remoteFileSystem.uploadFile(file.path, data, {
+		await remoteFileSystem.writeFile(file.path, data, {
 			mtimeMs: file.mtimeMs,
 			size: file.size,
 		});
@@ -31,7 +31,7 @@ export async function syncRemoteToLocal(
 	localFileSystem: LocalFileSystem,
 	remoteFileSystem: RemoteFileSystem,
 ): Promise<{ downloaded: number }> {
-	const remoteFiles = await remoteFileSystem.listFiles();
+	const remoteFiles = await remoteFileSystem.listFileEntries();
 	let downloaded = 0;
 	const rules = getBuiltInExcludeRules();
 
@@ -39,7 +39,7 @@ export async function syncRemoteToLocal(
 		if (remoteFile.type !== "file") {
 			continue;
 		}
-		const data = await remoteFileSystem.downloadFile(remoteFile.id);
+		const data = await remoteFileSystem.readFile(remoteFile.id);
 		const path = remoteFile.path ?? remoteFile.name;
 		if (isExcluded(path, rules)) {
 			continue;

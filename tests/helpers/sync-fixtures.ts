@@ -3,9 +3,9 @@ import type {
 	LocalFileSystem,
 	RemoteFileEntry,
 	RemoteFileSystem,
-} from "../../src/filesystem";
-import type { SyncEntry, SyncJob } from "../../src/data/sync-schema";
-import type { SyncState } from "../../src/sync/state/index-store";
+} from "../../src/contracts/filesystem/file-system";
+import type { SyncEntry, SyncJob } from "../../src/contracts/data/sync-schema";
+import type { SyncState } from "../../src/contracts/sync/state";
 
 export const FIXED_NOW = 1_700_000_000_000;
 
@@ -45,30 +45,29 @@ export function createState(entries: SyncEntry[] = []): SyncState {
 export function createLocalFileSystem(entries: LocalFileEntry[]): LocalFileSystem {
 	return {
 		listEntries: async () => entries,
-		listFiles: async () => entries.filter((entry) => entry.type === "file"),
+		listFileEntries: async () => entries.filter((entry) => entry.type === "file"),
+		listFolderEntries: async () => entries.filter((entry) => entry.type === "folder"),
+		getEntry: async (path: string) => {
+			const entry = entries.find((candidate) => candidate.path === path);
+			return entry ?? null;
+		},
 		readFile: async () => new Uint8Array(),
 		writeFile: async () => undefined,
-		deletePath: async () => undefined,
-		movePath: async () => undefined,
-		createFolder: async () => undefined,
-		stat: async (path: string) => {
-			const entry = entries.find((candidate) => candidate.path === path);
-			if (!entry) {
-				return null;
-			}
-			return { mtimeMs: entry.mtimeMs, size: entry.size };
-		},
+		deleteEntry: async () => undefined,
+		moveEntry: async () => undefined,
+		ensureFolder: async () => undefined,
 	};
 }
 
 export function createRemoteFileSystem(entries: RemoteFileEntry[]): RemoteFileSystem {
 	return {
 		listEntries: async () => entries,
-		listFiles: async () => entries.filter((entry) => entry.type === "file"),
-		uploadFile: async () => ({
+		listFileEntries: async () => entries.filter((entry) => entry.type === "file"),
+		listFolderEntries: async () => entries.filter((entry) => entry.type === "folder"),
+		writeFile: async () => ({
 			id: "remote-uploaded",
 			revisionId: "rev-next",
 		}),
-		downloadFile: async () => new Uint8Array(),
+		readFile: async () => new Uint8Array(),
 	};
 }

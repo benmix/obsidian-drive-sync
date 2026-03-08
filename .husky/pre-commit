@@ -1,2 +1,3 @@
 #!/bin/sh
 pnpm run lint-staged
+pnpm run lint:contracts

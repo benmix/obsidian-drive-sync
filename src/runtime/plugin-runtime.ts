@@ -6,12 +6,12 @@ import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "../internal-config"
 import { NetworkPolicy } from "./network-policy";
 import { Notice } from "obsidian";
 import { now } from "../sync/support/utils";
-import { type ObsidianDriveSyncPluginApi } from "../plugin/contracts";
+import { type ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 import { PluginDataStateStore } from "../sync/state/state-store";
-import type { RemoteProviderSession } from "../provider/contracts";
+import type { RemoteProviderSession } from "../contracts/provider/remote-provider";
 import { SessionManager } from "./session-manager";
 import { SyncCoordinator } from "./sync-coordinator";
-import { type SyncRunRequest } from "../sync/contracts";
+import { type SyncRunRequest } from "../contracts/sync/run-request";
 import { TriggerScheduler } from "./trigger-scheduler";
 
 export class PluginRuntime {

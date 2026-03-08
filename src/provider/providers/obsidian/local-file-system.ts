@@ -1,5 +1,5 @@
 import { type App, type TAbstractFile, TFile, TFolder } from "obsidian";
-import type { LocalFileEntry, LocalFileSystem } from "../../../filesystem";
+import type { LocalFileEntry, LocalFileSystem } from "../../../contracts/filesystem/file-system";
 
 export class ObsidianLocalFileSystem implements LocalFileSystem {
 	private app: App;
@@ -30,8 +30,26 @@ export class ObsidianLocalFileSystem implements LocalFileSystem {
 		return entries;
 	}
 
-	async listFiles(): Promise<LocalFileEntry[]> {
+	async listFileEntries(): Promise<LocalFileEntry[]> {
 		return this.app.vault.getFiles().map((file) => this.mapFile(file));
+	}
+
+	async listFolderEntries(): Promise<LocalFileEntry[]> {
+		return (await this.listEntries()).filter((entry) => entry.type === "folder");
+	}
+
+	async getEntry(path: string): Promise<LocalFileEntry | null> {
+		const file = this.app.vault.getAbstractFileByPath(path);
+		if (!file) {
+			return null;
+		}
+		if (file instanceof TFile) {
+			return this.mapFile(file);
+		}
+		if (file instanceof TFolder) {
+			return this.mapFolder(file);
+		}
+		return null;
 	}
 
 	async readFile(path: string): Promise<Uint8Array> {
@@ -49,7 +67,7 @@ export class ObsidianLocalFileSystem implements LocalFileSystem {
 		await this.app.vault.adapter.writeBinary(path, new Uint8Array(data).buffer);
 	}
 
-	async deletePath(path: string): Promise<void> {
+	async deleteEntry(path: string): Promise<void> {
 		const file = this.app.vault.getAbstractFileByPath(path);
 		if (!file) {
 			return;
@@ -57,7 +75,7 @@ export class ObsidianLocalFileSystem implements LocalFileSystem {
 		await this.app.vault.delete(file, true);
 	}
 
-	async movePath(fromPath: string, toPath: string): Promise<void> {
+	async moveEntry(fromPath: string, toPath: string): Promise<void> {
 		const file = this.app.vault.getAbstractFileByPath(fromPath);
 		if (!file) {
 			throw new Error(`Unable to move missing path: ${fromPath}`);
@@ -66,7 +84,7 @@ export class ObsidianLocalFileSystem implements LocalFileSystem {
 		await this.app.vault.rename(file, toPath);
 	}
 
-	async createFolder(path: string): Promise<void> {
+	async ensureFolder(path: string): Promise<void> {
 		if (!path) {
 			return;
 		}
@@ -74,20 +92,6 @@ export class ObsidianLocalFileSystem implements LocalFileSystem {
 		if (!exists) {
 			await this.app.vault.adapter.mkdir(path);
 		}
-	}
-
-	async stat(path: string): Promise<{ mtimeMs?: number; size?: number } | null> {
-		const file = this.app.vault.getAbstractFileByPath(path);
-		if (!file) {
-			return null;
-		}
-		if ((file as TFile).stat) {
-			return {
-				mtimeMs: (file as TFile).stat.mtime,
-				size: (file as TFile).stat.size,
-			};
-		}
-		return { mtimeMs: undefined, size: undefined };
 	}
 
 	private mapFile(file: TFile): LocalFileEntry {

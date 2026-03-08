@@ -1,8 +1,8 @@
 import { Modal, Notice, Setting } from "obsidian";
-import type { RemoteFileEntry, RemoteFileSystem } from "../filesystem";
+import type { RemoteFileEntry, RemoteFileSystem } from "../contracts/filesystem/file-system";
 import type { App } from "obsidian";
 import { normalizePath } from "../filesystem/path";
-import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
+import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 
 export class RemoteFolderPickerModal extends Modal {
 	private plugin: ObsidianDriveSyncPluginApi;
@@ -182,11 +182,7 @@ export class RemoteFolderPickerModal extends Modal {
 			return;
 		}
 
-		const listedFolders = this.remoteFileSystem.listFolders
-			? await this.remoteFileSystem.listFolders()
-			: (await this.remoteFileSystem.listEntries()).filter(
-					(entry) => entry.type === "folder",
-				);
+		const listedFolders = await this.remoteFileSystem.listFolderEntries();
 		const folders = listedFolders.filter((folder) => folder.id !== this.rootFolderId);
 		this.folders = [
 			{
@@ -237,7 +233,7 @@ export class RemoteFolderPickerModal extends Modal {
 			this.render();
 			return;
 		}
-		if (!this.remoteFileSystem.createFolder) {
+		if (!this.remoteFileSystem.ensureFolder) {
 			this.createError = "Current remote provider does not support folder creation.";
 			this.render();
 			return;
@@ -248,7 +244,7 @@ export class RemoteFolderPickerModal extends Modal {
 		this.render();
 
 		try {
-			const result = await this.remoteFileSystem.createFolder(folderPath);
+			const result = await this.remoteFileSystem.ensureFolder(folderPath);
 			if (!result.id) {
 				throw new Error("Created folder has no ID.");
 			}

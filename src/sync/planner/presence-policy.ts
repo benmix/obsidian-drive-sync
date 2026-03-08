@@ -1,6 +1,12 @@
-import type { EntryType, SyncEntry, SyncJob } from "../../data/sync-schema";
+import type {
+	BothChangedDecision,
+	PresenceDecision,
+	RemoteMissingConfirmation,
+} from "../../contracts/sync/presence-policy";
+import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
 import { buildConflictName } from "../support/utils";
-import type { SyncStrategy } from "../contracts/strategy";
+import type { EntryType } from "../../contracts/filesystem/entry";
+import type { SyncStrategy } from "../../contracts/sync/strategy";
 
 export const REMOTE_MISSING_CONFIRM_ROUNDS = 2;
 
@@ -15,12 +21,6 @@ type DecisionInput = {
 	preferRemoteSeed?: boolean;
 };
 
-export type PresenceDecision = {
-	job?: SyncJob;
-	// Used when a prior remote mapping is stale and should be discarded immediately.
-	removePriorPath?: boolean;
-};
-
 type BothChangedInput = {
 	path: string;
 	nowTs: number;
@@ -29,12 +29,6 @@ type BothChangedInput = {
 	remoteRev?: string;
 	localMtimeMs?: number;
 	prior?: SyncEntry;
-};
-
-export type BothChangedDecision = {
-	jobs: SyncJob[];
-	conflict?: SyncEntry["conflict"];
-	conflictPending?: boolean;
 };
 
 type BothPresentInput = {
@@ -53,12 +47,6 @@ type TrackedMissingInput = {
 	path: string;
 	nowTs: number;
 	prior: SyncEntry;
-};
-
-export type RemoteMissingConfirmation = {
-	confirmed: boolean;
-	nextCount: number;
-	sinceMs: number;
 };
 
 export function resolveLocalOnlyDecision(input: DecisionInput): PresenceDecision {

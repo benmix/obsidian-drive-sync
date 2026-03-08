@@ -1,7 +1,7 @@
 import { Modal, Setting } from "obsidian";
 import type { App } from "obsidian";
 import { formatBytes } from "./format";
-import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
+import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 
 export class SyncStatusModal extends Modal {
 	private plugin: ObsidianDriveSyncPluginApi;

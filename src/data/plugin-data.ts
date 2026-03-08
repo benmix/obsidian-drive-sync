@@ -1,14 +1,6 @@
-import { DEFAULT_SETTINGS } from "../contracts/default-settings";
-import type { DriveSyncSettings } from "../contracts/settings";
-
-export type PluginDataStore = {
-	loadData: () => Promise<unknown>;
-	saveData: (data: unknown) => Promise<void>;
-};
-
-export type PluginData = {
-	settings: DriveSyncSettings;
-};
+import type { PluginData, PluginDataStore } from "../contracts/data/plugin-data";
+import { DEFAULT_SETTINGS } from "../contracts/plugin/default-settings";
+import type { DriveSyncSettings } from "../contracts/plugin/settings";
 
 export function serializeSettings(settings: DriveSyncSettings): DriveSyncSettings {
 	return {

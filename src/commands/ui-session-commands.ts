@@ -1,4 +1,4 @@
-import type { CommandContext } from "./context";
+import type { CommandContext } from "../contracts/plugin/command-context";
 import { Notice } from "obsidian";
 import { RemoteProviderLoginModal } from "../ui/login-modal";
 import { SyncConflictModal } from "../ui/conflict-modal";

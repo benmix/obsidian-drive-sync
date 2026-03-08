@@ -1,3 +1,5 @@
+import type { NetworkDecision } from "../contracts/runtime/network-policy";
+
 type NetworkPolicyOptions = {
 	enabled: boolean;
 	onlineOnly?: boolean;
@@ -9,10 +11,6 @@ type NetworkPolicyOptions = {
 type NetworkGate = {
 	force: boolean;
 };
-
-export type NetworkDecision =
-	| { allowed: true }
-	| { allowed: false; reason: string; retryAfterMs?: number };
 
 const DEFAULT_FAILURE_COOLDOWN_MS = 30_000;
 

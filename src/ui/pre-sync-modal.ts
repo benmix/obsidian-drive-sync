@@ -1,13 +1,7 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
 import { formatBytes } from "./format";
-
-export type PreSyncEstimate = {
-	jobsPlanned: number;
-	entries: number;
-	uploadBytes: number;
-	downloadBytes: number;
-};
+import type { PreSyncEstimate } from "../contracts/ui/pre-sync";
 
 export class SyncPreflightModal extends Modal {
 	private estimate: PreSyncEstimate;

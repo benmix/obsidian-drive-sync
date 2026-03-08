@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS } from "./default-settings";
 import type { DriveSyncSettings } from "./settings";
-import { isSupportedRemoteProviderId } from "../provider/contracts";
-import { normalizeSyncStrategy } from "../sync/contracts";
+import { isSupportedRemoteProviderId } from "../provider/provider-ids";
+import { normalizeSyncStrategy } from "../sync/strategy";
 
 function normalizeString(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";

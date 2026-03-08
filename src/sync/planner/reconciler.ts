@@ -1,4 +1,4 @@
-import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../contracts/strategy";
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
 import {
 	evaluateRemoteMissingConfirmation,
 	resolveBothPresentDecision,
@@ -6,17 +6,13 @@ import {
 	resolveRemoteOnlyDecision,
 	resolveTrackedMissingDecision,
 } from "./presence-policy";
-import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem";
-import type { SyncEntry, SyncJob } from "../../data/sync-schema";
+import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
+import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
 import { normalizePath } from "../../filesystem/path";
 import { now } from "../support/utils";
+import type { ReconcileResult } from "../../contracts/sync/reconcile";
 import { shouldPreferRemoteSeed } from "./initialization";
-import type { SyncState } from "../state/index-store";
-
-export type ReconcileResult = {
-	jobs: SyncJob[];
-	snapshot: SyncEntry[];
-};
+import type { SyncState } from "../../contracts/sync/state";
 
 type EntrySnapshot = {
 	path: string;

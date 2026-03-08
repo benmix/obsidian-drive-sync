@@ -1,4 +1,4 @@
-export type ProtonLogLevel = "debug" | "info" | "warn" | "error";
+import type { ProtonLogLevel } from "../../../../contracts/provider/proton/log-level";
 
 const order: Record<ProtonLogLevel, number> = {
 	debug: 10,

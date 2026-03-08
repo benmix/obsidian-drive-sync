@@ -1,5 +1,10 @@
 import * as openpgp from "openpgp";
-import type { AuthInfo, Credentials, SrpProofs, SrpResult } from "./types";
+import type {
+	AuthInfo,
+	Credentials,
+	SrpProofs,
+	SrpResult,
+} from "../../../../../contracts/provider/proton/auth-types";
 import {
 	base64Decode,
 	base64Encode,
@@ -13,7 +18,7 @@ import {
 	uint8ArrayToBigIntLE,
 	uint8ArrayToBinaryString,
 } from "./crypto-utils";
-import { SRP_LEN, SRP_MODULUS_KEY } from "./types";
+import { SRP_LEN, SRP_MODULUS_KEY } from "../../../../../contracts/provider/proton/auth-types";
 
 // ============================================================================
 // SRP Protocol

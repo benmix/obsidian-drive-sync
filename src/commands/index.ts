@@ -1,5 +1,5 @@
 import { createCommandContext } from "./context";
-import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
+import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 import { registerMaintenanceCommands } from "./maintenance-commands";
 import { registerSyncCommands } from "./sync-commands";
 import { registerUiSessionCommands } from "./ui-session-commands";

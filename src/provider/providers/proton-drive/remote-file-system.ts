@@ -1,5 +1,9 @@
 import { basename, dirname, normalizePath, splitPath } from "../../../filesystem/path";
-import type { RemoteFileEntry, RemoteFileSystem, RemoteTreeEvent } from "../../../filesystem";
+import type {
+	RemoteEntryChangeEvent,
+	RemoteFileEntry,
+	RemoteFileSystem,
+} from "../../../contracts/filesystem/file-system";
 import mimeTypes from "mime-types";
 
 type ProtonDriveClient = {
@@ -156,7 +160,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 					path: relPath,
 					type: node.type === "folder" ? "folder" : "file",
 					parentId: node.parentUid ?? current.id,
-					treeEventScopeId: node.treeEventScopeId,
+					eventScopeId: node.treeEventScopeId,
 					mtimeMs: node.modificationTime?.getTime?.() ?? undefined,
 					size: node.activeRevision?.storageSize ?? node.totalStorageSize ?? undefined,
 					revisionId: node.activeRevision?.uid,
@@ -173,17 +177,17 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		return entries;
 	}
 
-	async listFiles(): Promise<RemoteFileEntry[]> {
+	async listFileEntries(): Promise<RemoteFileEntry[]> {
 		const entries = await this.listEntries();
 		return entries.filter((entry) => entry.type === "file");
 	}
 
-	async listFolders(): Promise<RemoteFileEntry[]> {
+	async listFolderEntries(): Promise<RemoteFileEntry[]> {
 		const entries = await this.listEntries();
 		return entries.filter((entry) => entry.type === "folder");
 	}
 
-	async getNode(id: string): Promise<RemoteFileEntry | null> {
+	async getEntry(id: string): Promise<RemoteFileEntry | null> {
 		if (!this.client.getNode) {
 			return null;
 		}
@@ -194,7 +198,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		return this.mapNodeToEntry(result.value);
 	}
 
-	async getRootFolder(): Promise<RemoteFileEntry | null> {
+	async getRootEntry(): Promise<RemoteFileEntry | null> {
 		if (!this.client.getMyFilesRootFolder) {
 			return null;
 		}
@@ -205,15 +209,15 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		return this.mapNodeToEntry(result.value);
 	}
 
-	async subscribeToTreeEvents(
-		treeEventScopeId: string,
-		onEvent: (event: RemoteTreeEvent) => Promise<void>,
+	async subscribeToEntryChanges(
+		eventScopeId: string,
+		onEvent: (event: RemoteEntryChangeEvent) => Promise<void>,
 	): Promise<{ dispose: () => void }> {
 		if (!this.client.subscribeToTreeEvents) {
 			throw new Error("Proton Drive SDK does not expose tree events.");
 		}
 		const subscription = await this.client.subscribeToTreeEvents(
-			treeEventScopeId,
+			eventScopeId,
 			async (event: unknown) => {
 				const normalized = this.normalizeRemoteEvent(event);
 				await onEvent(normalized);
@@ -222,7 +226,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		return subscription;
 	}
 
-	async uploadFile(
+	async writeFile(
 		path: string,
 		data: Uint8Array,
 		metadata?: { mtimeMs?: number; size?: number },
@@ -230,7 +234,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		const getFileUploader = this.client.getFileUploader?.bind(this.client);
 		const getFileRevisionUploader = this.client.getFileRevisionUploader?.bind(this.client);
 		if (!getFileUploader || !getFileRevisionUploader) {
-			throw new Error("Proton Drive SDK does not expose upload methods.");
+			throw new Error("Proton Drive SDK does not expose file write methods.");
 		}
 		const normalized = normalizePath(path);
 		const parentPath = dirname(normalized);
@@ -290,9 +294,9 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		}
 	}
 
-	async downloadFile(id: string): Promise<Uint8Array> {
+	async readFile(id: string): Promise<Uint8Array> {
 		if (!this.client.getFileDownloader) {
-			throw new Error("Proton Drive SDK does not expose download methods.");
+			throw new Error("Proton Drive SDK does not expose file read methods.");
 		}
 		const downloader = await this.client.getFileDownloader(id);
 		const chunks: Uint8Array[] = [];
@@ -313,7 +317,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		return combined;
 	}
 
-	async deletePath(id: string): Promise<void> {
+	async deleteEntry(id: string): Promise<void> {
 		if (!this.client.trashNodes) {
 			throw new Error("Proton Drive SDK does not expose delete methods.");
 		}
@@ -324,7 +328,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		}
 	}
 
-	async movePath(id: string, newPath: string): Promise<void> {
+	async moveEntry(id: string, newPath: string): Promise<void> {
 		if (!this.client.renameNode || !this.client.moveNodes) {
 			throw new Error("Proton Drive SDK does not expose move methods.");
 		}
@@ -340,7 +344,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		await this.client.renameNode(id, targetName);
 	}
 
-	async createFolder(path: string): Promise<{ id?: string }> {
+	async ensureFolder(path: string): Promise<{ id?: string }> {
 		const normalized = normalizePath(path);
 		if (!normalized) {
 			return { id: this.remoteFolderId };
@@ -429,14 +433,14 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 			path: relPath,
 			type: node.type === "folder" ? "folder" : "file",
 			parentId: node.parentUid,
-			treeEventScopeId: node.treeEventScopeId,
+			eventScopeId: node.treeEventScopeId,
 			mtimeMs: node.modificationTime?.getTime?.() ?? undefined,
 			size: node.activeRevision?.storageSize ?? node.totalStorageSize ?? undefined,
 			revisionId: node.activeRevision?.uid,
 		};
 	}
 
-	private normalizeRemoteEvent(event: unknown): RemoteTreeEvent {
+	private normalizeRemoteEvent(event: unknown): RemoteEntryChangeEvent {
 		if (!event || typeof event !== "object") {
 			return { type: "tree_refresh" };
 		}
@@ -446,11 +450,11 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 			return { type: "tree_refresh" };
 		}
 		return {
-			type: type as RemoteTreeEvent["type"],
-			nodeUid: typeof record.nodeUid === "string" ? record.nodeUid : undefined,
-			parentNodeUid:
+			type: type as RemoteEntryChangeEvent["type"],
+			entryId: typeof record.nodeUid === "string" ? record.nodeUid : undefined,
+			parentEntryId:
 				typeof record.parentNodeUid === "string" ? record.parentNodeUid : undefined,
-			treeEventScopeId:
+			eventScopeId:
 				typeof record.treeEventScopeId === "string" ? record.treeEventScopeId : undefined,
 			eventId: typeof record.eventId === "string" ? record.eventId : undefined,
 		};

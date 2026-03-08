@@ -9,11 +9,7 @@ import {
 import {
 	DEFAULT_LOCAL_PROVIDER_ID,
 	DEFAULT_REMOTE_PROVIDER_ID,
-	type LocalProvider,
-	type RemoteProvider,
-	type RemoteProviderCredentials,
-	type RemoteProviderSession,
-} from "./provider/contracts";
+} from "./contracts/provider/provider-ids";
 import {
 	loadPluginData,
 	mergePluginData,
@@ -21,11 +17,17 @@ import {
 	serializeSettings,
 } from "./data/plugin-data";
 import { LocalProviderRegistry, RemoteProviderRegistry } from "./provider/registry";
-import { DEFAULT_SETTINGS } from "./contracts/default-settings";
-import type { DriveSyncSettings } from "./contracts/settings";
+import type {
+	RemoteProvider,
+	RemoteProviderCredentials,
+	RemoteProviderSession,
+} from "./contracts/provider/remote-provider";
+import { DEFAULT_SETTINGS } from "./contracts/plugin/default-settings";
+import type { DriveSyncSettings } from "./contracts/plugin/settings";
 import { DriveSyncSettingTab } from "./settings";
-import { migrateLoadedSettings } from "./contracts/settings-migration";
-import type { ObsidianDriveSyncPluginApi } from "./plugin/contracts";
+import type { LocalProvider } from "./contracts/provider/local-provider";
+import { migrateLoadedSettings } from "./contracts/plugin/settings-migration";
+import type { ObsidianDriveSyncPluginApi } from "./contracts/plugin/plugin-api";
 import { Plugin } from "obsidian";
 import { PluginRuntime } from "./runtime/plugin-runtime";
 import { registerCommands } from "./commands";

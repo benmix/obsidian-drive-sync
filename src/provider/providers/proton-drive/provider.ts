@@ -1,7 +1,8 @@
-import {
-	applyRemoteFileSystemStrategies,
-	type RemoteFileSystemStrategy,
-} from "../../strategy/contracts";
+import type {
+	ProtonDriveAuthServiceContract,
+	ProtonDriveProviderInitOptions,
+	ProtonDriveServiceContract,
+} from "../../../contracts/provider/proton/drive-provider";
 import type {
 	RemoteProvider,
 	RemoteProviderConnectOptions,
@@ -10,28 +11,22 @@ import type {
 	RemoteProviderLoginResult,
 	RemoteProviderSession,
 	RemoteScopeRoot,
-} from "../../contracts";
-import { createRateLimitedRemoteFileSystemStrategy } from "../../strategy/rate-limited-remote-file-system-strategy";
+} from "../../../contracts/provider/remote-provider";
 import { ProtonDriveAuthService } from "./sdk/auth";
 import type { ProtonDriveClient } from "@protontech/drive-sdk";
 import { ProtonDriveRemoteFileSystem } from "./remote-file-system";
 import { ProtonDriveService } from "./sdk/service";
-import type { ProtonSession } from "./sdk/sdk-session";
-import type { RemoteFileSystem } from "../../../filesystem";
-import type { ReusableCredentials } from "./sdk/proton-auth/types";
-
-const DEFAULT_REMOTE_FILE_SYSTEM_STRATEGIES: readonly RemoteFileSystemStrategy[] = [
-	createRateLimitedRemoteFileSystemStrategy(),
-];
+import type { ProtonSession } from "../../../contracts/provider/proton/sdk-session";
+import type { RemoteFileSystem } from "../../../contracts/filesystem/file-system";
+import type { ReusableCredentials } from "../../../contracts/provider/proton/auth-types";
 
 export class ProtonDriveRemoteProvider implements RemoteProvider {
 	readonly id = "proton-drive";
 	readonly label = "Proton Drive";
 
 	constructor(
-		private readonly authService: ProtonDriveAuthService,
-		private readonly driveService: ProtonDriveService,
-		private readonly remoteFileSystemStrategies: readonly RemoteFileSystemStrategy[] = DEFAULT_REMOTE_FILE_SYSTEM_STRATEGIES,
+		private readonly authService: ProtonDriveAuthServiceContract,
+		private readonly driveService: ProtonDriveServiceContract,
 	) {}
 
 	async login(input: RemoteProviderLoginInput): Promise<RemoteProviderLoginResult> {
@@ -104,19 +99,7 @@ export class ProtonDriveRemoteProvider implements RemoteProvider {
 	}
 
 	createRemoteFileSystem(client: unknown, scopeId: string): RemoteFileSystem {
-		const baseRemoteFileSystem = new ProtonDriveRemoteFileSystem(
-			client as ProtonDriveClient,
-			scopeId,
-		);
-		return applyRemoteFileSystemStrategies(
-			baseRemoteFileSystem,
-			{
-				providerId: this.id,
-				client,
-				scopeId,
-			},
-			this.remoteFileSystemStrategies,
-		);
+		return new ProtonDriveRemoteFileSystem(client as ProtonDriveClient, scopeId);
 	}
 
 	async validateScope(
@@ -125,7 +108,7 @@ export class ProtonDriveRemoteProvider implements RemoteProvider {
 	): Promise<{ ok: boolean; message: string }> {
 		const remoteFileSystem = this.createRemoteFileSystem(client, scopeId);
 		try {
-			const node = await remoteFileSystem.getNode?.(scopeId);
+			const node = await remoteFileSystem.getEntry?.(scopeId);
 			if (!node) {
 				return { ok: false, message: "Folder not found." };
 			}
@@ -140,18 +123,11 @@ export class ProtonDriveRemoteProvider implements RemoteProvider {
 	}
 }
 
-export type ProtonDriveProviderInitOptions = {
-	authService?: ProtonDriveAuthService;
-	driveService?: ProtonDriveService;
-	remoteFileSystemStrategies?: readonly RemoteFileSystemStrategy[];
-};
-
 export function createProtonDriveRemoteProvider(
 	options: ProtonDriveProviderInitOptions = {},
 ): ProtonDriveRemoteProvider {
 	return new ProtonDriveRemoteProvider(
 		options.authService ?? new ProtonDriveAuthService(),
 		options.driveService ?? new ProtonDriveService(),
-		options.remoteFileSystemStrategies ?? DEFAULT_REMOTE_FILE_SYSTEM_STRATEGIES,
 	);
 }

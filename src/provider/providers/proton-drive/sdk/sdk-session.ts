@@ -3,28 +3,14 @@ import {
 	createProtonAccount,
 	createProtonHttpClient,
 	createSrpModule,
-	type SRPModuleInterface,
 } from "./proton-auth/sdk-helpers";
 import type {
-	MetricEvent,
-	ProtonDriveAccount,
-	ProtonDriveHTTPClient,
-	Telemetry,
-} from "@protontech/drive-sdk";
+	ProtonSession,
+	SdkSessionBundle,
+} from "../../../../contracts/provider/proton/sdk-session";
 import { createOpenPGPCryptoProxy } from "./openpgp-proxy";
 import { createSdkTelemetry } from "./telemetry";
 import { OpenPGPCryptoWithCryptoProxy } from "@protontech/drive-sdk";
-import type { Session } from "./proton-auth/types";
-
-export type ProtonSession = Session;
-
-export type SdkSessionBundle = {
-	httpClient: ProtonDriveHTTPClient;
-	account: ProtonDriveAccount;
-	openPGPCryptoModule: OpenPGPCryptoWithCryptoProxy;
-	srpModule: SRPModuleInterface;
-	telemetry?: Telemetry<MetricEvent>;
-};
 
 export async function buildSdkSessionClient(
 	session: ProtonSession,

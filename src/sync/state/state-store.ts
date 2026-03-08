@@ -1,11 +1,7 @@
 import { ensureSyncStateDbReady, syncStateDb } from "../../data/sync-db";
-import type { SyncEntry, SyncLog } from "../../data/sync-schema";
-import type { SyncRuntimeMetrics, SyncState } from "./index-store";
-
-export type StateStore = {
-	load(): Promise<SyncState>;
-	save(state: SyncState): Promise<void>;
-};
+import type { SyncEntry, SyncLog } from "../../contracts/data/sync-schema";
+import type { SyncRuntimeMetrics, SyncState } from "../../contracts/sync/state";
+import type { StateStore } from "../../contracts/sync/state-store";
 
 export class PluginDataStateStore implements StateStore {
 	async load(): Promise<SyncState> {

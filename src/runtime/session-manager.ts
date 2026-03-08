@@ -1,5 +1,5 @@
-import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";
-import type { RemoteProviderSession } from "../provider/contracts";
+import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import type { RemoteProviderSession } from "../contracts/provider/remote-provider";
 
 export class SessionManager {
 	private authPaused = false;

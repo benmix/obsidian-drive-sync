@@ -17,14 +17,14 @@ Recent updates:
 - Expanded hardening plan (pre-sync checks, queue visibility, cursor reuse).
 - Runtime refactor plan documented (main facade + runtime orchestration split).
 - Runtime refactor Phase A/B landed (`main.ts` facade + `runtime/{plugin-runtime,session-manager,trigger-scheduler,sync-coordinator}` + `sync/use-cases/sync-runner`).
-- Runtime refactor Phase C landed (`network-policy` remains optional; remote rate limiting moved to provider-scoped strategy chain).
+- Runtime refactor Phase C landed (`network-policy` remains optional; no provider-side remote strategy/middleware layer is currently enabled).
 - Sync module reorganized by responsibility (`contracts/planner/engine/state/support/use-cases`).
 - Added `oxlint` import-boundary guards for sync layer dependency direction.
 - Remote provider abstraction Phase C landed (commands + conflict/root modals migrated to provider interfaces; current default provider remains enabled).
 - Legacy settings compatibility layer removed (one-time migration to provider fields, provider-only persistence).
 - Proton SDK/auth implementation moved under provider tree (`provider/providers/proton-drive/sdk`).
 - Provider layering tightened: provider-specific/Obsidian file-system implementations now live under `provider/providers/*`; `sync/` keeps provider-agnostic kernel logic.
-- FileSystem contracts extracted to `src/filesystem/`; `sync/` and `provider/` now both depend on this lower-level module.
+- FileSystem contracts centralized under `src/contracts/filesystem/`; shared path utility remains in `src/filesystem/path.ts`.
 
 ## Goals
 
@@ -88,11 +88,17 @@ Manual install for testing:
 ```
 src/
   main.ts                       # plugin facade lifecycle
-  contracts/                    # shared plugin-level contracts
-  settings.ts                   # settings + defaults
-  filesystem/                   # shared file-system contracts (local/remote)
-  provider/                     # local/remote provider contracts + implementations
-    strategy/                   # provider-side remote file system strategy chain
+  contracts/                    # centralized type contracts by domain
+    filesystem/                 # shared local/remote file-system contracts
+    plugin/                     # plugin API + settings contracts
+    provider/                   # provider contracts
+    runtime/                    # runtime contracts
+    sync/                       # sync kernel contracts
+    ui/                         # UI-facing contracts
+  settings.ts                   # settings UI + persistence entry
+  filesystem/
+    path.ts                     # shared path utility
+  provider/                     # provider implementations + registries
     providers/obsidian/         # Obsidian local file system + watcher
     providers/proton-drive/     # Proton auth/service + remote file system
   commands/                     # command handlers
@@ -100,7 +106,6 @@ src/
     sync-coordinator.ts         # runtime->sync orchestration boundary
     use-cases/                  # manual sync and diagnostics flows
   sync/                         # sync kernel
-    contracts/                  # sync-run request/contracts
     planner/                    # reconcile and change planning logic
     engine/                     # queue and execution engine
     state/                      # sync state persistence model/store
@@ -123,7 +128,6 @@ src/
 - `SYNC_INITIALIZATION_STRATEGY.md` — first-sync initialization strategy baseline
 - `COMMANDS.md` — command module structure and command catalog
 - `TASKS.md` — development tasks
-- `REMOTE_RATE_LIMITING.md` — provider-scoped remote rate limiting design
 - `AGENTS.md` — agents rules
 
 ## Storage
