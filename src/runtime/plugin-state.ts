@@ -1,0 +1,126 @@
+import { DEFAULT_SETTINGS } from "../contracts/plugin/default-settings";
+import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import type { DriveSyncSettings } from "../contracts/plugin/settings";
+import { migrateLoadedSettings } from "../contracts/plugin/settings-migration";
+import type { LocalProvider } from "../contracts/provider/local-provider";
+import {
+	DEFAULT_LOCAL_PROVIDER_ID,
+	DEFAULT_REMOTE_PROVIDER_ID,
+} from "../contracts/provider/provider-ids";
+import type {
+	RemoteProvider,
+	RemoteProviderCredentials,
+} from "../contracts/provider/remote-provider";
+import {
+	loadPluginData,
+	mergePluginData,
+	savePluginData,
+	serializeSettings,
+} from "../data/plugin-data";
+import {
+	createLocalProviderRegistry,
+	createRemoteProviderRegistry,
+} from "../provider/default-registry";
+import { LocalProviderRegistry, RemoteProviderRegistry } from "../provider/registry";
+
+export class PluginState {
+	private mutableSettings: DriveSyncSettings = { ...DEFAULT_SETTINGS };
+	private localProviderRegistry: LocalProviderRegistry = new LocalProviderRegistry();
+	private remoteProviderRegistry: RemoteProviderRegistry = new RemoteProviderRegistry();
+
+	constructor(private readonly plugin: ObsidianDriveSyncPluginApi) {}
+
+	async initializeFromStorage(): Promise<boolean> {
+		const data = await loadPluginData(this.plugin);
+		const { settings, migrated } = migrateLoadedSettings(data.settings);
+		this.mutableSettings = settings;
+		this.localProviderRegistry = createLocalProviderRegistry(this.getLocalProviderId());
+		this.remoteProviderRegistry = createRemoteProviderRegistry(this.getRemoteProviderId());
+		return migrated;
+	}
+
+	get settings(): Readonly<DriveSyncSettings> {
+		return this.mutableSettings;
+	}
+
+	updateSettings(patch: Partial<DriveSyncSettings>): void {
+		this.mutableSettings = {
+			...this.mutableSettings,
+			...patch,
+		};
+	}
+
+	getRemoteProviderId(): string {
+		const providerId = this.mutableSettings.remoteProviderId.trim();
+		return providerId || DEFAULT_REMOTE_PROVIDER_ID;
+	}
+
+	getRemoteProvider(): RemoteProvider {
+		return this.remoteProviderRegistry.get(this.getRemoteProviderId());
+	}
+
+	getLocalProviderId(): string {
+		return DEFAULT_LOCAL_PROVIDER_ID;
+	}
+
+	getLocalProvider(): LocalProvider {
+		return this.localProviderRegistry.get(this.getLocalProviderId());
+	}
+
+	getRemoteScopeId(): string {
+		return this.mutableSettings.remoteScopeId.trim();
+	}
+
+	getRemoteScopePath(): string {
+		return this.mutableSettings.remoteScopePath.trim();
+	}
+
+	setRemoteScope(scopeId: string, scopePath: string): void {
+		this.updateSettings({
+			remoteScopeId: scopeId.trim(),
+			remoteScopePath: scopePath.trim(),
+		});
+	}
+
+	getStoredProviderCredentials(): RemoteProviderCredentials | undefined {
+		return this.mutableSettings.remoteProviderCredentials;
+	}
+
+	setStoredProviderCredentials(credentials: RemoteProviderCredentials | undefined): void {
+		this.updateSettings({
+			remoteProviderCredentials: credentials,
+		});
+	}
+
+	getRemoteAccountEmail(): string {
+		return this.mutableSettings.remoteAccountEmail;
+	}
+
+	setRemoteAccountEmail(email: string): void {
+		this.updateSettings({
+			remoteAccountEmail: email.trim(),
+		});
+	}
+
+	hasRemoteAuthSession(): boolean {
+		return this.mutableSettings.remoteHasAuthSession;
+	}
+
+	setRemoteAuthSession(hasAuthSession: boolean): void {
+		this.updateSettings({
+			remoteHasAuthSession: hasAuthSession,
+		});
+	}
+
+	clearStoredRemoteSession(): void {
+		this.setStoredProviderCredentials(undefined);
+		this.setRemoteAccountEmail("");
+		this.setRemoteAuthSession(false);
+	}
+
+	async saveSettings(): Promise<void> {
+		const data = mergePluginData(await loadPluginData(this.plugin));
+		data.settings = serializeSettings(this.mutableSettings);
+		await savePluginData(this.plugin, data);
+	}
+}

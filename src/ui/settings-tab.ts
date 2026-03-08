@@ -1,11 +1,11 @@
 import { PluginSettingTab, Setting } from "obsidian";
 import type { App } from "obsidian";
 
-import type { ObsidianDriveSyncPluginApi } from "./contracts/plugin/plugin-api";
-import type { DriveSyncSettings } from "./contracts/plugin/settings";
-import { getBuiltInExcludePatterns } from "./sync/planner/exclude";
-import { RemoteProviderLoginModal } from "./ui/login-modal";
-import { RemoteFolderPickerModal } from "./ui/remote-root-modal";
+import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import type { DriveSyncSettings } from "../contracts/plugin/settings";
+
+import { RemoteProviderLoginModal } from "./login-modal";
+import { RemoteFolderPickerModal } from "./remote-root-modal";
 
 export class DriveSyncSettingTab extends PluginSettingTab {
 	plugin: ObsidianDriveSyncPluginApi;
@@ -79,7 +79,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		});
 		void this.autoValidateRemoteFolder(remoteValidationStatus);
 
-		const builtInExcludePatterns = getBuiltInExcludePatterns();
+		const builtInExcludePatterns = this.plugin.getBuiltInExcludePatterns();
 		new Setting(containerEl)
 			.setName("Excluded paths")
 			.setDesc(

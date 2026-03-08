@@ -1,58 +1,30 @@
 import { Plugin } from "obsidian";
 
 import { registerCommands } from "./commands";
-import { DEFAULT_SETTINGS } from "./contracts/plugin/default-settings";
 import type { ObsidianDriveSyncPluginApi } from "./contracts/plugin/plugin-api";
 import type { DriveSyncSettings } from "./contracts/plugin/settings";
-import { migrateLoadedSettings } from "./contracts/plugin/settings-migration";
 import type { LocalProvider } from "./contracts/provider/local-provider";
-import {
-	DEFAULT_LOCAL_PROVIDER_ID,
-	DEFAULT_REMOTE_PROVIDER_ID,
-} from "./contracts/provider/provider-ids";
 import type {
 	RemoteProvider,
 	RemoteProviderCredentials,
 	RemoteProviderSession,
 } from "./contracts/provider/remote-provider";
-import {
-	loadPluginData,
-	mergePluginData,
-	savePluginData,
-	serializeSettings,
-} from "./data/plugin-data";
-import {
-	createLocalProviderRegistry,
-	createRemoteProviderRegistry,
-} from "./provider/default-registry";
-import { LocalProviderRegistry, RemoteProviderRegistry } from "./provider/registry";
 import { PluginRuntime } from "./runtime/plugin-runtime";
-import {
-	clearConflictMarker as clearConflictMarkerUseCase,
-	loadSyncState as loadSyncStateUseCase,
-} from "./runtime/use-cases/sync-state";
-import { DriveSyncSettingTab } from "./settings";
+import { PluginState } from "./runtime/plugin-state";
 
 export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianDriveSyncPluginApi {
-	private mutableSettings: DriveSyncSettings = { ...DEFAULT_SETTINGS };
-	private localProviderRegistry: LocalProviderRegistry = new LocalProviderRegistry();
-	private remoteProviderRegistry: RemoteProviderRegistry = new RemoteProviderRegistry();
+	private state: PluginState | null = null;
 	private runtime: PluginRuntime | null = null;
 
 	async onload(): Promise<void> {
-		const data = await loadPluginData(this);
-		const { settings, migrated } = migrateLoadedSettings(data.settings);
-		this.mutableSettings = settings;
-		this.localProviderRegistry = createLocalProviderRegistry(this.getLocalProviderId());
-		this.remoteProviderRegistry = createRemoteProviderRegistry(this.getRemoteProviderId());
+		const migrated = await this.getState().initializeFromStorage();
 		if (migrated) {
 			await this.saveSettings();
 		}
 
-		this.runtime = new PluginRuntime(this);
+		this.runtime = this.getRuntime();
 		await this.runtime.restoreSession();
 
-		this.addSettingTab(new DriveSyncSettingTab(this.app, this));
 		registerCommands(this);
 		this.refreshAutoSync();
 	}
@@ -62,88 +34,71 @@ export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianD
 	}
 
 	getRemoteProviderId(): string {
-		const providerId = this.mutableSettings.remoteProviderId.trim();
-		return providerId || DEFAULT_REMOTE_PROVIDER_ID;
+		return this.getState().getRemoteProviderId();
 	}
 
 	getRemoteProvider(): RemoteProvider {
-		return this.remoteProviderRegistry.get(this.getRemoteProviderId());
+		return this.getState().getRemoteProvider();
 	}
 
 	getLocalProviderId(): string {
-		return DEFAULT_LOCAL_PROVIDER_ID;
+		return this.getState().getLocalProviderId();
 	}
 
 	getLocalProvider(): LocalProvider {
-		return this.localProviderRegistry.get(this.getLocalProviderId());
+		return this.getState().getLocalProvider();
 	}
 
 	getRemoteScopeId(): string {
-		return this.mutableSettings.remoteScopeId.trim();
+		return this.getState().getRemoteScopeId();
 	}
 
 	getRemoteScopePath(): string {
-		return this.mutableSettings.remoteScopePath.trim();
+		return this.getState().getRemoteScopePath();
 	}
 
 	setRemoteScope(scopeId: string, scopePath: string): void {
-		this.updateSettings({
-			remoteScopeId: scopeId.trim(),
-			remoteScopePath: scopePath.trim(),
-		});
+		this.getState().setRemoteScope(scopeId, scopePath);
 	}
 
 	getStoredProviderCredentials(): RemoteProviderCredentials | undefined {
-		return this.mutableSettings.remoteProviderCredentials;
+		return this.getState().getStoredProviderCredentials();
 	}
 
 	setStoredProviderCredentials(credentials: RemoteProviderCredentials | undefined): void {
-		this.updateSettings({
-			remoteProviderCredentials: credentials,
-		});
+		this.getState().setStoredProviderCredentials(credentials);
 	}
 
 	getRemoteAccountEmail(): string {
-		return this.mutableSettings.remoteAccountEmail;
+		return this.getState().getRemoteAccountEmail();
 	}
 
 	setRemoteAccountEmail(email: string): void {
-		this.updateSettings({
-			remoteAccountEmail: email.trim(),
-		});
+		this.getState().setRemoteAccountEmail(email);
 	}
 
 	hasRemoteAuthSession(): boolean {
-		return this.mutableSettings.remoteHasAuthSession;
+		return this.getState().hasRemoteAuthSession();
 	}
 
 	setRemoteAuthSession(hasAuthSession: boolean): void {
-		this.updateSettings({
-			remoteHasAuthSession: hasAuthSession,
-		});
+		this.getState().setRemoteAuthSession(hasAuthSession);
 	}
 
 	clearStoredRemoteSession(): void {
-		this.setStoredProviderCredentials(undefined);
-		this.setRemoteAccountEmail("");
-		this.setRemoteAuthSession(false);
+		this.getState().clearStoredRemoteSession();
 	}
 
 	get settings(): Readonly<DriveSyncSettings> {
-		return this.mutableSettings;
+		return this.getState().settings;
 	}
 
 	updateSettings(patch: Partial<DriveSyncSettings>): void {
-		this.mutableSettings = {
-			...this.mutableSettings,
-			...patch,
-		};
+		this.getState().updateSettings(patch);
 	}
 
 	async saveSettings(): Promise<void> {
-		const data = mergePluginData(await loadPluginData(this));
-		data.settings = serializeSettings(this.mutableSettings);
-		await savePluginData(this, data);
+		await this.getState().saveSettings();
 	}
 
 	refreshAutoSync(): void {
@@ -193,17 +148,29 @@ export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianD
 		this.runtime?.handleAuthRecovered(scheduleSync);
 	}
 
+	getBuiltInExcludePatterns(): readonly string[] {
+		return this.getRuntime().getBuiltInExcludePatterns();
+	}
+
 	async loadSyncState() {
-		if (this.runtime) {
-			return await this.runtime.loadSyncState();
-		}
-		return await loadSyncStateUseCase();
+		return await this.getRuntime().loadSyncState();
 	}
 
 	async clearConflictMarker(path: string) {
-		if (this.runtime) {
-			return await this.runtime.clearConflictMarker(path);
+		return await this.getRuntime().clearConflictMarker(path);
+	}
+
+	private getRuntime(): PluginRuntime {
+		if (!this.runtime) {
+			this.runtime = new PluginRuntime(this);
 		}
-		return await clearConflictMarkerUseCase(path);
+		return this.runtime;
+	}
+
+	private getState(): PluginState {
+		if (!this.state) {
+			this.state = new PluginState(this);
+		}
+		return this.state;
 	}
 }

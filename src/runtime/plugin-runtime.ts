@@ -4,6 +4,7 @@ import { type ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api"
 import type { RemoteProviderSession } from "../contracts/provider/remote-provider";
 import { type SyncRunRequest } from "../contracts/sync/run-request";
 import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "../internal-config";
+import { getBuiltInExcludePatterns as getBuiltInExcludePatternsUseCase } from "../sync/planner/exclude";
 import { PluginDataStateStore } from "../sync/state/state-store";
 import { now } from "../sync/support/utils";
 
@@ -108,6 +109,10 @@ export class PluginRuntime {
 
 	isSyncRunning(): boolean {
 		return this.triggerScheduler.isSyncRunning();
+	}
+
+	getBuiltInExcludePatterns(): readonly string[] {
+		return getBuiltInExcludePatternsUseCase();
 	}
 
 	async loadSyncState() {

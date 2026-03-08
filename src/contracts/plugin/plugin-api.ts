@@ -47,6 +47,7 @@ export interface ObsidianDriveSyncPluginApi extends Plugin {
 	runAutoSync(force?: boolean): Promise<void>;
 	isSyncRunning(): boolean;
 	handleAuthRecovered(scheduleSync?: boolean): void;
+	getBuiltInExcludePatterns(): readonly string[];
 	loadSyncState(): Promise<SyncState>;
 	clearConflictMarker(path: string): Promise<boolean>;
 }
