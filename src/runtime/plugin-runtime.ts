@@ -1,3 +1,7 @@
+import {
+	clearConflictMarker as clearConflictMarkerUseCase,
+	loadSyncState as loadSyncStateUseCase,
+} from "./use-cases/sync-state";
 import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "../internal-config";
 import { NetworkPolicy } from "./network-policy";
 import { Notice } from "obsidian";
@@ -7,7 +11,7 @@ import { PluginDataStateStore } from "../sync/state/state-store";
 import type { RemoteProviderSession } from "../provider/contracts";
 import { SessionManager } from "./session-manager";
 import { SyncCoordinator } from "./sync-coordinator";
-import { type SyncRunRequest } from "../sync/contracts/types";
+import { type SyncRunRequest } from "../sync/contracts";
 import { TriggerScheduler } from "./trigger-scheduler";
 
 export class PluginRuntime {
@@ -102,6 +106,14 @@ export class PluginRuntime {
 
 	isSyncRunning(): boolean {
 		return this.triggerScheduler.isSyncRunning();
+	}
+
+	async loadSyncState() {
+		return await loadSyncStateUseCase();
+	}
+
+	async clearConflictMarker(path: string) {
+		return await clearConflictMarkerUseCase(path);
 	}
 
 	teardown(): void {

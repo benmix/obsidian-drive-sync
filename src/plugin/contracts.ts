@@ -10,7 +10,8 @@ import type { SyncState } from "../sync/state/index-store";
 
 export interface ObsidianDriveSyncPluginApi extends Plugin {
 	readonly app: App;
-	settings: DriveSyncSettings;
+	readonly settings: Readonly<DriveSyncSettings>;
+	updateSettings(patch: Partial<DriveSyncSettings>): void;
 
 	getRemoteProviderId(): string;
 	getRemoteProvider(): RemoteProvider;

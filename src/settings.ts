@@ -1,7 +1,6 @@
 import { PluginSettingTab, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { DEFAULT_REMOTE_PROVIDER_ID } from "./provider/contracts";
-import { DEFAULT_SYNC_STRATEGY } from "./sync/contracts/strategy";
+import { DEFAULT_SETTINGS } from "./contracts/default-settings";
 import type { DriveSyncSettings } from "./contracts/settings";
 import { getBuiltInExcludePatterns } from "./sync/planner/exclude";
 import type { ObsidianDriveSyncPluginApi } from "./plugin/contracts";
@@ -9,18 +8,7 @@ import { RemoteFolderPickerModal } from "./ui/remote-root-modal";
 import { RemoteProviderLoginModal } from "./ui/login-modal";
 
 export type { DriveSyncSettings } from "./contracts/settings";
-
-export const DEFAULT_SETTINGS: DriveSyncSettings = {
-	remoteProviderId: DEFAULT_REMOTE_PROVIDER_ID,
-	remoteScopeId: "",
-	remoteScopePath: "",
-	remoteProviderCredentials: undefined,
-	remoteAccountEmail: "",
-	remoteHasAuthSession: false,
-	syncStrategy: DEFAULT_SYNC_STRATEGY,
-	autoSyncEnabled: false,
-	enableNetworkPolicy: false,
-};
+export { DEFAULT_SETTINGS } from "./contracts/default-settings";
 
 export class DriveSyncSettingTab extends PluginSettingTab {
 	plugin: ObsidianDriveSyncPluginApi;
@@ -113,8 +101,9 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 					.addOption("remote_win", "Remote authority")
 					.setValue(this.plugin.settings.syncStrategy)
 					.onChange(async (value) => {
-						this.plugin.settings.syncStrategy =
-							value as DriveSyncSettings["syncStrategy"];
+						this.plugin.updateSettings({
+							syncStrategy: value as DriveSyncSettings["syncStrategy"],
+						});
 						await this.plugin.saveSettings();
 					}),
 			);
@@ -124,7 +113,9 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			.setDesc("Schedule periodic sync checks and respond to local changes.")
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.autoSyncEnabled).onChange(async (value) => {
-					this.plugin.settings.autoSyncEnabled = value;
+					this.plugin.updateSettings({
+						autoSyncEnabled: value,
+					});
 					await this.plugin.saveSettings();
 					this.plugin.refreshAutoSync();
 				}),
@@ -139,7 +130,9 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.enableNetworkPolicy)
 					.onChange(async (value) => {
-						this.plugin.settings.enableNetworkPolicy = value;
+						this.plugin.updateSettings({
+							enableNetworkPolicy: value,
+						});
 						await this.plugin.saveSettings();
 					}),
 			);

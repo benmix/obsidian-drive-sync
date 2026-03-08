@@ -101,7 +101,7 @@ Data Layer
 
 ### 4.2 `RemoteProvider` / `LocalProvider`
 
-- Location: `src/provider/contracts.ts`
+- Location: `src/provider/contracts/`
 - Purpose:
     - Consolidate auth, connectivity, scope handling, and file system creation into providers.
     - Keep Sync Kernel focused on `RemoteFileSystem` / `LocalFileSystem` without SDK awareness.

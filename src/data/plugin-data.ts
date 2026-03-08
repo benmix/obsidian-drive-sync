@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS } from "../settings";
+import { DEFAULT_SETTINGS } from "../contracts/default-settings";
 import type { DriveSyncSettings } from "../contracts/settings";
 
 export type PluginDataStore = {
@@ -9,6 +9,13 @@ export type PluginDataStore = {
 export type PluginData = {
 	settings: DriveSyncSettings;
 };
+
+export function serializeSettings(settings: DriveSyncSettings): DriveSyncSettings {
+	return {
+		...DEFAULT_SETTINGS,
+		...settings,
+	};
+}
 
 export function buildDefaultData(): PluginData {
 	return {
@@ -23,10 +30,7 @@ export function mergePluginData(raw: unknown): PluginData {
 	}
 	const data = raw as Partial<PluginData>;
 	return {
-		settings: {
-			...base.settings,
-			...(data.settings ?? {}),
-		},
+		settings: serializeSettings(data.settings ?? base.settings),
 	};
 }
 
