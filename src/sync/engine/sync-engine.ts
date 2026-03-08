@@ -3,7 +3,7 @@ import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../contracts/strategy"
 import { type ExcludeRule, getBuiltInExcludeRules } from "../planner/exclude";
 import { executeJobs, type ExecuteResult } from "./executor";
 import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../../internal-config";
-import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem/contracts";
+import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem";
 import type { SyncEntry, SyncJob } from "../../data/sync-schema";
 import { normalizePath } from "../../filesystem/path";
 import { reconcileSnapshot } from "../planner/reconciler";

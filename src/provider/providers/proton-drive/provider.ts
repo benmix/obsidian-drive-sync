@@ -17,7 +17,7 @@ import type { ProtonDriveClient } from "@protontech/drive-sdk";
 import { ProtonDriveRemoteFileSystem } from "./remote-file-system";
 import { ProtonDriveService } from "./sdk/service";
 import type { ProtonSession } from "./sdk/sdk-session";
-import type { RemoteFileSystem } from "../../../filesystem/contracts";
+import type { RemoteFileSystem } from "../../../filesystem";
 import type { ReusableCredentials } from "./sdk/proton-auth/types";
 
 const DEFAULT_REMOTE_FILE_SYSTEM_STRATEGIES: readonly RemoteFileSystemStrategy[] = [

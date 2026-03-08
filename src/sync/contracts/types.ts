@@ -1,4 +1,4 @@
-import type { LocalChange } from "../../filesystem/contracts";
+import type { LocalChange } from "../../filesystem";
 
 export type SyncRunTrigger = "manual" | "interval" | "local";
 export type SyncRunRequest = {

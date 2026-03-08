@@ -1,8 +1,4 @@
-import type {
-	RemoteFileEntry,
-	RemoteFileSystem,
-	RemoteTreeEvent,
-} from "../../filesystem/contracts";
+import type { RemoteFileEntry, RemoteFileSystem, RemoteTreeEvent } from "../../filesystem";
 import type { RemoteFileSystemStrategy } from "./contracts";
 
 export type RateLimitedRemoteFileSystemOptions = {

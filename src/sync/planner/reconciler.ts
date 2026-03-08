@@ -6,7 +6,7 @@ import {
 	resolveRemoteOnlyDecision,
 	resolveTrackedMissingDecision,
 } from "./presence-policy";
-import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem/contracts";
+import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem";
 import type { SyncEntry, SyncJob } from "../../data/sync-schema";
 import { normalizePath } from "../../filesystem/path";
 import { now } from "../support/utils";

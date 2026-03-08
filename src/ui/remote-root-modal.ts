@@ -1,5 +1,5 @@
 import { Modal, Notice, Setting } from "obsidian";
-import type { RemoteFileEntry, RemoteFileSystem } from "../filesystem/contracts";
+import type { RemoteFileEntry, RemoteFileSystem } from "../filesystem";
 import type { App } from "obsidian";
 import { normalizePath } from "../filesystem/path";
 import type { ObsidianDriveSyncPluginApi } from "../plugin/contracts";

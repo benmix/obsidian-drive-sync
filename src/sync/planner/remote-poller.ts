@@ -5,7 +5,7 @@ import {
 	resolveLocalOnlyDecision,
 	resolveRemoteOnlyDecision,
 } from "./presence-policy";
-import type { RemoteFileSystem, RemoteTreeEvent } from "../../filesystem/contracts";
+import type { RemoteFileSystem, RemoteTreeEvent } from "../../filesystem";
 import type { SyncEntry, SyncJob } from "../../data/sync-schema";
 import { normalizePath } from "../../filesystem/path";
 import { now } from "../support/utils";

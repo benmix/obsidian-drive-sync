@@ -9,7 +9,7 @@ import {
 	RateLimitedRemoteFileSystem,
 } from "../../src/provider/strategy/rate-limited-remote-file-system-strategy";
 
-import type { RemoteFileSystem } from "../../src/filesystem/contracts";
+import type { RemoteFileSystem } from "../../src/filesystem";
 
 describe("remote file system strategies", () => {
 	test("applies strategies as a composable chain", async () => {

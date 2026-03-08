@@ -5,7 +5,7 @@ import { isInitializationPhase } from "../../sync/planner/initialization";
 import { PluginDataStateStore } from "../../sync/state/state-store";
 import { pollRemoteChanges } from "../../sync/planner/remote-poller";
 import { SyncEngine } from "../../sync/engine/sync-engine";
-import { type SyncStrategy } from "../../sync/contracts/strategy";
+import { type SyncStrategy } from "../../sync/contracts";
 
 export async function syncVaultToRemote(
 	app: App,

@@ -1,4 +1,4 @@
-export type EntryType = "file" | "folder";
+import type { EntryType } from "../contracts/entry";
 
 export type LocalFileEntry = {
 	path: string;

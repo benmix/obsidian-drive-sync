@@ -1,9 +1,5 @@
 import { basename, dirname, normalizePath, splitPath } from "../../../filesystem/path";
-import type {
-	RemoteFileEntry,
-	RemoteFileSystem,
-	RemoteTreeEvent,
-} from "../../../filesystem/contracts";
+import type { RemoteFileEntry, RemoteFileSystem, RemoteTreeEvent } from "../../../filesystem";
 import mimeTypes from "mime-types";
 
 type ProtonDriveClient = {

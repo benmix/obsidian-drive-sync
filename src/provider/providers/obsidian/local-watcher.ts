@@ -1,8 +1,7 @@
 import { type App, type EventRef, type TAbstractFile, TFile, TFolder } from "obsidian";
-import type { LocalChange } from "../../../filesystem/contracts";
+import type { LocalChange } from "../../../filesystem";
+import type { LocalChangeHandler } from "../../contracts";
 import { normalizePath } from "../../../filesystem/path";
-
-export type LocalChangeHandler = (change: LocalChange) => void;
 
 export class ObsidianLocalFileSystemWatcher {
 	private app: App;

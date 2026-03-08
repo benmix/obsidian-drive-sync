@@ -2,8 +2,8 @@ import {
 	INTERNAL_AUTO_SYNC_INTERVAL_MS,
 	INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
 } from "../internal-config";
-import { type SyncRunRequest, type SyncRunTrigger } from "../sync/contracts/types";
-import { type LocalChange } from "../filesystem/contracts";
+import { type SyncRunRequest, type SyncRunTrigger } from "../sync/contracts";
+import { type LocalChange } from "../filesystem";
 import { type LocalChangeWatcher } from "../provider/contracts";
 
 type TriggerSchedulerOptions = {

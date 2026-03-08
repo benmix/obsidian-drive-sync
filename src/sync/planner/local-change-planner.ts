@@ -1,6 +1,6 @@
 import { dirname, normalizePath } from "../../filesystem/path";
 import type { SyncEntry, SyncJob } from "../../data/sync-schema";
-import type { LocalChange } from "../../filesystem/contracts";
+import type { LocalChange } from "../../filesystem";
 import { now } from "../support/utils";
 import type { SyncState } from "../state/index-store";
 

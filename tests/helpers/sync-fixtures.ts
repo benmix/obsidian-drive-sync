@@ -3,7 +3,7 @@ import type {
 	LocalFileSystem,
 	RemoteFileEntry,
 	RemoteFileSystem,
-} from "../../src/filesystem/contracts";
+} from "../../src/filesystem";
 import type { SyncEntry, SyncJob } from "../../src/data/sync-schema";
 import type { SyncState } from "../../src/sync/state/index-store";
 

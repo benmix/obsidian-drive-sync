@@ -1,6 +1,9 @@
 import { type App, type EventRef } from "obsidian";
-import { DEFAULT_LOCAL_PROVIDER_ID, type LocalProvider } from "../../contracts";
-import { type LocalChange } from "../../../filesystem/contracts";
+import {
+	DEFAULT_LOCAL_PROVIDER_ID,
+	type LocalChangeHandler,
+	type LocalProvider,
+} from "../../contracts";
 import { ObsidianLocalFileSystem } from "./local-file-system";
 import { ObsidianLocalFileSystemWatcher } from "./local-watcher";
 
@@ -14,7 +17,7 @@ export class ObsidianLocalProvider implements LocalProvider {
 
 	createLocalWatcher(
 		app: App,
-		onChange: (change: LocalChange) => void,
+		onChange: LocalChangeHandler,
 		registerEvent: (eventRef: EventRef) => void,
 		debounceMs = 500,
 	) {

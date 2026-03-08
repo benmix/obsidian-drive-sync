@@ -1,4 +1,4 @@
-import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem/contracts";
+import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem";
 import type { SyncEntry, SyncJob } from "../../data/sync-schema";
 import { hashBytes } from "../support/hash";
 import { now } from "../support/utils";

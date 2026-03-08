@@ -1,5 +1,5 @@
 import { getBuiltInExcludeRules, isExcluded } from "../../sync/planner/exclude";
-import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem/contracts";
+import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem";
 
 export async function syncLocalToRemote(
 	localFileSystem: LocalFileSystem,

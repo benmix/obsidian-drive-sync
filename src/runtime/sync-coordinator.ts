@@ -2,7 +2,7 @@ import { type ObsidianDriveSyncPluginApi } from "../plugin/contracts";
 import { PluginDataStateStore } from "../sync/state/state-store";
 import type { SessionManager } from "./session-manager";
 import { SyncRunner } from "../sync/use-cases/sync-runner";
-import { type SyncRunRequest } from "../sync/contracts/types";
+import { type SyncRunRequest } from "../sync/contracts";
 
 export class SyncCoordinator {
 	private readonly syncRunner = new SyncRunner(new PluginDataStateStore());

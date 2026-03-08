@@ -1,4 +1,4 @@
-import type { SyncStrategy } from "../sync/contracts/strategy";
+import type { SyncStrategy } from "../sync/contracts";
 
 export interface DriveSyncSettings {
 	remoteProviderId: string;

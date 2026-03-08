@@ -1,4 +1,4 @@
-import type { RemoteFileSystem } from "../../filesystem/contracts";
+import type { RemoteFileSystem } from "../../filesystem";
 
 export type ValidationStep = {
 	name: string;

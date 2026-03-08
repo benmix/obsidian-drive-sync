@@ -1,5 +1,5 @@
 import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../contracts/strategy";
-import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem/contracts";
+import type { LocalFileSystem, RemoteFileSystem } from "../../filesystem";
 import { isInitializationPhase } from "../planner/initialization";
 import { now } from "../support/utils";
 import { planLocalChanges } from "../planner/local-change-planner";
