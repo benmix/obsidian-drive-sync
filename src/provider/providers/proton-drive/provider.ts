@@ -1,8 +1,13 @@
+import type { ProtonDriveClient } from "@protontech/drive-sdk";
+
+import type { RemoteFileSystem } from "../../../contracts/filesystem/file-system";
+import type { ReusableCredentials } from "../../../contracts/provider/proton/auth-types";
 import type {
 	ProtonDriveAuthServiceContract,
 	ProtonDriveProviderInitOptions,
 	ProtonDriveServiceContract,
 } from "../../../contracts/provider/proton/drive-provider";
+import type { ProtonSession } from "../../../contracts/provider/proton/sdk-session";
 import type {
 	RemoteProvider,
 	RemoteProviderConnectOptions,
@@ -12,13 +17,10 @@ import type {
 	RemoteProviderSession,
 	RemoteScopeRoot,
 } from "../../../contracts/provider/remote-provider";
-import { ProtonDriveAuthService } from "./sdk/auth";
-import type { ProtonDriveClient } from "@protontech/drive-sdk";
+
 import { ProtonDriveRemoteFileSystem } from "./remote-file-system";
+import { ProtonDriveAuthService } from "./sdk/auth";
 import { ProtonDriveService } from "./sdk/service";
-import type { ProtonSession } from "../../../contracts/provider/proton/sdk-session";
-import type { RemoteFileSystem } from "../../../contracts/filesystem/file-system";
-import type { ReusableCredentials } from "../../../contracts/provider/proton/auth-types";
 
 export class ProtonDriveRemoteProvider implements RemoteProvider {
 	readonly id = "proton-drive";

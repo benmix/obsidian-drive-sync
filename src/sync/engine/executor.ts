@@ -1,5 +1,5 @@
-import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
 import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
+import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
 import type { ExecuteResult } from "../../contracts/sync/execution";
 import { hashBytes } from "../support/hash";
 import { now } from "../support/utils";

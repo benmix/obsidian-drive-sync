@@ -1,7 +1,8 @@
-import type { CommandContext } from "../contracts/plugin/command-context";
 import { Notice } from "obsidian";
-import { RemoteProviderLoginModal } from "../ui/login-modal";
+
+import type { CommandContext } from "../contracts/plugin/command-context";
 import { SyncConflictModal } from "../ui/conflict-modal";
+import { RemoteProviderLoginModal } from "../ui/login-modal";
 import { SyncStatusModal } from "../ui/status-modal";
 
 export function registerUiSessionCommands(context: CommandContext) {

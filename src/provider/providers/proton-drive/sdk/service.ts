@@ -1,7 +1,9 @@
 import { MemoryCache, ProtonDriveClient } from "@protontech/drive-sdk";
-import { buildSdkSessionClient } from "./sdk-session";
 import { Notice } from "obsidian";
+
 import type { ProtonSession } from "../../../../contracts/provider/proton/sdk-session";
+
+import { buildSdkSessionClient } from "./sdk-session";
 
 export class ProtonDriveService {
 	private client: ProtonDriveClient | null = null;

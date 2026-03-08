@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
+
+import { reconcileSnapshot } from "../../src/sync/planner/reconciler";
 import {
 	createEntry,
 	createLocalFileSystem,
@@ -6,7 +8,6 @@ import {
 	createState,
 	FIXED_NOW,
 } from "../helpers/sync-fixtures";
-import { reconcileSnapshot } from "../../src/sync/planner/reconciler";
 
 describe("reconcileSnapshot", () => {
 	afterEach(() => {

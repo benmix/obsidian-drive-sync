@@ -1,5 +1,5 @@
-import type { LocalProviderId, RemoteProviderId } from "../contracts/provider/provider-ids";
 import type { LocalProvider } from "../contracts/provider/local-provider";
+import type { LocalProviderId, RemoteProviderId } from "../contracts/provider/provider-ids";
 import type { RemoteProvider } from "../contracts/provider/remote-provider";
 
 export class RemoteProviderRegistry {

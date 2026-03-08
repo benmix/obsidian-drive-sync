@@ -1,18 +1,20 @@
+import { Notice } from "obsidian";
+
+import { type ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import type { RemoteProviderSession } from "../contracts/provider/remote-provider";
+import { type SyncRunRequest } from "../contracts/sync/run-request";
+import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "../internal-config";
+import { PluginDataStateStore } from "../sync/state/state-store";
+import { now } from "../sync/support/utils";
+
+import { NetworkPolicy } from "./network-policy";
+import { SessionManager } from "./session-manager";
+import { SyncCoordinator } from "./sync-coordinator";
+import { TriggerScheduler } from "./trigger-scheduler";
 import {
 	clearConflictMarker as clearConflictMarkerUseCase,
 	loadSyncState as loadSyncStateUseCase,
 } from "./use-cases/sync-state";
-import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "../internal-config";
-import { NetworkPolicy } from "./network-policy";
-import { Notice } from "obsidian";
-import { now } from "../sync/support/utils";
-import { type ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import { PluginDataStateStore } from "../sync/state/state-store";
-import type { RemoteProviderSession } from "../contracts/provider/remote-provider";
-import { SessionManager } from "./session-manager";
-import { SyncCoordinator } from "./sync-coordinator";
-import { type SyncRunRequest } from "../contracts/sync/run-request";
-import { TriggerScheduler } from "./trigger-scheduler";
 
 export class PluginRuntime {
 	private autoSyncPaused = false;

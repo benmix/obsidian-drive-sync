@@ -1,10 +1,10 @@
+import { type LocalChange } from "../contracts/filesystem/file-system";
+import { type LocalChangeWatcher } from "../contracts/provider/local-provider";
+import { type SyncRunRequest, type SyncRunTrigger } from "../contracts/sync/run-request";
 import {
 	INTERNAL_AUTO_SYNC_INTERVAL_MS,
 	INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
 } from "../internal-config";
-import { type SyncRunRequest, type SyncRunTrigger } from "../contracts/sync/run-request";
-import { type LocalChange } from "../contracts/filesystem/file-system";
-import { type LocalChangeWatcher } from "../contracts/provider/local-provider";
 
 type TriggerSchedulerOptions = {
 	createLocalWatcher: (

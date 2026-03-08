@@ -1,8 +1,9 @@
+import { Notice } from "obsidian";
+
 import type { CommandContext } from "../contracts/plugin/command-context";
 import { exportDiagnostics } from "../runtime/use-cases/diagnostics";
-import { Notice } from "obsidian";
-import { rebuildSyncIndex } from "../runtime/use-cases/sync-workflows";
 import { validateRemoteOperations } from "../runtime/use-cases/remote-validation";
+import { rebuildSyncIndex } from "../runtime/use-cases/sync-workflows";
 
 export function registerMaintenanceCommands(context: CommandContext) {
 	const { plugin, localProvider, runRemoteCommand } = context;

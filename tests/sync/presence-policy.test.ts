@@ -1,4 +1,6 @@
-import { createEntry, FIXED_NOW } from "../helpers/sync-fixtures";
+import { expect, test } from "vitest";
+
+import type { SyncEntry } from "../../src/contracts/data/sync-schema";
 import {
 	evaluateRemoteMissingConfirmation,
 	REMOTE_MISSING_CONFIRM_ROUNDS,
@@ -7,8 +9,7 @@ import {
 	resolveRemoteOnlyDecision,
 	resolveTrackedMissingDecision,
 } from "../../src/sync/planner/presence-policy";
-import { expect, test } from "vitest";
-import type { SyncEntry } from "../../src/contracts/data/sync-schema";
+import { createEntry, FIXED_NOW } from "../helpers/sync-fixtures";
 
 function trackedFile(overrides: Partial<SyncEntry> = {}): SyncEntry {
 	return createEntry(overrides);

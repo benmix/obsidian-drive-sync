@@ -1,4 +1,5 @@
 import { type App, type EventRef, type TAbstractFile, TFile, TFolder } from "obsidian";
+
 import type { LocalChange } from "../../../contracts/filesystem/file-system";
 import type { LocalChangeHandler } from "../../../contracts/provider/local-provider";
 import { normalizePath } from "../../../filesystem/path";

@@ -1,4 +1,5 @@
 import * as openpgp from "openpgp";
+
 import type {
 	Address,
 	AddressData,
@@ -20,15 +21,16 @@ import {
 	CHILD_CLIENT_ID,
 	INVALID_REFRESH_TOKEN_CODE,
 } from "../../../../../contracts/provider/proton/auth-types";
+import { logger } from "../logger";
+
 import { apiRequest, createHeaders } from "./api";
 import {
 	computeKeyPassword,
 	createForkEncryptedBlob,
 	decryptForkEncryptedBlob,
 } from "./crypto-utils";
-import { getSrp } from "./srp";
-import { logger } from "../logger";
 import { requestHttp } from "./http";
+import { getSrp } from "./srp";
 
 // ============================================================================
 // ProtonAuth Class

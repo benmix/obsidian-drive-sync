@@ -27,7 +27,7 @@ export class SyncIndexStore {
 	setEntry(entry: SyncEntry): void {
 		const prior = this.state.entries[entry.relPath];
 		const merged: SyncEntry = {
-			...(prior ?? {}),
+			...prior,
 			...entry,
 		};
 		const hasRemoteMissingCount = Object.prototype.hasOwnProperty.call(

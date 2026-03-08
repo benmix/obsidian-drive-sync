@@ -1,5 +1,6 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
+
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 
 type ConflictItem = {

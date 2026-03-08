@@ -1,4 +1,7 @@
+import type { ProtonDriveAccount, ProtonDriveAccountAddress } from "@protontech/drive-sdk";
+import type { PublicKey as DrivePublicKey } from "@protontech/drive-sdk/dist/crypto/interface";
 import * as openpgp from "openpgp";
+
 import type {
 	AddressKeyInfo,
 	ApiResponse,
@@ -12,6 +15,13 @@ import {
 	AUTH_VERSION,
 	SRP_LEN,
 } from "../../../../../contracts/provider/proton/auth-types";
+import type { OpenPGPCryptoInterface } from "../../../../../contracts/provider/proton/openpgp";
+import type {
+	SRPModuleInterface,
+	SRPVerifier,
+} from "../../../../../contracts/provider/proton/srp-module";
+
+import { apiRequest } from "./api";
 import {
 	base64Encode,
 	bigIntToUint8ArrayLE,
@@ -21,16 +31,8 @@ import {
 	uint8ArrayToBigIntLE,
 	uint8ArrayToBinaryString,
 } from "./crypto-utils";
-import { getSrp, verifyAndGetModulus } from "./srp";
-import type { ProtonDriveAccount, ProtonDriveAccountAddress } from "@protontech/drive-sdk";
-import type {
-	SRPModuleInterface,
-	SRPVerifier,
-} from "../../../../../contracts/provider/proton/srp-module";
-import { apiRequest } from "./api";
-import type { PublicKey as DrivePublicKey } from "@protontech/drive-sdk/dist/crypto/interface";
-import type { OpenPGPCryptoInterface } from "../../../../../contracts/provider/proton/openpgp";
 import { requestHttp } from "./http";
+import { getSrp, verifyAndGetModulus } from "./srp";
 
 // ============================================================================
 // SDK Integration Helpers

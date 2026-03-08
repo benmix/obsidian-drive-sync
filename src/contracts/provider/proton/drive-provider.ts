@@ -1,7 +1,8 @@
-import type { ReusableCredentials, Session } from "./auth-types";
-import type { AuthSession } from "./auth-session";
-import type { ProtonSession } from "./sdk-session";
 import type { RemoteProviderLoginInput } from "../remote-provider";
+
+import type { AuthSession } from "./auth-session";
+import type { ReusableCredentials, Session } from "./auth-types";
+import type { ProtonSession } from "./sdk-session";
 
 export interface ProtonDriveAuthServiceContract {
 	login(credentials: RemoteProviderLoginInput): Promise<AuthSession>;

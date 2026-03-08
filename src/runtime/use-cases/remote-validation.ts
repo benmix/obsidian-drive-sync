@@ -1,8 +1,8 @@
+import type { RemoteFileSystem } from "../../contracts/filesystem/file-system";
 import type {
 	RemoteValidationReport,
 	ValidationStep,
 } from "../../contracts/provider/remote-validation";
-import type { RemoteFileSystem } from "../../contracts/filesystem/file-system";
 
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
 	if (a.byteLength !== b.byteLength) {

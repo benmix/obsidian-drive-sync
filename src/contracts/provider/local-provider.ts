@@ -1,5 +1,7 @@
 import type { App, EventRef } from "obsidian";
+
 import type { LocalChange, LocalFileSystem } from "../filesystem/file-system";
+
 import type { LocalProviderId } from "./provider-ids";
 
 export type LocalChangeWatcher = {

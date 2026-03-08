@@ -1,10 +1,10 @@
+import type { SyncEntry, SyncJob } from "../../src/contracts/data/sync-schema";
 import type {
 	LocalFileEntry,
 	LocalFileSystem,
 	RemoteFileEntry,
 	RemoteFileSystem,
 } from "../../src/contracts/filesystem/file-system";
-import type { SyncEntry, SyncJob } from "../../src/contracts/data/sync-schema";
 import type { SyncState } from "../../src/contracts/sync/state";
 
 export const FIXED_NOW = 1_700_000_000_000;
@@ -52,10 +52,10 @@ export function createLocalFileSystem(entries: LocalFileEntry[]): LocalFileSyste
 			return entry ?? null;
 		},
 		readFile: async () => new Uint8Array(),
-		writeFile: async () => undefined,
-		deleteEntry: async () => undefined,
-		moveEntry: async () => undefined,
-		ensureFolder: async () => undefined,
+		writeFile: async () => {},
+		deleteEntry: async () => {},
+		moveEntry: async () => {},
+		ensureFolder: async () => {},
 	};
 }
 

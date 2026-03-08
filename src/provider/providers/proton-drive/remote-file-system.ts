@@ -1,10 +1,11 @@
-import { basename, dirname, normalizePath, splitPath } from "../../../filesystem/path";
+import mimeTypes from "mime-types";
+
 import type {
 	RemoteEntryChangeEvent,
 	RemoteFileEntry,
 	RemoteFileSystem,
 } from "../../../contracts/filesystem/file-system";
-import mimeTypes from "mime-types";
+import { basename, dirname, normalizePath, splitPath } from "../../../filesystem/path";
 
 type ProtonDriveClient = {
 	iterateFolderChildren?: (parentNodeUid: string) => AsyncIterable<unknown>;

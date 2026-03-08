@@ -1,12 +1,14 @@
-import { syncLocalToRemote, syncRemoteToLocal } from "./manual-sync";
 import { type App } from "obsidian";
-import { isInitializationPhase } from "../../sync/planner/initialization";
+
 import type { LocalProvider } from "../../contracts/provider/local-provider";
-import { PluginDataStateStore } from "../../sync/state/state-store";
-import { pollRemoteChanges } from "../../sync/planner/remote-poller";
 import type { RemoteProvider } from "../../contracts/provider/remote-provider";
-import { SyncEngine } from "../../sync/engine/sync-engine";
 import { type SyncStrategy } from "../../contracts/sync/strategy";
+import { SyncEngine } from "../../sync/engine/sync-engine";
+import { isInitializationPhase } from "../../sync/planner/initialization";
+import { pollRemoteChanges } from "../../sync/planner/remote-poller";
+import { PluginDataStateStore } from "../../sync/state/state-store";
+
+import { syncLocalToRemote, syncRemoteToLocal } from "./manual-sync";
 
 export async function syncVaultToRemote(
 	app: App,

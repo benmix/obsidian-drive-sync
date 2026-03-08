@@ -1,4 +1,24 @@
 {
-	"$schema": "./node_modules/oxfmt/configuration_schema.json",
-	"ignorePatterns": ["example_repo", "node_modules", "dist", "main.js"]
+	"experimentalSortImports": {
+		"groups": [
+			["side-effect"],
+			["builtin"],
+			["external", "type-external"],
+			["internal", "type-internal"],
+			["parent", "type-parent"],
+			["sibling", "type-sibling"],
+			["index", "type-index"],
+			["unknown"]
+		],
+		"newlinesBetween": true,
+		"ignoreCase": true
+	},
+	"experimentalSortPackageJson": {
+		"sortScripts": true
+	},
+	"experimentalTailwindcss": {
+		"stylesheet": "./src/styles.css",
+		"attributes": ["class", "className"],
+		"functions": ["clsx", "cva", "cn", "twMerge"]
+	}
 }

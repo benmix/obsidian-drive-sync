@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+
 import { BCRYPT_PREFIX } from "../../../../../contracts/provider/proton/auth-types";
 import type { ForkEncryptedBlob } from "../../../../../contracts/provider/proton/auth-types";
 
@@ -38,7 +39,9 @@ export function bigIntToUint8ArrayLE(num: bigint, length: number): Uint8Array {
  * Get byte length of a BigInt
  */
 export function bigIntByteLength(num: bigint): number {
-	if (num === 0n) return 1;
+	if (num === 0n) {
+		return 1;
+	}
 	let length = 0;
 	let temp = num;
 	while (temp > 0n) {
@@ -52,7 +55,9 @@ export function bigIntByteLength(num: bigint): number {
  * Modular exponentiation: (base^exp) mod modulus
  */
 export function modExp(base: bigint, exp: bigint, modulus: bigint): bigint {
-	if (modulus === 1n) return 0n;
+	if (modulus === 1n) {
+		return 0n;
+	}
 	let result = 1n;
 	base = base % modulus;
 	while (exp > 0n) {
@@ -383,7 +388,9 @@ export async function hashPassword({
 	version,
 }: HashPasswordParams): Promise<Uint8Array> {
 	if (version >= 3) {
-		if (!salt) throw new Error("Missing salt for auth version >= 3");
+		if (!salt) {
+			throw new Error("Missing salt for auth version >= 3");
+		}
 		return hashPasswordV3(password, salt, modulus);
 	}
 	throw new Error(`Unsupported auth version: ${version}`);

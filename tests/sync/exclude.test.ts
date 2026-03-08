@@ -1,10 +1,11 @@
+import { describe, expect, test } from "vitest";
+
 import {
 	compileExcludeRules,
 	getBuiltInExcludePatterns,
 	getBuiltInExcludeRules,
 	isExcluded,
 } from "../../src/sync/planner/exclude";
-import { describe, expect, test } from "vitest";
 
 describe("exclude rules", () => {
 	test("compiles multiline patterns and trims whitespace", () => {

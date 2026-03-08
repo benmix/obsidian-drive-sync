@@ -1,14 +1,15 @@
 import type { App, Plugin } from "obsidian";
+
+import { loadPluginData } from "../../data/plugin-data";
 import {
 	INTERNAL_AUTO_SYNC_INTERVAL_MS,
 	INTERNAL_LOCAL_CHANGE_DEBOUNCE_MS,
 	INTERNAL_MAX_CONCURRENT_JOBS,
 	INTERNAL_MAX_RETRY_ATTEMPTS,
 } from "../../internal-config";
-import { formatBytes } from "../../sync/support/utils";
 import { getBuiltInExcludePatterns } from "../../sync/planner/exclude";
-import { loadPluginData } from "../../data/plugin-data";
 import { PluginDataStateStore } from "../../sync/state/state-store";
+import { formatBytes } from "../../sync/support/utils";
 
 type DiagnosticsReport = {
 	generatedAt: string;

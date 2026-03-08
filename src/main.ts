@@ -1,36 +1,37 @@
-import {
-	clearConflictMarker as clearConflictMarkerUseCase,
-	loadSyncState as loadSyncStateUseCase,
-} from "./runtime/use-cases/sync-state";
-import {
-	createLocalProviderRegistry,
-	createRemoteProviderRegistry,
-} from "./provider/default-registry";
+import { Plugin } from "obsidian";
+
+import { registerCommands } from "./commands";
+import { DEFAULT_SETTINGS } from "./contracts/plugin/default-settings";
+import type { ObsidianDriveSyncPluginApi } from "./contracts/plugin/plugin-api";
+import type { DriveSyncSettings } from "./contracts/plugin/settings";
+import { migrateLoadedSettings } from "./contracts/plugin/settings-migration";
+import type { LocalProvider } from "./contracts/provider/local-provider";
 import {
 	DEFAULT_LOCAL_PROVIDER_ID,
 	DEFAULT_REMOTE_PROVIDER_ID,
 } from "./contracts/provider/provider-ids";
+import type {
+	RemoteProvider,
+	RemoteProviderCredentials,
+	RemoteProviderSession,
+} from "./contracts/provider/remote-provider";
 import {
 	loadPluginData,
 	mergePluginData,
 	savePluginData,
 	serializeSettings,
 } from "./data/plugin-data";
+import {
+	createLocalProviderRegistry,
+	createRemoteProviderRegistry,
+} from "./provider/default-registry";
 import { LocalProviderRegistry, RemoteProviderRegistry } from "./provider/registry";
-import type {
-	RemoteProvider,
-	RemoteProviderCredentials,
-	RemoteProviderSession,
-} from "./contracts/provider/remote-provider";
-import { DEFAULT_SETTINGS } from "./contracts/plugin/default-settings";
-import type { DriveSyncSettings } from "./contracts/plugin/settings";
-import { DriveSyncSettingTab } from "./settings";
-import type { LocalProvider } from "./contracts/provider/local-provider";
-import { migrateLoadedSettings } from "./contracts/plugin/settings-migration";
-import type { ObsidianDriveSyncPluginApi } from "./contracts/plugin/plugin-api";
-import { Plugin } from "obsidian";
 import { PluginRuntime } from "./runtime/plugin-runtime";
-import { registerCommands } from "./commands";
+import {
+	clearConflictMarker as clearConflictMarkerUseCase,
+	loadSyncState as loadSyncStateUseCase,
+} from "./runtime/use-cases/sync-state";
+import { DriveSyncSettingTab } from "./settings";
 
 export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianDriveSyncPluginApi {
 	private mutableSettings: DriveSyncSettings = { ...DEFAULT_SETTINGS };

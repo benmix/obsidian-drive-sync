@@ -1,13 +1,14 @@
+import type { AuthSession } from "../../../../contracts/provider/proton/auth-session";
 import type {
 	ApiError,
 	ReusableCredentials,
 	Session,
 } from "../../../../contracts/provider/proton/auth-types";
-import type { AuthSession } from "../../../../contracts/provider/proton/auth-session";
-import { createProtonHttpClient } from "./proton-auth/sdk-helpers";
+
 import { logger } from "./logger";
 import type { ProtonAuth } from "./proton-auth/core";
 import { ProtonAuth as ProtonAuthClient } from "./proton-auth/core";
+import { createProtonHttpClient } from "./proton-auth/sdk-helpers";
 
 export class ProtonDriveAuthService {
 	private authClient: ProtonAuth | null = null;

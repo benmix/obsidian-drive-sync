@@ -1,18 +1,19 @@
-import { backoffMs, now } from "../support/utils";
-import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
-import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../../internal-config";
-import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
 import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
+import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
 import type { ExcludeRule } from "../../contracts/sync/exclude";
-import { executeJobs } from "./executor";
 import type { ExecuteResult } from "../../contracts/sync/execution";
-import { getBuiltInExcludeRules } from "../planner/exclude";
-import { normalizePath } from "../../filesystem/path";
-import { reconcileSnapshot } from "../planner/reconciler";
-import type { StateStore } from "../../contracts/sync/state-store";
-import { SyncIndexStore } from "../state/index-store";
-import { SyncJobQueue } from "./job-queue";
 import type { SyncState } from "../../contracts/sync/state";
+import type { StateStore } from "../../contracts/sync/state-store";
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
+import { normalizePath } from "../../filesystem/path";
+import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../../internal-config";
+import { getBuiltInExcludeRules } from "../planner/exclude";
+import { reconcileSnapshot } from "../planner/reconciler";
+import { SyncIndexStore } from "../state/index-store";
+import { backoffMs, now } from "../support/utils";
+
+import { executeJobs } from "./executor";
+import { SyncJobQueue } from "./job-queue";
 
 type SyncEngineOptions = {
 	syncStrategy?: SyncStrategy;

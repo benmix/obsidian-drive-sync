@@ -1,5 +1,6 @@
-import type { CommandContext, ConnectedRemoteClient } from "../contracts/plugin/command-context";
 import { Notice } from "obsidian";
+
+import type { CommandContext, ConnectedRemoteClient } from "../contracts/plugin/command-context";
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 
 export function createCommandContext(plugin: ObsidianDriveSyncPluginApi): CommandContext {

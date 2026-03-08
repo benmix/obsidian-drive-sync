@@ -1,8 +1,9 @@
 import { Modal, Notice, Setting } from "obsidian";
-import type { RemoteFileEntry, RemoteFileSystem } from "../contracts/filesystem/file-system";
 import type { App } from "obsidian";
-import { normalizePath } from "../filesystem/path";
+
+import type { RemoteFileEntry, RemoteFileSystem } from "../contracts/filesystem/file-system";
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import { normalizePath } from "../filesystem/path";
 
 export class RemoteFolderPickerModal extends Modal {
 	private plugin: ObsidianDriveSyncPluginApi;

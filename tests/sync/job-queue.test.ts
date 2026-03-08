@@ -1,6 +1,7 @@
-import { createJob, FIXED_NOW } from "../helpers/sync-fixtures";
 import { describe, expect, test } from "vitest";
+
 import { SyncJobQueue } from "../../src/sync/engine/job-queue";
+import { createJob, FIXED_NOW } from "../helpers/sync-fixtures";
 
 describe("SyncJobQueue", () => {
 	test("enqueue defaults status and ignores duplicate id", () => {

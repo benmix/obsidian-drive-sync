@@ -1,4 +1,5 @@
 import { type App, type TAbstractFile, TFile, TFolder } from "obsidian";
+
 import type { LocalFileEntry, LocalFileSystem } from "../../../contracts/filesystem/file-system";
 
 export class ObsidianLocalFileSystem implements LocalFileSystem {

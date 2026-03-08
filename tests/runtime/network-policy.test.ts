@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+
 import { NetworkPolicy } from "../../src/runtime/network-policy";
 
 describe("NetworkPolicy", () => {

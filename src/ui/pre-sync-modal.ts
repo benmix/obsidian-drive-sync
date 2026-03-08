@@ -1,7 +1,9 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { formatBytes } from "./format";
+
 import type { PreSyncEstimate } from "../contracts/ui/pre-sync";
+
+import { formatBytes } from "./format";
 
 export class SyncPreflightModal extends Modal {
 	private estimate: PreSyncEstimate;

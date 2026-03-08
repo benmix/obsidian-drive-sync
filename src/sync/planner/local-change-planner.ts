@@ -1,9 +1,9 @@
-import { dirname, normalizePath } from "../../filesystem/path";
 import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
 import type { LocalChange } from "../../contracts/filesystem/file-system";
 import type { LocalChangePlan } from "../../contracts/sync/local-change-plan";
-import { now } from "../support/utils";
 import type { SyncState } from "../../contracts/sync/state";
+import { dirname, normalizePath } from "../../filesystem/path";
+import { now } from "../support/utils";
 
 export function planLocalChanges(changes: LocalChange[], state: SyncState): LocalChangePlan {
 	const jobs: SyncJob[] = [];
