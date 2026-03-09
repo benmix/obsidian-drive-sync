@@ -12,10 +12,7 @@ import type {
 import { PluginRuntime } from "./runtime/plugin-runtime";
 import { PluginState } from "./runtime/plugin-state";
 
-export default class ObsidianDriveSyncPlugin
-	extends Plugin
-	implements ObsidianDriveSyncPluginApi
-{
+export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianDriveSyncPluginApi {
 	private state: PluginState | null = null;
 	private runtime: PluginRuntime | null = null;
 
@@ -68,9 +65,7 @@ export default class ObsidianDriveSyncPlugin
 		return this.getState().getStoredProviderCredentials();
 	}
 
-	setStoredProviderCredentials(
-		credentials: RemoteProviderCredentials | undefined,
-	): void {
+	setStoredProviderCredentials(credentials: RemoteProviderCredentials | undefined): void {
 		this.getState().setStoredProviderCredentials(credentials);
 	}
 

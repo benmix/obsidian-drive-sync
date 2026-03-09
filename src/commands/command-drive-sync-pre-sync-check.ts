@@ -2,11 +2,7 @@ import { Notice } from "obsidian";
 
 import type { CommandContext } from "../contracts/plugin/command-context";
 import { tr } from "../i18n";
-import {
-	estimateSyncPlan,
-	planSync,
-	runPlannedSync,
-} from "../runtime/use-cases/sync-workflows";
+import { estimateSyncPlan, planSync, runPlannedSync } from "../runtime/use-cases/sync-workflows";
 import { SyncPreflightModal } from "../ui/pre-sync-modal";
 
 export function registerDriveSyncPreSyncCheckCommand(context: CommandContext) {
@@ -25,37 +21,25 @@ export function registerDriveSyncPreSyncCheckCommand(context: CommandContext) {
 						scopeId,
 						{ syncStrategy: plugin.settings.syncStrategy },
 					);
-					new SyncPreflightModal(
-						plugin.app,
-						plugin,
-						estimate,
-						async () => {
-							await planSync(
-								plugin.app,
-								localProvider,
-								provider,
-								client,
-								scopeId,
-								{
-									syncStrategy: plugin.settings.syncStrategy,
-								},
-							);
-							const result = await runPlannedSync(
-								plugin.app,
-								localProvider,
-								provider,
-								client,
-								scopeId,
-								{ syncStrategy: plugin.settings.syncStrategy },
-							);
-							new Notice(
-								tr("notice.executedJobsUpdatedEntries", {
-									jobs: result.jobsExecuted,
-									entries: result.entriesUpdated,
-								}),
-							);
-						},
-					).open();
+					new SyncPreflightModal(plugin.app, plugin, estimate, async () => {
+						await planSync(plugin.app, localProvider, provider, client, scopeId, {
+							syncStrategy: plugin.settings.syncStrategy,
+						});
+						const result = await runPlannedSync(
+							plugin.app,
+							localProvider,
+							provider,
+							client,
+							scopeId,
+							{ syncStrategy: plugin.settings.syncStrategy },
+						);
+						new Notice(
+							tr("notice.executedJobsUpdatedEntries", {
+								jobs: result.jobsExecuted,
+								entries: result.entriesUpdated,
+							}),
+						);
+					}).open();
 				} catch (error) {
 					console.warn("Pre-sync check failed.", error);
 					new Notice(tr("notice.preSyncCheckFailed"));

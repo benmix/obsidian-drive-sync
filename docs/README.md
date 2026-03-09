@@ -128,6 +128,7 @@ src/
 - `SYNC_STRATEGY.md` — runtime sync strategy baseline (post-initialization)
 - `SYNC_INITIALIZATION_STRATEGY.md` — first-sync initialization strategy baseline
 - `COMMANDS.md` — command module structure and command catalog
+- `TROUBLESHOOTING.md` — troubleshooting guide and common debugging checks
 - `TASKS.md` — development tasks
 - `AGENTS.md` — agents rules
 - `zh-CN/` — Chinese translations for design/specification docs

@@ -30,16 +30,10 @@ function interpolate(template: string, params?: TranslationParams): string {
 	if (!params) {
 		return template;
 	}
-	return template.replace(/\{(\w+)\}/g, (_, key: string) =>
-		String(params[key] ?? `{${key}}`),
-	);
+	return template.replace(/\{(\w+)\}/g, (_, key: string) => String(params[key] ?? `{${key}}`));
 }
 
-function t(
-	locale: SupportedLocale,
-	key: TranslationKey,
-	params?: TranslationParams,
-): string {
+function t(locale: SupportedLocale, key: TranslationKey, params?: TranslationParams): string {
 	const dict = locale === "zh-CN" ? ZH : EN;
 	return interpolate(dict[key] ?? EN[key], params);
 }

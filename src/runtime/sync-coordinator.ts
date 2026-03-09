@@ -28,8 +28,8 @@ export class SyncCoordinator {
 			localFileSystem,
 			remoteFileSystem,
 			syncStrategy: this.plugin.settings.syncStrategy,
-			onAuthError: (message) => {
-				this.sessionManager.pauseAuth(message);
+			onAuthError: (error) => {
+				this.sessionManager.pauseAuth(error);
 			},
 		});
 	}

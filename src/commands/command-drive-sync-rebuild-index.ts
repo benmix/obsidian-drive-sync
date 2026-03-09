@@ -12,16 +12,9 @@ export function registerDriveSyncRebuildIndexCommand(context: CommandContext) {
 		callback: async () => {
 			await runRemoteCommand(async ({ provider, client, scopeId }) => {
 				try {
-					await rebuildSyncIndex(
-						plugin.app,
-						localProvider,
-						provider,
-						client,
-						scopeId,
-						{
-							syncStrategy: plugin.settings.syncStrategy,
-						},
-					);
+					await rebuildSyncIndex(plugin.app, localProvider, provider, client, scopeId, {
+						syncStrategy: plugin.settings.syncStrategy,
+					});
 					new Notice(tr("notice.indexRebuilt"));
 				} catch (error) {
 					console.warn("Index rebuild failed.", error);

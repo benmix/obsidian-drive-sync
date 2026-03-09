@@ -18,8 +18,7 @@ export function migrateLoadedSettings(loaded: DriveSyncSettings): {
 	const loadedAccountEmail = normalizeString(loaded.remoteAccountEmail);
 	const normalizedSyncStrategy = normalizeSyncStrategy(loaded.syncStrategy);
 
-	const nextProviderId =
-		loadedProviderId || DEFAULT_SETTINGS.remoteProviderId;
+	const nextProviderId = loadedProviderId || DEFAULT_SETTINGS.remoteProviderId;
 	const providerId = isSupportedRemoteProviderId(nextProviderId)
 		? nextProviderId
 		: DEFAULT_SETTINGS.remoteProviderId;
@@ -41,10 +40,8 @@ export function migrateLoadedSettings(loaded: DriveSyncSettings): {
 		remoteAccountEmail: accountEmail,
 		remoteHasAuthSession: hasAuthSession,
 		syncStrategy: normalizedSyncStrategy ?? DEFAULT_SETTINGS.syncStrategy,
-		autoSyncEnabled:
-			loaded.autoSyncEnabled ?? DEFAULT_SETTINGS.autoSyncEnabled,
-		enableNetworkPolicy:
-			loaded.enableNetworkPolicy ?? DEFAULT_SETTINGS.enableNetworkPolicy,
+		autoSyncEnabled: loaded.autoSyncEnabled ?? DEFAULT_SETTINGS.autoSyncEnabled,
+		enableNetworkPolicy: loaded.enableNetworkPolicy ?? DEFAULT_SETTINGS.enableNetworkPolicy,
 	};
 
 	const migrated =

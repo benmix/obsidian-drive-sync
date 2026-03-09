@@ -1,32 +1,35 @@
 import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
-import type {
-	LocalFileSystem,
-	RemoteFileSystem,
-} from "../../contracts/filesystem/file-system";
+import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
 import type { ExcludeRule } from "../../contracts/sync/exclude";
 import type { ExecuteResult } from "../../contracts/sync/execution";
 import type { SyncState } from "../../contracts/sync/state";
 import type { StateStore } from "../../contracts/sync/state-store";
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
+import type { DriveSyncError } from "../../errors";
 import {
-	DEFAULT_SYNC_STRATEGY,
-	type SyncStrategy,
-} from "../../contracts/sync/strategy";
+	formatDriveSyncErrorForLog,
+	getDriveSyncErrorUserMessage,
+	getRetryDelayForDriveSyncError,
+	isAuthDriveSyncErrorCode,
+	isNotFoundDriveSyncError,
+	isPathConflictDriveSyncError,
+	normalizeUnknownDriveSyncError,
+	shouldPauseAuthForError,
+	shouldRetryBlockedDriveSyncErrorCode,
+} from "../../errors";
 import { normalizePath } from "../../filesystem/path";
-import {
-	INTERNAL_MAX_CONCURRENT_JOBS,
-	INTERNAL_MAX_RETRY_ATTEMPTS,
-} from "../../internal-config";
+import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../../internal-config";
 import { getBuiltInExcludeRules } from "../planner/exclude";
 import { reconcileSnapshot } from "../planner/reconciler";
 import { SyncIndexStore } from "../state/index-store";
-import { backoffMs, now } from "../support/utils";
+import { now } from "../support/utils";
 
 import { executeJobs } from "./executor";
 import { SyncJobQueue } from "./job-queue";
 
 type SyncEngineOptions = {
 	syncStrategy?: SyncStrategy;
-	onAuthError?: (message: string) => void;
+	onAuthError?: (error: DriveSyncError) => void;
 };
 
 const MAX_CONCURRENT_JOBS_CAP = 4;
@@ -67,10 +70,7 @@ export class SyncEngine {
 
 	async save(overrides?: Partial<SyncState>): Promise<void> {
 		const base = this.index.toJSON();
-		if (
-			overrides &&
-			("lastError" in overrides || "lastErrorAt" in overrides)
-		) {
+		if (overrides && ("lastError" in overrides || "lastErrorAt" in overrides)) {
 			this.index.setLastError(overrides.lastError, overrides.lastErrorAt);
 		}
 		if (overrides && "remoteEventCursor" in overrides) {
@@ -82,8 +82,7 @@ export class SyncEngine {
 			lastSyncAt: base.lastSyncAt,
 			lastError: overrides?.lastError ?? base.lastError,
 			lastErrorAt: overrides?.lastErrorAt ?? base.lastErrorAt,
-			remoteEventCursor:
-				overrides?.remoteEventCursor ?? base.remoteEventCursor,
+			remoteEventCursor: overrides?.remoteEventCursor ?? base.remoteEventCursor,
 			logs: base.logs,
 		};
 		await this.stateStore.save(state);
@@ -97,17 +96,14 @@ export class SyncEngine {
 			this.remoteFileSystem,
 			this.index.toJSON(),
 			{
-				syncStrategy:
-					this.options.syncStrategy ?? DEFAULT_SYNC_STRATEGY,
+				syncStrategy: this.options.syncStrategy ?? DEFAULT_SYNC_STRATEGY,
 				preferRemoteSeed: options?.preferRemoteSeed,
 			},
 		);
 		for (const entry of result.snapshot) {
 			this.index.setEntry(entry);
 		}
-		this.queue.enqueueMany(
-			this.mergeMoveJobs(this.filterJobs(result.jobs)),
-		);
+		this.queue.enqueueMany(this.mergeMoveJobs(this.filterJobs(result.jobs)));
 		await this.save();
 		return {
 			jobsPlanned: this.queue.list().length,
@@ -127,9 +123,7 @@ export class SyncEngine {
 		}
 		const startedAt = now();
 		const nowTs = now();
-		const dueJobs = jobs.filter(
-			(job) => job.status !== "blocked" && job.nextRunAt <= nowTs,
-		);
+		const dueJobs = jobs.filter((job) => job.status !== "blocked" && job.nextRunAt <= nowTs);
 		const pendingJobs = jobs.filter((job) => job.nextRunAt > nowTs);
 		if (dueJobs.length === 0) {
 			return { jobsExecuted: 0, entriesUpdated: 0 };
@@ -152,9 +146,7 @@ export class SyncEngine {
 		for (let index = 0; index < buckets.length; index += concurrency) {
 			const parallelBuckets = buckets.slice(index, index + concurrency);
 			const bucketResults = await Promise.all(
-				parallelBuckets.map((bucket) =>
-					this.executeBucketSequentially(bucket, retryJobs),
-				),
+				parallelBuckets.map((bucket) => this.executeBucketSequentially(bucket, retryJobs)),
 			);
 			for (const results of bucketResults) {
 				for (const result of results) {
@@ -165,10 +157,7 @@ export class SyncEngine {
 				}
 			}
 			if (this.authPaused) {
-				this.index.addLog(
-					"Authentication required. Sync paused.",
-					"auth",
-				);
+				this.index.addLog("Authentication required. Sync paused.", "auth");
 				break;
 			}
 		}
@@ -251,10 +240,7 @@ export class SyncEngine {
 			for (const prefix of prefixes) {
 				const from = normalizePath(prefix.from);
 				const to = normalizePath(prefix.to);
-				if (
-					entry.relPath === from ||
-					entry.relPath.startsWith(`${from}/`)
-				) {
+				if (entry.relPath === from || entry.relPath.startsWith(`${from}/`)) {
 					const suffix = entry.relPath.slice(from.length);
 					const nextPath = `${to}${suffix}`;
 					this.index.removeEntry(entry.relPath);
@@ -295,10 +281,7 @@ export class SyncEngine {
 	}
 
 	private mergeMoveJobs(jobs: SyncJob[]): SyncJob[] {
-		const byRemoteId = new Map<
-			string,
-			{ move: SyncJob; uploads: SyncJob[] }
-		>();
+		const byRemoteId = new Map<string, { move: SyncJob; uploads: SyncJob[] }>();
 		const remaining: SyncJob[] = [];
 
 		for (const job of jobs) {
@@ -362,31 +345,26 @@ export class SyncEngine {
 		return results;
 	}
 
-	private async executeJob(
-		job: SyncJob,
-		retryJobs: SyncJob[],
-	): Promise<ExecuteResult | null> {
+	private async executeJob(job: SyncJob, retryJobs: SyncJob[]): Promise<ExecuteResult | null> {
 		try {
 			const activeJob: SyncJob = {
 				...job,
 				status: "processing",
 				lockedAt: now(),
 				lastError: undefined,
+				lastErrorCode: undefined,
 			};
-			const result = await executeJobs(
-				this.localFileSystem,
-				this.remoteFileSystem,
-				[activeJob],
-			);
+			const result = await executeJobs(this.localFileSystem, this.remoteFileSystem, [
+				activeJob,
+			]);
 			this.index.addLog(`Done: ${describeJob(job)}`, "task");
 			return result;
 		} catch (error) {
-			const message = error instanceof Error ? error.message : "retry";
-			if (isNotFoundError(message) && job.op === "delete-remote") {
-				this.index.addLog(
-					`Done (idempotent): ${describeJob(job)} (${message})`,
-					"task",
-				);
+			const normalized = normalizeUnknownDriveSyncError(error);
+			const userMessage = getDriveSyncErrorUserMessage(normalized);
+			const logMessage = formatDriveSyncErrorForLog(normalized);
+			if (isNotFoundDriveSyncError(normalized) && job.op === "delete-remote") {
+				this.index.addLog(`Done (idempotent): ${describeJob(job)} (${logMessage})`, "task");
 				return {
 					entries: [
 						{
@@ -409,62 +387,60 @@ export class SyncEngine {
 					downloadBytes: 0,
 				};
 			}
-			if (isNotFoundError(message) && job.op !== "upload") {
-				this.index.addLog(
-					`Blocked: ${describeJob(job)} (${message})`,
-					"task",
-				);
+			if (isNotFoundDriveSyncError(normalized) && job.op !== "upload") {
+				this.index.addLog(`Blocked: ${describeJob(job)} (${logMessage})`, "task");
 				retryJobs.push({
 					...job,
 					status: "blocked",
 					lockedAt: undefined,
-					lastError: message,
+					lastError: userMessage,
+					lastErrorCode: normalized.code,
 				});
 				return null;
 			}
-			if (isAuthError(message)) {
+			if (shouldPauseAuthForError(normalized)) {
 				this.authPaused = true;
-				this.options.onAuthError?.(message);
-				this.index.addLog(
-					`Auth blocked: ${describeJob(job)} (${message})`,
-					"auth",
-				);
+				this.options.onAuthError?.(normalized);
+				this.index.addLog(`Auth blocked: ${describeJob(job)} (${logMessage})`, "auth");
 				retryJobs.push({
 					...job,
 					status: "blocked",
 					lockedAt: undefined,
-					lastError: message,
+					lastError: userMessage,
+					lastErrorCode: normalized.code,
 				});
 				return null;
 			}
-			if (isPathConflictError(message)) {
+			if (isPathConflictDriveSyncError(normalized)) {
 				this.index.addLog(
-					`Blocked (path conflict): ${describeJob(job)}`,
+					`Blocked (path conflict): ${describeJob(job)} (${logMessage})`,
 					"task",
 				);
 				retryJobs.push({
 					...job,
 					status: "blocked",
 					lockedAt: undefined,
-					lastError: message,
+					lastError: userMessage,
+					lastErrorCode: normalized.code,
 				});
 				return null;
 			}
 			if (job.attempt + 1 >= this.maxRetryAttempts) {
 				this.index.addLog(
-					`Blocked (max retries): ${describeJob(job)} (${message})`,
+					`Blocked (max retries): ${describeJob(job)} (${logMessage})`,
 					"task",
 				);
 				retryJobs.push({
 					...job,
 					status: "blocked",
 					lockedAt: undefined,
-					lastError: message,
+					lastError: userMessage,
+					lastErrorCode: normalized.code,
 				});
 				return null;
 			}
 			const nextAttempt = job.attempt + 1;
-			const delay = backoffForError(message, nextAttempt);
+			const delay = getRetryDelayForDriveSyncError(normalized, nextAttempt);
 			this.index.addLog(
 				`Retry scheduled: ${describeJob(job)} (#${nextAttempt}, ${Math.ceil(delay / 1000)}s)`,
 				"task",
@@ -473,10 +449,11 @@ export class SyncEngine {
 				...job,
 				attempt: nextAttempt,
 				nextRunAt: now() + delay,
-				reason: message,
+				reason: normalized.code,
 				status: "pending",
 				lockedAt: undefined,
-				lastError: message,
+				lastError: userMessage,
+				lastErrorCode: normalized.code,
 			});
 			return null;
 		}
@@ -495,7 +472,11 @@ export class SyncEngine {
 			}
 			if (
 				job.status === "blocked" &&
-				shouldRetryBlockedJob(job.lastError)
+				(shouldRetryBlockedDriveSyncErrorCode(job.lastErrorCode) ||
+					(job.lastError &&
+						shouldRetryBlockedDriveSyncErrorCode(
+							normalizeUnknownDriveSyncError(job.lastError).code,
+						)))
 			) {
 				return {
 					...job,
@@ -515,20 +496,21 @@ export class SyncEngine {
 
 	private unblockAuthJobs(jobs: SyncJob[]): void {
 		for (const job of jobs) {
-			if (job.status !== "blocked" || !job.lastError) {
+			if (job.status !== "blocked") {
 				continue;
 			}
-			if (isAuthError(job.lastError)) {
+			if (
+				isAuthDriveSyncErrorCode(job.lastErrorCode) ||
+				(job.lastError &&
+					isAuthDriveSyncErrorCode(normalizeUnknownDriveSyncError(job.lastError).code))
+			) {
 				job.status = "pending";
 				job.lockedAt = undefined;
 			}
 		}
 	}
 
-	private cleanupJobs(
-		jobs: SyncJob[],
-		entries: Record<string, SyncEntry>,
-	): SyncJob[] {
+	private cleanupJobs(jobs: SyncJob[], entries: Record<string, SyncEntry>): SyncJob[] {
 		const cleaned: SyncJob[] = [];
 		for (const job of jobs) {
 			if (!this.isJobValid(job)) {
@@ -537,10 +519,7 @@ export class SyncEngine {
 			}
 			const entry = entries[job.path];
 			if (entry?.tombstone && job.op === "upload") {
-				this.index.addLog(
-					`Dropped upload for tombstone: ${job.id}`,
-					"cleanup",
-				);
+				this.index.addLog(`Dropped upload for tombstone: ${job.id}`, "cleanup");
 				continue;
 			}
 			cleaned.push(job);
@@ -588,66 +567,4 @@ function countJobStates(jobs: SyncJob[]): {
 		}
 	}
 	return counts;
-}
-function isAuthError(message: string): boolean {
-	const normalized = message.toLowerCase();
-	return (
-		normalized.includes("auth") ||
-		normalized.includes("token") ||
-		normalized.includes("unauthorized") ||
-		normalized.includes("forbidden") ||
-		normalized.includes("login")
-	);
-}
-
-function isNotFoundError(message: string): boolean {
-	const normalized = message.toLowerCase();
-	return normalized.includes("not found") || normalized.includes("404");
-}
-
-function isPathConflictError(message: string): boolean {
-	const normalized = message.toLowerCase();
-	if (normalized.includes("draft revision already exists for this link")) {
-		return false;
-	}
-	return (
-		normalized.includes("already exists") ||
-		normalized.includes("file or folder with that name already exists") ||
-		normalized.includes("remote path conflict")
-	);
-}
-
-function backoffForError(message: string, attempt: number): number {
-	const normalized = message.toLowerCase();
-	if (isNotFoundError(normalized)) {
-		return Math.min(10000 * attempt, 60000);
-	}
-	if (
-		normalized.includes("rate") ||
-		normalized.includes("throttle") ||
-		normalized.includes("too many")
-	) {
-		return Math.min(30000 * attempt, 300000);
-	}
-	if (
-		normalized.includes("network") ||
-		normalized.includes("timeout") ||
-		normalized.includes("temporar") ||
-		normalized.includes("503") ||
-		normalized.includes("500")
-	) {
-		return backoffMs(attempt);
-	}
-	return Math.min(5000 * attempt, 60000);
-}
-
-function shouldRetryBlockedJob(lastError?: string): boolean {
-	if (!lastError) {
-		return false;
-	}
-	const normalized = lastError.toLowerCase();
-	return (
-		normalized.includes("session key is missing openpgp metadata") ||
-		normalized.includes("missing block file")
-	);
 }

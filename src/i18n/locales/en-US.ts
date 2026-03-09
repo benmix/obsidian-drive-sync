@@ -32,42 +32,29 @@ export const EN = {
 	"notice.autoSyncFailed": "Auto sync failed. Check the console for details.",
 	"notice.autoSyncPaused": "Auto sync paused.",
 	"notice.autoSyncResumed": "Auto sync resumed.",
-	"notice.syncPlanningFailed":
-		"Sync planning failed. Check the console for details.",
-	"notice.plannedJobsAcrossEntries":
-		"Planned {jobs} jobs across {entries} entries.",
+	"notice.syncPlanningFailed": "Sync planning failed. Check the console for details.",
+	"notice.plannedJobsAcrossEntries": "Planned {jobs} jobs across {entries} entries.",
 	"notice.remotePollQueuedJobs": "Remote poll queued {jobs} jobs.",
-	"notice.remotePollFailed":
-		"Remote poll failed. Check the console for details.",
-	"notice.preSyncCheckFailed":
-		"Pre-sync check failed. Check the console for details.",
-	"notice.executedJobsUpdatedEntries":
-		"Executed {jobs} jobs, updated {entries} entries.",
+	"notice.remotePollFailed": "Remote poll failed. Check the console for details.",
+	"notice.preSyncCheckFailed": "Pre-sync check failed. Check the console for details.",
+	"notice.executedJobsUpdatedEntries": "Executed {jobs} jobs, updated {entries} entries.",
 	"notice.indexRebuilt": "Sync index rebuilt.",
-	"notice.indexRebuildFailed":
-		"Index rebuild failed. Check the console for details.",
+	"notice.indexRebuildFailed": "Index rebuild failed. Check the console for details.",
 	"notice.providerConnectionReset": "{provider} connection reset.",
-	"notice.downloadedFilesFromProvider":
-		"Downloaded {count} files from {provider}.",
-	"notice.vaultRestoreFailed":
-		"Vault restore failed. Check the console for details.",
-	"notice.plannedSyncFailed":
-		"Planned sync failed. Check the console for details.",
+	"notice.downloadedFilesFromProvider": "Downloaded {count} files from {provider}.",
+	"notice.vaultRestoreFailed": "Vault restore failed. Check the console for details.",
+	"notice.plannedSyncFailed": "Planned sync failed. Check the console for details.",
 	"notice.uploadedFilesToProvider": "Uploaded {count} files to {provider}.",
-	"notice.vaultSyncFailed":
-		"Vault sync failed. Check the console for details.",
+	"notice.vaultSyncFailed": "Vault sync failed. Check the console for details.",
 	"notice.remoteOpsValidated": "Remote operations validated successfully.",
 	"notice.remoteValidationFailedStep": "Remote validation failed: {step}",
 	"notice.unknownStep": "unknown step",
-	"notice.remoteValidationFailed":
-		"Remote validation failed. Check the console for details.",
-	"notice.selectRemoteFolderFirst":
-		"Select a remote folder in settings first.",
+	"notice.remoteValidationFailed": "Remote validation failed. Check the console for details.",
+	"notice.selectRemoteFolderFirst": "Select a remote folder in settings first.",
 	"notice.signInToProviderFirst": "Sign in to {provider} first.",
 	"notice.unableToConnectProvider": "Unable to connect to {provider}.",
 	"notice.diagnosticsExportedTo": "Diagnostics exported to {path}.",
-	"notice.diagnosticsExportFailed":
-		"Diagnostics export failed. Check the console for details.",
+	"notice.diagnosticsExportFailed": "Diagnostics export failed. Check the console for details.",
 
 	"login.title": "Sign in to {provider}",
 	"login.email": "Email",
@@ -75,8 +62,7 @@ export const EN = {
 	"login.password": "Password",
 	"login.passwordPlaceholder": "Enter your password",
 	"login.twoFactorCode": "Two-factor code",
-	"login.twoFactorDesc":
-		"Leave empty if two-factor authentication is not enabled.",
+	"login.twoFactorDesc": "Leave empty if two-factor authentication is not enabled.",
 	"login.twoFactorPlaceholder": "123456",
 	"login.mailboxPassword": "Mailbox password",
 	"login.mailboxPasswordDesc":
@@ -95,34 +81,29 @@ export const EN = {
 	"settings.remoteFolderDesc":
 		"Choose the target {provider} folder path. Validation runs automatically.",
 	"settings.remoteFolderChoose": "Choose folder",
-	"settings.remoteFolderPath.idConfigured":
-		"(ID configured, reselect to show path)",
+	"settings.remoteFolderPath.idConfigured": "(ID configured, reselect to show path)",
 	"settings.remoteFolderPath.notSelected": "(not selected)",
 	"settings.excludedPaths": "Excluded paths",
 	"settings.builtInRules": "Built-in rules: {rules}",
 	"settings.noBuiltInRules": "No built-in exclude rules.",
 	"settings.syncStrategy": "Sync strategy",
-	"settings.syncStrategyDesc":
-		"Choose direction/authority for automatic sync decisions.",
+	"settings.syncStrategyDesc": "Choose direction/authority for automatic sync decisions.",
 	"settings.syncStrategy.bidirectional": "Bidirectional (default)",
 	"settings.syncStrategy.localWin": "Local authority",
 	"settings.syncStrategy.remoteWin": "Remote authority",
 	"settings.autoSync": "Enable auto sync",
-	"settings.autoSyncDesc":
-		"Schedule periodic sync checks and respond to local changes.",
+	"settings.autoSyncDesc": "Schedule periodic sync checks and respond to local changes.",
 	"settings.networkPolicy": "Experimental: network policy",
 	"settings.networkPolicyDesc":
 		"Gate sync runs by online status and transient-network cooldown. Disabled by default.",
-	"settings.authStatus.pendingValidation":
-		"Session stored. Validation pending.",
+	"settings.authStatus.pendingValidation": "Session stored. Validation pending.",
 	"settings.authStatus.signedInAs": "Signed in as {email}.",
 	"settings.authStatus.signedInToProvider": "Signed in to {provider}.",
 	"settings.authStatus.needsAttention":
 		"Session needs attention. Sign in again to restore access.",
 	"settings.authStatus.needsAttentionCommand":
 		"Session needs attention. Sign in again from the command palette.",
-	"settings.authStatus.signInHint":
-		"Sign in here to store a session locally.",
+	"settings.authStatus.signInHint": "Sign in here to store a session locally.",
 	"settings.validation.checking": "Validation: checking...",
 	"settings.validation.result": "Validation: {message}",
 	"settings.validation.selectFolderFirst": "Select a folder first.",
@@ -130,29 +111,24 @@ export const EN = {
 	"remoteFolder.title": "Select remote folder",
 	"remoteFolder.loading": "Loading folders...",
 	"remoteFolder.createFolder": "Create folder",
-	"remoteFolder.createFolderDesc":
-		"Create a folder path under the remote root and select it.",
+	"remoteFolder.createFolderDesc": "Create a folder path under the remote root and select it.",
 	"remoteFolder.createPlaceholder": "notes/obsidian/sync",
 	"remoteFolder.creating": "Creating...",
 	"remoteFolder.createAndSelect": "Create and select",
 	"remoteFolder.noFolders": "No folders available to select.",
 	"remoteFolder.noFolderAvailable": "No folder available to select.",
 	"remoteFolder.selectFolder": "Select folder",
-	"remoteFolder.selectFolderDesc":
-		"Choose a folder path from your remote provider.",
+	"remoteFolder.selectFolderDesc": "Choose a folder path from your remote provider.",
 	"remoteFolder.select": "Select",
 	"remoteFolder.selectFolderFirst": "Select a folder first.",
 	"remoteFolder.refreshing": "Refreshing...",
 	"remoteFolder.refresh": "Refresh",
-	"remoteFolder.enterPathExample":
-		"Enter a folder path, for example notes/obsidian/sync.",
-	"remoteFolder.unableBeforeLoaded":
-		"Unable to create folder before remote folders are loaded.",
+	"remoteFolder.enterPathExample": "Enter a folder path, for example notes/obsidian/sync.",
+	"remoteFolder.unableBeforeLoaded": "Unable to create folder before remote folders are loaded.",
 	"remoteFolder.providerNoCreateSupport":
 		"Current remote provider does not support folder creation.",
 	"remoteFolder.createdFolderNoId": "Created folder has no ID.",
-	"remoteFolder.createFailed":
-		"Failed to create folder. Check console for details.",
+	"remoteFolder.createFailed": "Failed to create folder. Check console for details.",
 	"remoteFolder.unableRefreshNow": "Unable to refresh folders right now.",
 	"remoteFolder.listRefreshed": "Folder list refreshed.",
 	"remoteFolder.listRefreshFailed": "Failed to refresh folder list.",
@@ -160,8 +136,7 @@ export const EN = {
 	"remoteFolder.optionRoot": "/ (root)",
 	"remoteFolder.remoteRoot": "Remote root",
 	"remoteFolder.unableList": "Unable to list remote folders.",
-	"remoteFolder.unableLoadProviderRoot":
-		"Unable to load the {provider} root folder.",
+	"remoteFolder.unableLoadProviderRoot": "Unable to load the {provider} root folder.",
 
 	"conflicts.title": "Resolve sync conflicts",
 	"conflicts.loading": "Loading conflicts...",
@@ -174,8 +149,7 @@ export const EN = {
 	"conflicts.remoteRevisionUnknown": "Remote revision: unknown",
 	"conflicts.clearMarker": "Clear marker",
 	"conflicts.autoSync": "Auto sync",
-	"conflicts.autoSyncPaused":
-		"Auto sync is paused while conflicts are resolved.",
+	"conflicts.autoSyncPaused": "Auto sync is paused while conflicts are resolved.",
 	"conflicts.autoSyncRunning": "Auto sync is running.",
 	"conflicts.resumeAutoSync": "Resume auto sync",
 	"conflicts.pauseAutoSync": "Pause auto sync",
@@ -233,13 +207,11 @@ export const EN = {
 	"status.recentTasks": "Recent task status",
 	"status.recentLogs": "Recent logs",
 	"status.syncLogs": "Sync logs",
-	"status.jobsByStateValue":
-		"pending {pending}, processing {processing}, blocked {blocked}",
+	"status.jobsByStateValue": "pending {pending}, processing {processing}, blocked {blocked}",
 	"status.nextRetryValue": "{time} ({count})",
 	"status.lastRunDurationMs": "{value} ms",
 	"status.lastRunThroughputValue": "{value}/s",
 	"status.lastRunBytesValue": "{up} up / {down} down",
-	"status.queuePeaksValue":
-		"depth {depth}, pending {pending}, blocked {blocked}",
+	"status.queuePeaksValue": "depth {depth}, pending {pending}, blocked {blocked}",
 	"status.attemptValue": "Attempt {attempt} · {retryAt}",
 } as const;

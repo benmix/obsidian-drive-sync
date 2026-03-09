@@ -68,6 +68,59 @@ If your plugin does not need CSS, delete this file.
 	margin-top: 4px;
 	font-size: 12px;
 	color: var(--text-muted);
+	line-height: 1.5;
+	word-break: break-word;
+}
+
+.drive-sync-account-status.is-error {
+	margin-top: 10px;
+	padding: 10px 12px;
+	border: 1px solid
+		color-mix(
+			in srgb,
+			var(--color-orange) 58%,
+			var(--background-modifier-border) 42%
+		);
+	border-radius: 10px;
+	color: var(--text-normal);
+	background: color-mix(
+		in srgb,
+		var(--color-orange) 10%,
+		var(--background-primary)
+	);
+}
+
+.drive-sync-setting-callout {
+	margin-bottom: 14px;
+	padding: 14px 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 14px;
+	background: linear-gradient(
+		180deg,
+		color-mix(
+			in srgb,
+			var(--background-secondary) 92%,
+			var(--interactive-accent) 8%
+		),
+		var(--background-primary)
+	);
+}
+
+.drive-sync-setting-callout.is-auth-warning {
+	border-color: color-mix(
+		in srgb,
+		var(--color-orange) 52%,
+		var(--background-modifier-border) 48%
+	);
+	background: linear-gradient(
+		180deg,
+		color-mix(
+			in srgb,
+			var(--color-orange) 12%,
+			var(--background-secondary)
+		),
+		var(--background-primary)
+	);
 }
 
 .drive-sync-brand-name {
@@ -133,26 +186,29 @@ If your plugin does not need CSS, delete this file.
 
 .drive-sync-status-header {
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 12px;
-	padding: 14px;
+	border-radius: 18px;
+	padding: 18px;
 	background: linear-gradient(
 		180deg,
 		color-mix(
 			in srgb,
-			var(--background-secondary) 88%,
-			var(--interactive-accent) 12%
+			var(--background-secondary) 80%,
+			var(--interactive-accent) 20%
 		),
-		var(--background-secondary)
+		color-mix(in srgb, var(--background-secondary) 92%, black 8%)
 	);
+	box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
 }
 
 .drive-sync-status-header h2 {
 	margin: 0;
+	font-size: 30px;
+	letter-spacing: -0.04em;
 }
 
 .drive-sync-status-header-meta {
-	margin-top: 6px;
-	font-size: 12px;
+	margin-top: 8px;
+	font-size: 13px;
 	color: var(--text-muted);
 }
 
@@ -167,11 +223,12 @@ If your plugin does not need CSS, delete this file.
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	padding: 4px 10px;
+	padding: 7px 12px;
 	border-radius: 999px;
-	font-size: 12px;
+	font-size: 13px;
 	border: 1px solid var(--background-modifier-border);
-	background: var(--background-primary);
+	background: color-mix(in srgb, var(--background-primary) 84%, transparent);
+	backdrop-filter: blur(6px);
 }
 
 .drive-sync-status-chip.is-ok {
@@ -179,6 +236,11 @@ If your plugin does not need CSS, delete this file.
 		in srgb,
 		var(--color-green) 60%,
 		var(--background-modifier-border) 40%
+	);
+	background: color-mix(
+		in srgb,
+		var(--color-green) 10%,
+		var(--background-primary)
 	);
 }
 
@@ -188,6 +250,11 @@ If your plugin does not need CSS, delete this file.
 		var(--color-orange) 70%,
 		var(--background-modifier-border) 30%
 	);
+	background: color-mix(
+		in srgb,
+		var(--color-orange) 12%,
+		var(--background-primary)
+	);
 }
 
 .drive-sync-status-chip.is-active {
@@ -195,6 +262,11 @@ If your plugin does not need CSS, delete this file.
 		in srgb,
 		var(--interactive-accent) 70%,
 		var(--background-modifier-border) 30%
+	);
+	background: color-mix(
+		in srgb,
+		var(--interactive-accent) 14%,
+		var(--background-primary)
 	);
 }
 
@@ -219,26 +291,69 @@ If your plugin does not need CSS, delete this file.
 	padding: 0;
 }
 
+.drive-sync-status-alert {
+	margin-top: 14px;
+	padding: 14px 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 16px;
+	background: color-mix(in srgb, var(--background-primary) 88%, transparent);
+}
+
+.drive-sync-status-alert.is-warn {
+	border-color: color-mix(
+		in srgb,
+		var(--color-orange) 58%,
+		var(--background-modifier-border) 42%
+	);
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--color-orange) 12%, var(--background-primary)),
+		color-mix(in srgb, var(--background-primary) 92%, black 8%)
+	);
+}
+
+.drive-sync-status-alert-label {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.drive-sync-status-alert-message {
+	margin-top: 8px;
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 1.45;
+	word-break: break-word;
+}
+
 .drive-sync-status-summary {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 8px;
+	gap: 10px;
 }
 
 .drive-sync-status-card {
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 10px;
-	padding: 10px;
-	background: var(--background-primary-alt);
+	border-radius: 14px;
+	padding: 12px;
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--background-primary-alt) 90%, white 10%),
+		var(--background-primary-alt)
+	);
 }
 
 .drive-sync-status-card-label {
 	font-size: 12px;
 	color: var(--text-muted);
+	letter-spacing: 0.02em;
 }
 
 .drive-sync-status-card-value {
 	margin-top: 6px;
+	font-size: 16px;
 	font-weight: 600;
 	line-height: 1.35;
 	word-break: break-word;
@@ -265,14 +380,19 @@ If your plugin does not need CSS, delete this file.
 
 .drive-sync-status-section {
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 10px;
-	padding: 10px;
-	background: var(--background-primary);
+	border-radius: 14px;
+	padding: 14px;
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--background-primary) 94%, white 6%),
+		var(--background-primary)
+	);
 }
 
 .drive-sync-status-section h3 {
-	margin: 0 0 10px;
-	font-size: 14px;
+	margin: 0 0 12px;
+	font-size: 15px;
+	letter-spacing: -0.01em;
 }
 
 .drive-sync-status-empty {
@@ -296,9 +416,9 @@ If your plugin does not need CSS, delete this file.
 	display: grid;
 	grid-template-columns: minmax(120px, 180px) minmax(70px, 110px) 1fr;
 	gap: 8px;
-	padding: 6px;
+	padding: 8px;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
+	border-radius: 10px;
 	font-size: 12px;
 	background: var(--background-primary-alt);
 }
@@ -322,9 +442,9 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
-	padding: 8px;
+	padding: 10px;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
+	border-radius: 12px;
 	font-size: 12px;
 	background: var(--background-primary-alt);
 }
@@ -401,9 +521,9 @@ If your plugin does not need CSS, delete this file.
 }
 
 .drive-sync-status-conflict-item {
-	padding: 6px 8px;
+	padding: 8px 10px;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
+	border-radius: 10px;
 	font-size: 12px;
 	background: var(--background-primary-alt);
 	word-break: break-word;
@@ -416,9 +536,9 @@ If your plugin does not need CSS, delete this file.
 }
 
 .drive-sync-task-status-row {
-	padding: 6px 8px;
+	padding: 8px 10px;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
+	border-radius: 10px;
 	background: var(--background-primary-alt);
 	font-size: 12px;
 }

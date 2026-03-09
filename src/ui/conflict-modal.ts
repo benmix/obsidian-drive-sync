@@ -21,7 +21,6 @@ export class SyncConflictModal extends Modal {
 		this.plugin = plugin;
 	}
 
-
 	async onOpen() {
 		await this.loadConflicts();
 		this.render();
@@ -37,8 +36,7 @@ export class SyncConflictModal extends Modal {
 			.map((entry) => ({
 				path: entry.relPath,
 				remoteRev: entry.remoteRev ?? entry.conflict?.remoteRev,
-				localMtimeMs:
-					entry.localMtimeMs ?? entry.conflict?.localMtimeMs,
+				localMtimeMs: entry.localMtimeMs ?? entry.conflict?.localMtimeMs,
 			}));
 		this.loading = false;
 	}
@@ -113,9 +111,7 @@ export class SyncConflictModal extends Modal {
 			return;
 		}
 		const { contentEl } = this;
-		const control = new Setting(contentEl).setName(
-			tr("conflicts.autoSync"),
-		);
+		const control = new Setting(contentEl).setName(tr("conflicts.autoSync"));
 		control.setDesc(
 			this.plugin.isAutoSyncPaused()
 				? tr("conflicts.autoSyncPaused")

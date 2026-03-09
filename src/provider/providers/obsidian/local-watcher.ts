@@ -66,36 +66,40 @@ export class ObsidianLocalFileSystemWatcher {
 	}
 
 	private onCreate = (file: TAbstractFile) => {
-		this.queue({
+		const change: LocalChange = {
 			type: "create",
 			path: normalizePath(file.path),
 			entryType: file instanceof TFolder ? "folder" : "file",
-		});
+		};
+		this.queue(change);
 	};
 
 	private onModify = (file: TAbstractFile) => {
-		this.queue({
+		const change: LocalChange = {
 			type: "modify",
 			path: normalizePath(file.path),
 			entryType: file instanceof TFile ? "file" : "folder",
-		});
+		};
+		this.queue(change);
 	};
 
 	private onDelete = (file: TAbstractFile) => {
-		this.queue({
+		const change: LocalChange = {
 			type: "delete",
 			path: normalizePath(file.path),
 			entryType: file instanceof TFolder ? "folder" : "file",
-		});
+		};
+		this.queue(change);
 	};
 
 	private onRename = (file: TAbstractFile, oldPath: string) => {
-		this.queue({
+		const change: LocalChange = {
 			type: "rename",
 			from: normalizePath(oldPath),
 			to: normalizePath(file.path),
 			entryType: file instanceof TFolder ? "folder" : "file",
-		});
+		};
+		this.queue(change);
 	};
 
 	private queue(change: LocalChange) {

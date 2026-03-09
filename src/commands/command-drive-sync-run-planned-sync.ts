@@ -4,9 +4,7 @@ import type { CommandContext } from "../contracts/plugin/command-context";
 import { tr } from "../i18n";
 import { runPlannedSync } from "../runtime/use-cases/sync-workflows";
 
-export function registerDriveSyncRunPlannedSyncCommand(
-	context: CommandContext,
-) {
+export function registerDriveSyncRunPlannedSyncCommand(context: CommandContext) {
 	const { plugin, localProvider, runRemoteCommand } = context;
 	plugin.addCommand({
 		id: "drive-sync-run-planned-sync",

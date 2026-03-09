@@ -22,30 +22,31 @@ export class SyncStatusModal extends Modal {
 
 		const provider = this.plugin.getRemoteProvider();
 		const state = await this.plugin.loadSyncState();
-		const conflicts = Object.values(state.entries ?? {}).filter(
-			(entry) => entry.conflict,
-		);
+		const conflicts = Object.values(state.entries ?? {}).filter((entry) => entry.conflict);
 		const entriesTracked = Object.keys(state.entries ?? {}).length;
 		const logs = state.logs ?? [];
 		const taskLogs = logs.filter((entry) => entry.context === "task");
 		const jobs = state.jobs ?? [];
 		const nowTs = Date.now();
+		const authPaused = this.plugin.isAuthPaused();
+		const autoSyncPaused = this.plugin.isAutoSyncPaused() || authPaused;
 
 		const autoSyncStatus = this.plugin.settings.autoSyncEnabled
-			? this.plugin.isAutoSyncPaused()
+			? autoSyncPaused
 				? tr("status.autoSync.paused")
 				: tr("status.autoSync.running")
 			: tr("status.autoSync.disabled");
 		const syncActivity = this.plugin.isSyncRunning()
 			? tr("status.inProgress")
 			: tr("status.idle");
-		const authStatus = this.plugin.isAuthPaused()
-			? (this.plugin.getLastAuthError() ?? tr("status.authPaused"))
+		const authStatus = authPaused
+			? tr("status.authPaused")
 			: this.plugin.hasRemoteAuthSession()
 				? provider.isSessionValidated()
 					? tr("status.authOk")
 					: tr("status.authPending")
 				: tr("status.signedOut");
+		const authError = authPaused ? this.plugin.getLastAuthError() : undefined;
 
 		const queueMeta = this.collectQueueMeta(jobs, nowTs);
 
@@ -58,9 +59,7 @@ export class SyncStatusModal extends Modal {
 		header.createDiv({
 			cls: "drive-sync-status-header-meta",
 			text: `${tr("status.lastSync")}: ${
-				state.lastSyncAt
-					? new Date(state.lastSyncAt).toLocaleString()
-					: tr("status.never")
+				state.lastSyncAt ? new Date(state.lastSyncAt).toLocaleString() : tr("status.never")
 			}`,
 		});
 		const chips = header.createDiv({ cls: "drive-sync-status-chips" });
@@ -70,20 +69,15 @@ export class SyncStatusModal extends Modal {
 			syncActivity,
 			this.plugin.isSyncRunning() ? "active" : "idle",
 		);
-		this.renderChip(
-			chips,
-			tr("status.authStatus"),
-			authStatus,
-			this.plugin.isAuthPaused() ? "warn" : "ok",
-		);
+		this.renderChip(chips, tr("status.authStatus"), authStatus, authPaused ? "warn" : "ok");
 		this.renderChip(
 			chips,
 			tr("status.autoSync"),
 			autoSyncStatus,
-			this.plugin.isAutoSyncPaused() ? "warn" : "ok",
+			autoSyncPaused ? "warn" : "ok",
 		);
 
-		if (this.plugin.settings.autoSyncEnabled) {
+		if (this.plugin.settings.autoSyncEnabled && !authPaused) {
 			const controlWrap = header.createDiv({
 				cls: "drive-sync-status-control",
 			});
@@ -104,27 +98,29 @@ export class SyncStatusModal extends Modal {
 			});
 		}
 
+		if (authError) {
+			const authAlert = header.createDiv({
+				cls: "drive-sync-status-alert is-warn",
+			});
+			authAlert.createDiv({
+				cls: "drive-sync-status-alert-label",
+				text: tr("status.authStatus"),
+			});
+			authAlert.createDiv({
+				cls: "drive-sync-status-alert-message",
+				text: authError,
+			});
+		}
+
 		const summary = layout.createDiv({ cls: "drive-sync-status-summary" });
-		this.renderSummaryCard(
-			summary,
-			tr("status.jobsQueued"),
-			String(jobs.length),
-		);
+		this.renderSummaryCard(summary, tr("status.jobsQueued"), String(jobs.length));
 		this.renderSummaryCard(
 			summary,
 			tr("status.syncStrategy"),
 			this.plugin.settings.syncStrategy,
 		);
-		this.renderSummaryCard(
-			summary,
-			tr("status.entriesTracked"),
-			String(entriesTracked),
-		);
-		this.renderSummaryCard(
-			summary,
-			tr("status.conflicts"),
-			String(conflicts.length),
-		);
+		this.renderSummaryCard(summary, tr("status.entriesTracked"), String(entriesTracked));
+		this.renderSummaryCard(summary, tr("status.conflicts"), String(conflicts.length));
 		this.renderSummaryCard(
 			summary,
 			`${tr("status.jobsByState")} · ${tr("status.pending")}`,
@@ -169,9 +165,7 @@ export class SyncStatusModal extends Modal {
 				summary,
 				tr("status.lastRunDuration"),
 				tr("status.lastRunDurationMs", {
-					value: metrics.lastRunDurationMs
-						? Math.round(metrics.lastRunDurationMs)
-						: 0,
+					value: metrics.lastRunDurationMs ? Math.round(metrics.lastRunDurationMs) : 0,
 				}),
 			);
 			this.renderSummaryCard(
@@ -179,9 +173,7 @@ export class SyncStatusModal extends Modal {
 				tr("status.lastRunThroughput"),
 				metrics.lastRunThroughputBytesPerSec
 					? tr("status.lastRunThroughputValue", {
-							value: formatBytes(
-								metrics.lastRunThroughputBytesPerSec,
-							),
+							value: formatBytes(metrics.lastRunThroughputBytesPerSec),
 						})
 					: tr("status.lastRunThroughputValue", { value: "0 B" }),
 			);
@@ -199,10 +191,7 @@ export class SyncStatusModal extends Modal {
 			cls: "drive-sync-status-sections",
 		});
 
-		const queueSection = this.renderSection(
-			sections,
-			tr("status.queueDetails"),
-		);
+		const queueSection = this.renderSection(sections, tr("status.queueDetails"));
 		if (jobs.length === 0) {
 			queueSection.createDiv({
 				cls: "drive-sync-status-empty",
@@ -224,10 +213,7 @@ export class SyncStatusModal extends Modal {
 		}
 
 		if (conflicts.length > 0) {
-			const conflictSection = this.renderSection(
-				sections,
-				tr("status.conflictsNeedReview"),
-			);
+			const conflictSection = this.renderSection(sections, tr("status.conflictsNeedReview"));
 			const conflictList = conflictSection.createDiv({
 				cls: "drive-sync-status-conflicts",
 			});
@@ -247,10 +233,7 @@ export class SyncStatusModal extends Modal {
 			}
 		}
 
-		const taskStatusSection = this.renderSection(
-			sections,
-			tr("status.recentTasks"),
-		);
+		const taskStatusSection = this.renderSection(sections, tr("status.recentTasks"));
 		if (taskLogs.length === 0) {
 			taskStatusSection.createDiv({
 				cls: "drive-sync-status-empty",
@@ -305,10 +288,7 @@ export class SyncStatusModal extends Modal {
 		}
 	}
 
-	private renderSection(
-		container: HTMLElement,
-		title: string,
-	): HTMLDivElement {
+	private renderSection(container: HTMLElement, title: string): HTMLDivElement {
 		const section = container.createDiv({
 			cls: "drive-sync-status-section",
 		});
@@ -332,21 +312,13 @@ export class SyncStatusModal extends Modal {
 		chip.createSpan({ cls: "drive-sync-status-chip-value", text: value });
 	}
 
-	private renderSummaryCard(
-		container: HTMLElement,
-		label: string,
-		value: string,
-	): void {
+	private renderSummaryCard(container: HTMLElement, label: string, value: string): void {
 		const card = container.createDiv({ cls: "drive-sync-status-card" });
 		card.createDiv({ cls: "drive-sync-status-card-label", text: label });
 		card.createDiv({ cls: "drive-sync-status-card-value", text: value });
 	}
 
-	private renderQueueRow(
-		container: HTMLElement,
-		job: SyncJob,
-		nowTs: number,
-	): void {
+	private renderQueueRow(container: HTMLElement, job: SyncJob, nowTs: number): void {
 		const status = job.status ?? "pending";
 		const statusLabel = this.renderJobStatus(status);
 		const row = container.createEl("div", {

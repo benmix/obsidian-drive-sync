@@ -128,6 +128,7 @@ src/
 - `SYNC_STRATEGY.md` — 运行时同步策略基线（初始化后）
 - `SYNC_INITIALIZATION_STRATEGY.md` — 首次同步初始化策略基线
 - `COMMANDS.md` — 命令模块结构与命令目录
+- `TROUBLESHOOTING.md` — 排障文档与常见调试检查项
 - `TASKS.md` — 开发任务
 - `VERIFICATION.md` — 验证步骤
 

@@ -3,6 +3,11 @@ import { Notice } from "obsidian";
 import { type ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 import type { RemoteProviderSession } from "../contracts/provider/remote-provider";
 import { type SyncRunRequest } from "../contracts/sync/run-request";
+import {
+	createDriveSyncError,
+	getDriveSyncErrorUserMessage,
+	normalizeUnknownDriveSyncError,
+} from "../errors";
 import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "../internal-config";
 import { getBuiltInExcludePatterns as getBuiltInExcludePatternsUseCase } from "../sync/planner/exclude";
 import { PluginDataStateStore } from "../sync/state/state-store";
@@ -157,10 +162,19 @@ export class PluginRuntime {
 			await this.syncCoordinator.run(request);
 			this.networkPolicy.recordSuccess();
 			if (this.sessionManager.isAuthPaused() && request.trigger === "manual") {
-				new Notice("Authentication required. Sync paused.");
+				new Notice(
+					getDriveSyncErrorUserMessage(
+						createDriveSyncError("AUTH_REAUTH_REQUIRED", {
+							category: "auth",
+						}),
+					),
+				);
 			}
 		} catch (error) {
-			const message = error instanceof Error ? error.message : "Auto sync failed.";
+			const normalized = normalizeUnknownDriveSyncError(error, {
+				userMessage: "Auto sync failed.",
+			});
+			const message = getDriveSyncErrorUserMessage(normalized);
 			console.warn("Auto sync failed.", error);
 			this.networkPolicy.recordFailure(error);
 			await this.recordSyncError(message);

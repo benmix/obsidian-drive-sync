@@ -1,10 +1,7 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
 
-import type {
-	RemoteFileEntry,
-	RemoteFileSystem,
-} from "../contracts/filesystem/file-system";
+import type { RemoteFileEntry, RemoteFileSystem } from "../contracts/filesystem/file-system";
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 import { normalizePath } from "../filesystem/path";
 import { tr } from "../i18n";
@@ -28,7 +25,6 @@ export class RemoteFolderPickerModal extends Modal {
 		this.plugin = plugin;
 	}
 
-
 	async onOpen() {
 		await this.loadFolders();
 		this.render();
@@ -46,10 +42,7 @@ export class RemoteFolderPickerModal extends Modal {
 		this.selectedFolderId = this.plugin.getRemoteScopeId().trim();
 
 		const provider = this.plugin.getRemoteProvider();
-		if (
-			!this.plugin.getStoredProviderCredentials() &&
-			!provider.getSession()
-		) {
+		if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
 			this.error = tr("notice.signInToProviderFirst", {
 				provider: provider.label,
 			});
@@ -68,13 +61,9 @@ export class RemoteFolderPickerModal extends Modal {
 
 		try {
 			const rootScope = await provider.getRootScope(client);
-			this.rootLabel =
-				rootScope.label || tr("remoteFolder.remoteRoot");
+			this.rootLabel = rootScope.label || tr("remoteFolder.remoteRoot");
 			this.rootFolderId = rootScope.id;
-			this.remoteFileSystem = provider.createRemoteFileSystem(
-				client,
-				rootScope.id,
-			);
+			this.remoteFileSystem = provider.createRemoteFileSystem(client, rootScope.id);
 		} catch (loadRootError) {
 			console.warn("Failed to load remote root folder.", loadRootError);
 			this.error = tr("remoteFolder.unableLoadProviderRoot", {
@@ -183,17 +172,12 @@ export class RemoteFolderPickerModal extends Modal {
 						new Notice(tr("remoteFolder.selectFolderFirst"));
 						return;
 					}
-					void this.selectFolder(
-						selectedFolder.id,
-						selectedFolder.path ?? "",
-					);
+					void this.selectFolder(selectedFolder.id, selectedFolder.path ?? "");
 				});
 			})
 			.addButton((button) => {
 				button.setButtonText(
-					this.refreshing
-						? tr("remoteFolder.refreshing")
-						: tr("remoteFolder.refresh"),
+					this.refreshing ? tr("remoteFolder.refreshing") : tr("remoteFolder.refresh"),
 				);
 				button.setDisabled(this.refreshing || this.creating);
 				button.onClick(() => {
@@ -219,9 +203,7 @@ export class RemoteFolderPickerModal extends Modal {
 		}
 
 		const listedFolders = await this.remoteFileSystem.listFolderEntries();
-		const folders = listedFolders.filter(
-			(folder) => folder.id !== this.rootFolderId,
-		);
+		const folders = listedFolders.filter((folder) => folder.id !== this.rootFolderId);
 		this.folders = [
 			{
 				id: this.rootFolderId,
@@ -233,25 +215,19 @@ export class RemoteFolderPickerModal extends Modal {
 		];
 	}
 
-	private resolveSelectedFolder(
-		list: RemoteFileEntry[],
-	): RemoteFileEntry | null {
+	private resolveSelectedFolder(list: RemoteFileEntry[]): RemoteFileEntry | null {
 		if (list.length === 0) {
 			return null;
 		}
 		if (this.selectedFolderId) {
-			const selected = list.find(
-				(folder) => folder.id === this.selectedFolderId,
-			);
+			const selected = list.find((folder) => folder.id === this.selectedFolderId);
 			if (selected) {
 				return selected;
 			}
 		}
 		const configuredId = this.plugin.getRemoteScopeId().trim();
 		if (configuredId) {
-			const configured = list.find(
-				(folder) => folder.id === configuredId,
-			);
+			const configured = list.find((folder) => folder.id === configuredId);
 			if (configured) {
 				this.selectedFolderId = configured.id;
 				return configured;
@@ -329,10 +305,7 @@ export class RemoteFolderPickerModal extends Modal {
 		}
 	}
 
-	private async selectFolder(
-		folderId: string,
-		folderPath: string,
-	): Promise<void> {
+	private async selectFolder(folderId: string, folderPath: string): Promise<void> {
 		const absolutePath = this.toAbsolutePath(folderPath);
 		this.plugin.setRemoteScope(folderId, absolutePath);
 		await this.plugin.saveSettings();

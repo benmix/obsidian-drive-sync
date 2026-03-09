@@ -2,6 +2,7 @@ import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesyst
 import { type SyncRunRequest } from "../../contracts/sync/run-request";
 import { type StateStore } from "../../contracts/sync/state-store";
 import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
+import type { DriveSyncError } from "../../errors";
 import { SyncEngine } from "../engine/sync-engine";
 import { isInitializationPhase } from "../planner/initialization";
 import { filterLocalChanges } from "../planner/local-change-filter";
@@ -15,7 +16,7 @@ type SyncRunContext = {
 	localFileSystem: LocalFileSystem;
 	remoteFileSystem: RemoteFileSystem;
 	syncStrategy: SyncStrategy;
-	onAuthError?: (message: string) => void;
+	onAuthError?: (error: DriveSyncError) => void;
 };
 
 type SyncRunnerOptions = {

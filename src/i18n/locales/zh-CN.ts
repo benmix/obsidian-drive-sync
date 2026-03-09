@@ -34,18 +34,15 @@ export const ZH: Record<keyof typeof EN, string> = {
 	"notice.autoSyncPaused": "自动同步已暂停。",
 	"notice.autoSyncResumed": "自动同步已恢复。",
 	"notice.syncPlanningFailed": "同步规划失败。请查看控制台详情。",
-	"notice.plannedJobsAcrossEntries":
-		"已规划 {jobs} 个任务，覆盖 {entries} 个条目。",
+	"notice.plannedJobsAcrossEntries": "已规划 {jobs} 个任务，覆盖 {entries} 个条目。",
 	"notice.remotePollQueuedJobs": "远端轮询已排队 {jobs} 个任务。",
 	"notice.remotePollFailed": "远端轮询失败。请查看控制台详情。",
 	"notice.preSyncCheckFailed": "同步前检查失败。请查看控制台详情。",
-	"notice.executedJobsUpdatedEntries":
-		"已执行 {jobs} 个任务，更新 {entries} 个条目。",
+	"notice.executedJobsUpdatedEntries": "已执行 {jobs} 个任务，更新 {entries} 个条目。",
 	"notice.indexRebuilt": "同步索引已重建。",
 	"notice.indexRebuildFailed": "索引重建失败。请查看控制台详情。",
 	"notice.providerConnectionReset": "{provider} 连接已重置。",
-	"notice.downloadedFilesFromProvider":
-		"已从 {provider} 下载 {count} 个文件。",
+	"notice.downloadedFilesFromProvider": "已从 {provider} 下载 {count} 个文件。",
 	"notice.vaultRestoreFailed": "仓库恢复失败。请查看控制台详情。",
 	"notice.plannedSyncFailed": "计划同步失败。请查看控制台详情。",
 	"notice.uploadedFilesToProvider": "已上传 {count} 个文件到 {provider}。",
@@ -81,11 +78,9 @@ export const ZH: Record<keyof typeof EN, string> = {
 	"settings.signOut": "退出登录",
 	"settings.signInToProviderTooltip": "登录到 {provider}",
 	"settings.remoteFolder": "远端文件夹",
-	"settings.remoteFolderDesc":
-		"选择 {provider} 目标文件夹路径，系统会自动校验。",
+	"settings.remoteFolderDesc": "选择 {provider} 目标文件夹路径，系统会自动校验。",
 	"settings.remoteFolderChoose": "选择文件夹",
-	"settings.remoteFolderPath.idConfigured":
-		"（已配置 ID，请重新选择以显示路径）",
+	"settings.remoteFolderPath.idConfigured": "（已配置 ID，请重新选择以显示路径）",
 	"settings.remoteFolderPath.notSelected": "（未选择）",
 	"settings.excludedPaths": "排除路径",
 	"settings.builtInRules": "内置规则：{rules}",
@@ -98,14 +93,12 @@ export const ZH: Record<keyof typeof EN, string> = {
 	"settings.autoSync": "启用自动同步",
 	"settings.autoSyncDesc": "按周期执行同步检查并响应本地变更。",
 	"settings.networkPolicy": "实验功能：网络策略",
-	"settings.networkPolicyDesc":
-		"根据在线状态与网络冷却时间决定是否执行同步。默认关闭。",
+	"settings.networkPolicyDesc": "根据在线状态与网络冷却时间决定是否执行同步。默认关闭。",
 	"settings.authStatus.pendingValidation": "会话已保存，等待校验。",
 	"settings.authStatus.signedInAs": "已登录为 {email}。",
 	"settings.authStatus.signedInToProvider": "已登录到 {provider}。",
 	"settings.authStatus.needsAttention": "会话需要处理，请重新登录恢复访问。",
-	"settings.authStatus.needsAttentionCommand":
-		"会话需要处理，请从命令面板重新登录。",
+	"settings.authStatus.needsAttentionCommand": "会话需要处理，请从命令面板重新登录。",
 	"settings.authStatus.signInHint": "在此登录以本地保存会话。",
 	"settings.validation.checking": "校验中...",
 	"settings.validation.result": "校验结果：{message}",
@@ -126,8 +119,7 @@ export const ZH: Record<keyof typeof EN, string> = {
 	"remoteFolder.selectFolderFirst": "请先选择一个文件夹。",
 	"remoteFolder.refreshing": "刷新中...",
 	"remoteFolder.refresh": "刷新",
-	"remoteFolder.enterPathExample":
-		"请输入文件夹路径，例如 notes/obsidian/sync。",
+	"remoteFolder.enterPathExample": "请输入文件夹路径，例如 notes/obsidian/sync。",
 	"remoteFolder.unableBeforeLoaded": "远端文件夹加载完成前无法创建。",
 	"remoteFolder.providerNoCreateSupport": "当前远端提供方不支持创建文件夹。",
 	"remoteFolder.createdFolderNoId": "创建的文件夹缺少 ID。",
@@ -209,8 +201,7 @@ export const ZH: Record<keyof typeof EN, string> = {
 	"status.recentTasks": "最近任务状态",
 	"status.recentLogs": "最近日志",
 	"status.syncLogs": "同步日志",
-	"status.jobsByStateValue":
-		"待处理 {pending}，处理中 {processing}，阻塞 {blocked}",
+	"status.jobsByStateValue": "待处理 {pending}，处理中 {processing}，阻塞 {blocked}",
 	"status.nextRetryValue": "{time}（{count}）",
 	"status.lastRunDurationMs": "{value} 毫秒",
 	"status.lastRunThroughputValue": "{value}/秒",

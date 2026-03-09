@@ -12,7 +12,6 @@ export class RemoteProviderLoginModal extends Modal {
 		this.plugin = plugin;
 	}
 
-
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
@@ -38,16 +37,14 @@ export class RemoteProviderLoginModal extends Modal {
 				}),
 		);
 
-		new Setting(contentEl)
-			.setName(tr("login.password"))
-			.addText((text) => {
-				text.inputEl.type = "password";
-				text.setPlaceholder(tr("login.passwordPlaceholder"));
-				text.setValue(password);
-				text.onChange((value) => {
-					password = value;
-				});
+		new Setting(contentEl).setName(tr("login.password")).addText((text) => {
+			text.inputEl.type = "password";
+			text.setPlaceholder(tr("login.passwordPlaceholder"));
+			text.setValue(password);
+			text.onChange((value) => {
+				password = value;
 			});
+		});
 
 		new Setting(contentEl)
 			.setName(tr("login.twoFactorCode"))
@@ -66,9 +63,7 @@ export class RemoteProviderLoginModal extends Modal {
 			.setDesc(tr("login.mailboxPasswordDesc"))
 			.addText((text) => {
 				text.inputEl.type = "password";
-				text.setPlaceholder(
-					tr("login.mailboxPasswordPlaceholder"),
-				);
+				text.setPlaceholder(tr("login.mailboxPasswordPlaceholder"));
 				text.setValue(mailboxPassword);
 				text.onChange((value) => {
 					mailboxPassword = value;
@@ -94,12 +89,8 @@ export class RemoteProviderLoginModal extends Modal {
 						mailboxPassword: mailboxPassword.trim() || undefined,
 					});
 
-					this.plugin.setStoredProviderCredentials(
-						result.credentials,
-					);
-					this.plugin.setRemoteAccountEmail(
-						result.userEmail ?? username.trim(),
-					);
+					this.plugin.setStoredProviderCredentials(result.credentials);
+					this.plugin.setRemoteAccountEmail(result.userEmail ?? username.trim());
 					this.plugin.setRemoteAuthSession(true);
 					await this.plugin.saveSettings();
 					this.plugin.handleAuthRecovered();
@@ -112,9 +103,7 @@ export class RemoteProviderLoginModal extends Modal {
 					this.close();
 				} catch (error) {
 					const message =
-						error instanceof Error
-							? error.message
-							: tr("login.unableToSignIn");
+						error instanceof Error ? error.message : tr("login.unableToSignIn");
 					this.plugin.setRemoteAuthSession(false);
 					new Notice(message);
 				}

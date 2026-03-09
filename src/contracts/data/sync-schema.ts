@@ -1,3 +1,4 @@
+import type { DriveSyncErrorCode } from "../../errors";
 import type { EntryType } from "../filesystem/entry";
 
 export type SyncEntry = {
@@ -53,6 +54,7 @@ export type SyncJob = {
 	status?: "pending" | "processing" | "blocked";
 	lockedAt?: number;
 	lastError?: string;
+	lastErrorCode?: DriveSyncErrorCode;
 };
 
 export type SyncMeta = {

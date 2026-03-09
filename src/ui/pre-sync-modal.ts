@@ -25,7 +25,6 @@ export class SyncPreflightModal extends Modal {
 		this.onConfirm = onConfirm;
 	}
 
-
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();

@@ -26,22 +26,21 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		const hasAuthSession = this.plugin.hasRemoteAuthSession();
 
 		const accountSetting = new Setting(containerEl)
-			.setName(
-				hasAuthSession ? provider.label : tr("settings.remoteAccount"),
-			)
+			.setName(hasAuthSession ? provider.label : tr("settings.remoteAccount"))
 			.setDesc("");
+		const authPaused = this.plugin.isAuthPaused();
 		if (hasAuthSession) {
 			accountSetting.nameEl.addClass("drive-sync-brand-name");
-			this.renderProviderIcon(
-				accountSetting.nameEl,
-				provider.id,
-				provider.label,
-			);
+			this.renderProviderIcon(accountSetting.nameEl, provider.id, provider.label);
 		}
 		accountSetting.descEl.createDiv({
 			cls: "drive-sync-account-status",
 			text: this.getAuthStatusText(),
 		});
+		if (authPaused) {
+			accountSetting.settingEl.addClass("drive-sync-setting-callout", "is-auth-warning");
+			accountSetting.descEl.addClass("is-error");
+		}
 		if (hasAuthSession) {
 			accountSetting.addButton((button) => {
 				button.setButtonText(tr("settings.signOut"));
@@ -62,11 +61,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 						provider: provider.label,
 					}),
 				);
-				this.renderProviderIcon(
-					button.buttonEl,
-					provider.id,
-					provider.label,
-				);
+				this.renderProviderIcon(button.buttonEl, provider.id, provider.label);
 				button.onClick(() => this.openLoginModal());
 			});
 		}
@@ -89,10 +84,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			.addButton((button) => {
 				button.setButtonText(tr("settings.remoteFolderChoose"));
 				button.onClick(() => {
-					const modal = new RemoteFolderPickerModal(
-						this.app,
-						this.plugin,
-					);
+					const modal = new RemoteFolderPickerModal(this.app, this.plugin);
 					modal.onClose = () => {
 						this.display();
 					};
@@ -118,23 +110,13 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			.setDesc(tr("settings.syncStrategyDesc"))
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOption(
-						"bidirectional",
-						tr("settings.syncStrategy.bidirectional"),
-					)
-					.addOption(
-						"local_win",
-						tr("settings.syncStrategy.localWin"),
-					)
-					.addOption(
-						"remote_win",
-						tr("settings.syncStrategy.remoteWin"),
-					)
+					.addOption("bidirectional", tr("settings.syncStrategy.bidirectional"))
+					.addOption("local_win", tr("settings.syncStrategy.localWin"))
+					.addOption("remote_win", tr("settings.syncStrategy.remoteWin"))
 					.setValue(this.plugin.settings.syncStrategy)
 					.onChange(async (value) => {
 						this.plugin.updateSettings({
-							syncStrategy:
-								value as DriveSyncSettings["syncStrategy"],
+							syncStrategy: value as DriveSyncSettings["syncStrategy"],
 						});
 						await this.plugin.saveSettings();
 					}),
@@ -144,15 +126,13 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			.setName(tr("settings.autoSync"))
 			.setDesc(tr("settings.autoSyncDesc"))
 			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.autoSyncEnabled)
-					.onChange(async (value) => {
-						this.plugin.updateSettings({
-							autoSyncEnabled: value,
-						});
-						await this.plugin.saveSettings();
-						this.plugin.refreshAutoSync();
-					}),
+				toggle.setValue(this.plugin.settings.autoSyncEnabled).onChange(async (value) => {
+					this.plugin.updateSettings({
+						autoSyncEnabled: value,
+					});
+					await this.plugin.saveSettings();
+					this.plugin.refreshAutoSync();
+				}),
 			);
 
 		new Setting(containerEl)
@@ -172,10 +152,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 
 	private getAuthStatusText(): string {
 		const provider = this.plugin.getRemoteProvider();
-		if (
-			this.plugin.hasRemoteAuthSession() &&
-			!provider.isSessionValidated()
-		) {
+		if (this.plugin.hasRemoteAuthSession() && !provider.isSessionValidated()) {
 			return tr("settings.authStatus.pendingValidation");
 		}
 		if (this.plugin.hasRemoteAuthSession()) {
@@ -188,14 +165,13 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 						provider: provider.label,
 					});
 		}
-		if (this.plugin.getStoredProviderCredentials()) {
-			return tr("settings.authStatus.needsAttention");
-		}
 		if (this.plugin.isAuthPaused()) {
 			return (
-				this.plugin.getLastAuthError() ??
-				tr("settings.authStatus.needsAttentionCommand")
+				this.plugin.getLastAuthError() ?? tr("settings.authStatus.needsAttentionCommand")
 			);
+		}
+		if (this.plugin.getStoredProviderCredentials()) {
+			return tr("settings.authStatus.needsAttention");
 		}
 		return tr("settings.authStatus.signInHint");
 	}
@@ -234,16 +210,11 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		return null;
 	}
 
-	private async autoValidateRemoteFolder(
-		statusEl: HTMLDivElement,
-	): Promise<void> {
+	private async autoValidateRemoteFolder(statusEl: HTMLDivElement): Promise<void> {
 		const requestId = ++this.remoteValidationSequence;
 		statusEl.setText(tr("settings.validation.checking"));
 		const result = await this.validateRemoteFolder();
-		if (
-			requestId !== this.remoteValidationSequence ||
-			!statusEl.isConnected
-		) {
+		if (requestId !== this.remoteValidationSequence || !statusEl.isConnected) {
 			return;
 		}
 		statusEl.setText(
@@ -265,10 +236,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 				message: tr("settings.validation.selectFolderFirst"),
 			};
 		}
-		if (
-			!this.plugin.getStoredProviderCredentials() &&
-			!provider.getSession()
-		) {
+		if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
 			return {
 				ok: false,
 				message: tr("notice.signInToProviderFirst", {
