@@ -8,6 +8,9 @@ import type {
 import type { SyncState } from "../../src/contracts/sync/state";
 
 export const FIXED_NOW = 1_700_000_000_000;
+const encoder = new TextEncoder();
+
+type FileContentMap = Record<string, Uint8Array>;
 
 export function createEntry(overrides: Partial<SyncEntry> = {}): SyncEntry {
 	return {
@@ -42,7 +45,14 @@ export function createState(entries: SyncEntry[] = []): SyncState {
 	};
 }
 
-export function createLocalFileSystem(entries: LocalFileEntry[]): LocalFileSystem {
+export function textBytes(value: string): Uint8Array {
+	return encoder.encode(value);
+}
+
+export function createLocalFileSystem(
+	entries: LocalFileEntry[],
+	contentsByPath: FileContentMap = {},
+): LocalFileSystem {
 	return {
 		listEntries: async () => entries,
 		listFileEntries: async () => entries.filter((entry) => entry.type === "file"),
@@ -51,7 +61,7 @@ export function createLocalFileSystem(entries: LocalFileEntry[]): LocalFileSyste
 			const entry = entries.find((candidate) => candidate.path === path);
 			return entry ?? null;
 		},
-		readFile: async () => new Uint8Array(),
+		readFile: async (path: string) => contentsByPath[path] ?? textBytes(`local:${path}`),
 		writeFile: async () => {},
 		deleteEntry: async () => {},
 		moveEntry: async () => {},
@@ -59,7 +69,10 @@ export function createLocalFileSystem(entries: LocalFileEntry[]): LocalFileSyste
 	};
 }
 
-export function createRemoteFileSystem(entries: RemoteFileEntry[]): RemoteFileSystem {
+export function createRemoteFileSystem(
+	entries: RemoteFileEntry[],
+	contentsById: FileContentMap = {},
+): RemoteFileSystem {
 	return {
 		listEntries: async () => entries,
 		listFileEntries: async () => entries.filter((entry) => entry.type === "file"),
@@ -68,6 +81,6 @@ export function createRemoteFileSystem(entries: RemoteFileEntry[]): RemoteFileSy
 			id: "remote-uploaded",
 			revisionId: "rev-next",
 		}),
-		readFile: async () => new Uint8Array(),
+		readFile: async (id: string) => contentsById[id] ?? textBytes(`remote:${id}`),
 	};
 }

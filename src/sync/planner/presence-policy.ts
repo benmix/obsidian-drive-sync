@@ -8,6 +8,8 @@ import type {
 import type { SyncStrategy } from "../../contracts/sync/strategy";
 import { buildConflictName } from "../support/utils";
 
+import { compareMtimeWithTolerance } from "./mtime";
+
 export const REMOTE_MISSING_CONFIRM_ROUNDS = 2;
 
 type DecisionInput = {
@@ -37,10 +39,12 @@ type BothPresentInput = {
 	syncStrategy: SyncStrategy;
 	remoteId?: string;
 	remoteRev?: string;
+	remoteMtimeMs?: number;
 	localMtimeMs?: number;
 	localChanged: boolean;
 	remoteChanged: boolean;
 	prior?: SyncEntry;
+	initializationPhase?: boolean;
 };
 
 type TrackedMissingInput = {
@@ -266,6 +270,49 @@ export function resolveBothPresentDecision(input: BothPresentInput): BothChanged
 			conflict: input.prior.conflict,
 			conflictPending: true,
 		};
+	}
+
+	if (
+		input.initializationPhase &&
+		input.syncStrategy === "bidirectional" &&
+		input.localChanged &&
+		input.remoteChanged
+	) {
+		const mtimeOrder = compareMtimeWithTolerance(input.localMtimeMs, input.remoteMtimeMs);
+		if (mtimeOrder === 1) {
+			return {
+				jobs: [
+					{
+						id: `upload:${input.path}`,
+						op: "upload",
+						path: input.path,
+						entryType: "file",
+						priority: 5,
+						attempt: 0,
+						nextRunAt: input.nowTs,
+						reason: "initial-local-newer",
+					},
+				],
+			};
+		}
+		if (mtimeOrder === -1 && input.remoteId) {
+			return {
+				jobs: [
+					{
+						id: `download:${input.remoteId}`,
+						op: "download",
+						path: input.path,
+						remoteId: input.remoteId,
+						remoteRev: input.remoteRev,
+						entryType: "file",
+						priority: 10,
+						attempt: 0,
+						nextRunAt: input.nowTs,
+						reason: "initial-remote-newer",
+					},
+				],
+			};
+		}
 	}
 
 	if (input.localChanged && input.remoteChanged) {

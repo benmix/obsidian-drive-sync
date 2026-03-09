@@ -7,6 +7,7 @@ import {
 	createRemoteFileSystem,
 	createState,
 	FIXED_NOW,
+	textBytes,
 } from "../helpers/sync-fixtures";
 
 describe("reconcileSnapshot", () => {
@@ -171,6 +172,265 @@ describe("reconcileSnapshot", () => {
 			remoteId: "remote-a",
 			remoteRev: "rev-b",
 			detectedAt: FIXED_NOW,
+		});
+	});
+
+	test("initialization bidirectional prefers local upload when local file is newer", async () => {
+		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
+		const state = createState();
+
+		const result = await reconcileSnapshot(
+			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 3_000, size: 5 }], {
+				"notes/a.md": textBytes("local-newer"),
+			}),
+			createRemoteFileSystem(
+				[
+					{
+						id: "remote-a",
+						name: "a.md",
+						path: "notes/a.md",
+						type: "file",
+						mtimeMs: 1_000,
+						revisionId: "rev-a",
+					},
+				],
+				{ "remote-a": textBytes("remote-older") },
+			),
+			state,
+			{ syncStrategy: "bidirectional" },
+		);
+
+		expect(result.jobs).toEqual([
+			expect.objectContaining({
+				op: "upload",
+				path: "notes/a.md",
+				reason: "initial-local-newer",
+			}),
+		]);
+		expect(result.snapshot[0]?.conflictPending).toBeUndefined();
+	});
+
+	test("initialization bidirectional writes baseline without jobs for unchanged file", async () => {
+		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
+		const state = createState();
+
+		const result = await reconcileSnapshot(
+			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 300, size: 5 }]),
+			createRemoteFileSystem([
+				{
+					id: "remote-a",
+					name: "a.md",
+					path: "notes/a.md",
+					type: "file",
+					mtimeMs: 300,
+					size: 5,
+					revisionId: "rev-a",
+				},
+			]),
+			state,
+			{ syncStrategy: "bidirectional" },
+		);
+
+		expect(result.jobs).toEqual([]);
+		expect(result.snapshot[0]).toMatchObject({
+			relPath: "notes/a.md",
+			remoteRev: "rev-a",
+			syncedRemoteRev: "rev-a",
+		});
+		expect(result.snapshot[0]?.conflictPending).toBeUndefined();
+	});
+
+	test("initialization local_win writes baseline without upload for unchanged file", async () => {
+		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
+		const state = createState();
+
+		const result = await reconcileSnapshot(
+			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 300, size: 5 }]),
+			createRemoteFileSystem([
+				{
+					id: "remote-a",
+					name: "a.md",
+					path: "notes/a.md",
+					type: "file",
+					mtimeMs: 300,
+					size: 5,
+					revisionId: "rev-a",
+				},
+			]),
+			state,
+			{ syncStrategy: "local_win" },
+		);
+
+		expect(result.jobs).toEqual([]);
+		expect(result.snapshot[0]).toMatchObject({
+			relPath: "notes/a.md",
+			remoteRev: "rev-a",
+			syncedRemoteRev: "rev-a",
+		});
+	});
+
+	test("initialization local_win treats near-equal mtimes as unchanged when size matches", async () => {
+		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
+		const state = createState();
+
+		const result = await reconcileSnapshot(
+			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 1_000, size: 5 }]),
+			createRemoteFileSystem([
+				{
+					id: "remote-a",
+					name: "a.md",
+					path: "notes/a.md",
+					type: "file",
+					mtimeMs: 1_700,
+					size: 5,
+					revisionId: "rev-a",
+				},
+			]),
+			state,
+			{ syncStrategy: "local_win" },
+		);
+
+		expect(result.jobs).toEqual([]);
+		expect(result.snapshot[0]).toMatchObject({
+			relPath: "notes/a.md",
+			remoteRev: "rev-a",
+			syncedRemoteRev: "rev-a",
+		});
+	});
+
+	test("initialization local_win writes baseline without upload when content matches but mtime differs", async () => {
+		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
+		const state = createState();
+		const shared = textBytes("same-content");
+
+		const result = await reconcileSnapshot(
+			createLocalFileSystem(
+				[
+					{
+						path: "notes/a.md",
+						type: "file",
+						mtimeMs: 4_000,
+						size: shared.byteLength,
+					},
+				],
+				{ "notes/a.md": shared },
+			),
+			createRemoteFileSystem(
+				[
+					{
+						id: "remote-a",
+						name: "a.md",
+						path: "notes/a.md",
+						type: "file",
+						mtimeMs: 1_000,
+						size: shared.byteLength,
+						revisionId: "rev-a",
+					},
+				],
+				{ "remote-a": shared },
+			),
+			state,
+			{ syncStrategy: "local_win" },
+		);
+
+		expect(result.jobs).toEqual([]);
+		expect(result.snapshot[0]).toMatchObject({
+			relPath: "notes/a.md",
+			remoteRev: "rev-a",
+			syncedRemoteRev: "rev-a",
+		});
+	});
+
+	test("initialization bidirectional prefers remote download when remote file is newer", async () => {
+		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
+		const state = createState();
+
+		const result = await reconcileSnapshot(
+			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 1_000, size: 5 }], {
+				"notes/a.md": textBytes("local-older"),
+			}),
+			createRemoteFileSystem(
+				[
+					{
+						id: "remote-a",
+						name: "a.md",
+						path: "notes/a.md",
+						type: "file",
+						mtimeMs: 3_000,
+						revisionId: "rev-a",
+					},
+				],
+				{ "remote-a": textBytes("remote-newer") },
+			),
+			state,
+			{ syncStrategy: "bidirectional" },
+		);
+
+		expect(result.jobs).toEqual([
+			expect.objectContaining({
+				op: "download",
+				path: "notes/a.md",
+				reason: "initial-remote-newer",
+			}),
+		]);
+		expect(result.snapshot[0]?.conflictPending).toBeUndefined();
+	});
+
+	test("initialization bidirectional does not treat same mtime with different size as unchanged", async () => {
+		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
+		const state = createState();
+
+		const result = await reconcileSnapshot(
+			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 300, size: 5 }]),
+			createRemoteFileSystem([
+				{
+					id: "remote-a",
+					name: "a.md",
+					path: "notes/a.md",
+					type: "file",
+					mtimeMs: 300,
+					size: 6,
+					revisionId: "rev-a",
+				},
+			]),
+			state,
+			{ syncStrategy: "bidirectional" },
+		);
+
+		expect(result.jobs).toHaveLength(1);
+		expect(result.jobs[0]).toMatchObject({
+			op: "download",
+			reason: "conflict-copy",
+		});
+		expect(result.snapshot[0]?.conflictPending).toBe(true);
+	});
+
+	test("initialization remote_win writes baseline without conflict copy for unchanged file", async () => {
+		vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW);
+		const state = createState();
+
+		const result = await reconcileSnapshot(
+			createLocalFileSystem([{ path: "notes/a.md", type: "file", mtimeMs: 300, size: 5 }]),
+			createRemoteFileSystem([
+				{
+					id: "remote-a",
+					name: "a.md",
+					path: "notes/a.md",
+					type: "file",
+					mtimeMs: 300,
+					size: 5,
+					revisionId: "rev-a",
+				},
+			]),
+			state,
+			{ syncStrategy: "remote_win" },
+		);
+
+		expect(result.jobs).toEqual([]);
+		expect(result.snapshot[0]).toMatchObject({
+			relPath: "notes/a.md",
+			remoteRev: "rev-a",
+			syncedRemoteRev: "rev-a",
 		});
 	});
 

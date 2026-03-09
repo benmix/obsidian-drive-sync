@@ -4,6 +4,7 @@ import { type StateStore } from "../../contracts/sync/state-store";
 import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
 import { SyncEngine } from "../engine/sync-engine";
 import { isInitializationPhase } from "../planner/initialization";
+import { filterLocalChanges } from "../planner/local-change-filter";
 import { planLocalChanges } from "../planner/local-change-planner";
 import { pollRemoteChanges } from "../planner/remote-poller";
 import { now } from "../support/utils";
@@ -51,6 +52,15 @@ export class SyncRunner {
 			},
 		);
 		await engine.load();
+		const initialState = engine.getStateSnapshot();
+		const filteredLocalChanges =
+			request.localChanges.length > 0
+				? await filterLocalChanges(
+						request.localChanges,
+						initialState,
+						context.localFileSystem,
+					)
+				: [];
 		let localEntryCount: number | null = null;
 		const getLocalEntryCount = async (): Promise<number> => {
 			if (localEntryCount !== null) {
@@ -67,8 +77,8 @@ export class SyncRunner {
 			return (await getLocalEntryCount()) === 0;
 		};
 
-		if (request.localChanges.length > 0) {
-			const plan = planLocalChanges(request.localChanges, engine.getStateSnapshot());
+		if (filteredLocalChanges.length > 0) {
+			const plan = planLocalChanges(filteredLocalChanges, engine.getStateSnapshot());
 			engine.applyEntries(plan.entries);
 			engine.removeEntries(plan.removedPaths);
 			if (plan.rewritePrefixes.length > 0) {
@@ -79,7 +89,7 @@ export class SyncRunner {
 			}
 		}
 
-		if (request.trigger !== "local" || request.localChanges.length === 0 || shouldReconcile) {
+		if (request.trigger !== "local" || filteredLocalChanges.length === 0 || shouldReconcile) {
 			const remotePlan = await pollRemoteChanges(
 				context.remoteFileSystem,
 				engine.getStateSnapshot(),

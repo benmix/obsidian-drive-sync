@@ -43,6 +43,7 @@ type ProtonDriveClient = {
 			thumbnails: [],
 			onProgress?: (uploadedBytes: number) => void,
 		) => Promise<{
+			resume?: () => void;
 			completion: () => Promise<{
 				nodeUid: string;
 				nodeRevisionUid: string;
@@ -73,6 +74,7 @@ type ProtonDriveClient = {
 			thumbnails: [],
 			onProgress?: (uploadedBytes: number) => void,
 		) => Promise<{
+			resume?: () => void;
 			completion: () => Promise<{
 				nodeUid: string;
 				nodeRevisionUid: string;
@@ -162,7 +164,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 					type: node.type === "folder" ? "folder" : "file",
 					parentId: node.parentUid ?? current.id,
 					eventScopeId: node.treeEventScopeId,
-					mtimeMs: node.modificationTime?.getTime?.() ?? undefined,
+					mtimeMs: getNodeMtimeMs(node),
 					size: node.activeRevision?.storageSize ?? node.totalStorageSize ?? undefined,
 					revisionId: node.activeRevision?.uid,
 				};
@@ -256,8 +258,27 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		const uploadRevision = async (fileId: string) => {
 			const uploader = await getFileRevisionUploader(fileId, uploadMetadata);
 			const controller = await uploader.uploadFromStream(blob.stream(), []);
-			const result = await controller.completion();
-			return { id: result.nodeUid, revisionId: result.nodeRevisionUid };
+			try {
+				const result = await controller.completion();
+				return {
+					id: result.nodeUid,
+					revisionId: result.nodeRevisionUid,
+				};
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				if (!isDraftRevisionExistsError(message)) {
+					throw error;
+				}
+				if (controller.resume) {
+					controller.resume();
+					const resumed = await controller.completion();
+					return {
+						id: resumed.nodeUid,
+						revisionId: resumed.nodeRevisionUid,
+					};
+				}
+				throw error;
+			}
 		};
 		const uploadNewFile = async () => {
 			const uploader = await getFileUploader(parentId, name, uploadMetadata);
@@ -270,11 +291,18 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 			throw new Error(`Remote path conflict: folder exists at ${normalized}`);
 		}
 		if (existingFile?.id) {
-			try {
-				return await uploadRevision(existingFile.id);
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				if (!isNotFoundError(message)) {
+			for (let attempt = 1; attempt <= 3; attempt += 1) {
+				try {
+					return await uploadRevision(existingFile.id);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					if (isNotFoundError(message)) {
+						break;
+					}
+					if (isDraftRevisionExistsError(message) && attempt < 3) {
+						await waitMs(250 * attempt);
+						continue;
+					}
 					throw error;
 				}
 			}
@@ -324,7 +352,15 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		}
 		for await (const result of this.client.trashNodes([id])) {
 			if (!result.ok) {
-				throw new Error("Failed to delete remote node.");
+				const detail = extractErrorMessage(result.error);
+				if (isNotFoundError(detail) || isAlreadyDeletedError(detail)) {
+					return;
+				}
+				throw new Error(
+					detail
+						? `Failed to delete remote node: ${detail}`
+						: "Failed to delete remote node.",
+				);
 			}
 		}
 	}
@@ -435,7 +471,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 			type: node.type === "folder" ? "folder" : "file",
 			parentId: node.parentUid,
 			eventScopeId: node.treeEventScopeId,
-			mtimeMs: node.modificationTime?.getTime?.() ?? undefined,
+			mtimeMs: getNodeMtimeMs(node),
 			size: node.activeRevision?.storageSize ?? node.totalStorageSize ?? undefined,
 			revisionId: node.activeRevision?.uid,
 		};
@@ -462,6 +498,18 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	}
 }
 
+function waitMs(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getNodeMtimeMs(node: NodeEntity): number | undefined {
+	return (
+		node.activeRevision?.claimedModificationTime?.getTime?.() ??
+		node.modificationTime?.getTime?.() ??
+		undefined
+	);
+}
+
 function isAlreadyExistsError(message: string): boolean {
 	const normalized = message.toLowerCase();
 	return (
@@ -470,7 +518,54 @@ function isAlreadyExistsError(message: string): boolean {
 	);
 }
 
+function isDraftRevisionExistsError(message: string): boolean {
+	const normalized = message.toLowerCase();
+	return (
+		normalized.includes("draft revision already exists for this link") ||
+		(normalized.includes("draft revision") && normalized.includes("already exists"))
+	);
+}
+
 function isNotFoundError(message: string): boolean {
 	const normalized = message.toLowerCase();
 	return normalized.includes("not found") || normalized.includes("404");
+}
+
+function isAlreadyDeletedError(message: string): boolean {
+	const normalized = message.toLowerCase();
+	return (
+		normalized.includes("already in trash") ||
+		normalized.includes("already trashed") ||
+		(normalized.includes("already") && normalized.includes("deleted"))
+	);
+}
+
+function extractErrorMessage(error: unknown): string {
+	if (!error) {
+		return "";
+	}
+	if (error instanceof Error) {
+		return error.message;
+	}
+	if (typeof error === "string") {
+		return error;
+	}
+	if (typeof error === "object") {
+		const record = error as Record<string, unknown>;
+		if (typeof record.message === "string") {
+			return record.message;
+		}
+		if (typeof record.error === "string") {
+			return record.error;
+		}
+		if (typeof record.details === "string") {
+			return record.details;
+		}
+		try {
+			return JSON.stringify(error);
+		} catch {
+			return String(error);
+		}
+	}
+	return String(error);
 }

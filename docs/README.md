@@ -95,14 +95,14 @@ src/
     runtime/                    # runtime contracts
     sync/                       # sync kernel contracts
     ui/                         # UI-facing contracts
-  settings.ts                   # settings UI + persistence entry
   filesystem/
     path.ts                     # shared path utility
   provider/                     # provider implementations + registries
     providers/obsidian/         # Obsidian local file system + watcher
     providers/proton-drive/     # Proton auth/service + remote file system
-  commands/                     # command handlers
+  commands/                     # command handlers (one command per file, registered in commands/index.ts)
   runtime/                      # runtime orchestration
+    plugin-state.ts             # settings/provider state facade
     sync-coordinator.ts         # runtime->sync orchestration boundary
     use-cases/                  # manual sync and diagnostics flows
   sync/                         # sync kernel
@@ -111,7 +111,8 @@ src/
     state/                      # sync state persistence model/store
     support/                    # hash/path/time helpers
     use-cases/                  # provider-agnostic sync execution pipeline
-  ui/                           # settings tab + views
+  ui/                           # settings tab + modals/views
+    settings-tab.ts             # plugin settings tab
 ```
 
 ## Security & Privacy
@@ -129,6 +130,7 @@ src/
 - `COMMANDS.md` — command module structure and command catalog
 - `TASKS.md` — development tasks
 - `AGENTS.md` — agents rules
+- `zh-CN/` — Chinese translations for design/specification docs
 
 ## Storage
 

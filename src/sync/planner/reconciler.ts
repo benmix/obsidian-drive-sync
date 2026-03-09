@@ -6,7 +6,8 @@ import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/s
 import { normalizePath } from "../../filesystem/path";
 import { now } from "../support/utils";
 
-import { shouldPreferRemoteSeed } from "./initialization";
+import { isInitializationPhase, shouldPreferRemoteSeed } from "./initialization";
+import { compareMtimeWithTolerance } from "./mtime";
 import {
 	evaluateRemoteMissingConfirmation,
 	resolveBothPresentDecision,
@@ -43,6 +44,7 @@ export async function reconcileSnapshot(
 	const snapshot: SyncEntry[] = [];
 	const nowTs = now();
 	const syncStrategy = options?.syncStrategy ?? DEFAULT_SYNC_STRATEGY;
+	const initializationPhase = isInitializationPhase(state);
 	const preferRemoteSeed =
 		options?.preferRemoteSeed ??
 		shouldPreferRemoteSeed(state, localEntries.length, remoteEntries.length);
@@ -143,6 +145,23 @@ export async function reconcileSnapshot(
 			continue;
 		}
 
+		if (shouldSeedInitializationBaseline(entry, initializationPhase, prior)) {
+			base.syncedRemoteRev = entry.remote?.revisionId;
+			continue;
+		}
+		if (
+			await shouldSeedInitializationBaselineByContent(
+				entry,
+				initializationPhase,
+				prior,
+				localFileSystem,
+				remoteFileSystem,
+			)
+		) {
+			base.syncedRemoteRev = entry.remote?.revisionId;
+			continue;
+		}
+
 		const localChanged = entry.local
 			? !effectivePrior?.syncedLocalHash &&
 				!effectivePrior?.localMtimeMs &&
@@ -203,10 +222,12 @@ export async function reconcileSnapshot(
 				syncStrategy,
 				remoteId: entry.remote.id,
 				remoteRev: entry.remote.revisionId,
+				remoteMtimeMs: entry.remote.mtimeMs,
 				localMtimeMs: entry.local?.mtimeMs,
 				localChanged,
 				remoteChanged,
 				prior,
+				initializationPhase,
 			});
 			if (decision.conflict) {
 				base.conflict = decision.conflict;
@@ -247,4 +268,77 @@ function keepUnconfirmedRemoteMissing(
 	base.remoteRev = prior.remoteRev;
 	base.remoteMissingCount = missing.nextCount;
 	base.remoteMissingSinceMs = missing.sinceMs;
+}
+
+function shouldSeedInitializationBaseline(
+	entry: EntrySnapshot,
+	initializationPhase: boolean,
+	prior?: SyncEntry,
+): boolean {
+	if (
+		!initializationPhase ||
+		entry.type !== "file" ||
+		!entry.local ||
+		!entry.remote ||
+		prior?.conflictPending ||
+		prior?.conflict ||
+		typeof entry.remote.revisionId !== "string"
+	) {
+		return false;
+	}
+
+	return (
+		compareMtimeWithTolerance(entry.local.mtimeMs, entry.remote.mtimeMs) === 0 &&
+		typeof entry.local.size === "number" &&
+		typeof entry.remote.size === "number" &&
+		entry.local.size === entry.remote.size
+	);
+}
+
+async function shouldSeedInitializationBaselineByContent(
+	entry: EntrySnapshot,
+	initializationPhase: boolean,
+	prior: SyncEntry | undefined,
+	localFileSystem: LocalFileSystem,
+	remoteFileSystem: RemoteFileSystem,
+): Promise<boolean> {
+	if (
+		!initializationPhase ||
+		entry.type !== "file" ||
+		!entry.local ||
+		!entry.remote ||
+		prior?.conflictPending ||
+		prior?.conflict ||
+		typeof entry.remote.id !== "string" ||
+		typeof entry.remote.revisionId !== "string"
+	) {
+		return false;
+	}
+
+	if (
+		typeof entry.local.size === "number" &&
+		typeof entry.remote.size === "number" &&
+		entry.local.size !== entry.remote.size
+	) {
+		return false;
+	}
+
+	const [localBytes, remoteBytes] = await Promise.all([
+		localFileSystem.readFile(entry.path),
+		remoteFileSystem.readFile(entry.remote.id),
+	]);
+
+	return sameBytes(localBytes, remoteBytes);
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+	if (left.byteLength !== right.byteLength) {
+		return false;
+	}
+	for (let index = 0; index < left.byteLength; index += 1) {
+		if (left[index] !== right[index]) {
+			return false;
+		}
+	}
+	return true;
 }
