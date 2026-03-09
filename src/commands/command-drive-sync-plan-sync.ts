@@ -5,7 +5,7 @@ import { tr } from "../i18n";
 import { planSync } from "../runtime/use-cases/sync-workflows";
 
 export function registerDriveSyncPlanSyncCommand(context: CommandContext) {
-	const { plugin, localProvider, runRemoteCommand } = context;
+	const { plugin, localProvider, runRemoteCommand, showCommandError } = context;
 	plugin.addCommand({
 		id: "drive-sync-plan-sync",
 		name: tr("commands.planSync.name"),
@@ -27,8 +27,10 @@ export function registerDriveSyncPlanSyncCommand(context: CommandContext) {
 						}),
 					);
 				} catch (error) {
-					console.warn("Sync planning failed.", error);
-					new Notice(tr("notice.syncPlanningFailed"));
+					showCommandError(error, {
+						logMessage: "Sync planning failed.",
+						noticeKey: "notice.syncPlanningFailed",
+					});
 				}
 			});
 		},

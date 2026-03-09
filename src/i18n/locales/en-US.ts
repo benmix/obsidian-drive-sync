@@ -27,6 +27,7 @@ export const EN = {
 
 	"notice.connectedToProvider": "Connected to {provider}.",
 	"notice.signedOutOfProvider": "Signed out of {provider}.",
+	"notice.signOutFailed": "Sign out failed. Check the console for details.",
 	"notice.openSettingsUnavailable": "Unable to open settings view.",
 	"notice.autoSyncCompleted": "Auto sync completed.",
 	"notice.autoSyncFailed": "Auto sync failed. Check the console for details.",
@@ -55,6 +56,34 @@ export const EN = {
 	"notice.unableToConnectProvider": "Unable to connect to {provider}.",
 	"notice.diagnosticsExportedTo": "Diagnostics exported to {path}.",
 	"notice.diagnosticsExportFailed": "Diagnostics export failed. Check the console for details.",
+
+	"error.auth.sessionExpired": "Session expired. Sign in again to continue.",
+	"error.auth.reauthRequired": "Authentication required. Sign in again to continue.",
+	"error.auth.signInFirst": "Sign in first.",
+	"error.auth.signInToProviderFirst": "Sign in to {provider} first.",
+	"error.auth.invalidCredentials": "Authentication failed. Check your credentials and try again.",
+	"error.auth.twoFactorRequired": "Two-factor authentication is required.",
+	"error.auth.mailboxPasswordRequired": "Mailbox password is required for this account.",
+	"error.network.timeout": "Network request timed out. The sync will retry automatically.",
+	"error.network.rateLimited":
+		"Remote provider rate limited requests. The sync will retry automatically.",
+	"error.network.temporaryFailure":
+		"Temporary network failure. The sync will retry automatically.",
+	"error.local.notFound": "Local item not found.",
+	"error.remote.notFound": "Remote item not found.",
+	"error.remote.pathConflict": "Remote path conflict detected.",
+	"error.remote.writeFailed": "Remote write failed.",
+	"error.remote.writeRejectedRetrying":
+		"Remote write was rejected. The sync will retry automatically.",
+	"error.remote.transientIncomplete":
+		"Remote data is not ready yet. The sync will retry automatically.",
+	"error.provider.unsupportedOperation": "This remote operation is not supported.",
+	"error.provider.unableToConnect": "Unable to connect to the remote provider.",
+	"error.provider.unableToConnectNamed": "Unable to connect to {provider}.",
+	"error.sync.retryExhausted": "Sync retries exhausted.",
+	"error.sync.invalidJob": "Sync job is invalid.",
+	"error.config.scopeMissing": "Select a remote folder first.",
+	"error.internal.unexpected": "Unexpected sync error.",
 
 	"login.title": "Sign in to {provider}",
 	"login.email": "Email",

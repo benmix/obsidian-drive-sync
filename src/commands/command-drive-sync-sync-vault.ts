@@ -5,7 +5,7 @@ import { tr } from "../i18n";
 import { syncVaultToRemote } from "../runtime/use-cases/sync-workflows";
 
 export function registerDriveSyncSyncVaultCommand(context: CommandContext) {
-	const { plugin, localProvider, runRemoteCommand } = context;
+	const { plugin, localProvider, runRemoteCommand, showCommandError } = context;
 	plugin.addCommand({
 		id: "drive-sync-sync-vault",
 		name: tr("commands.syncVault.name"),
@@ -26,8 +26,10 @@ export function registerDriveSyncSyncVaultCommand(context: CommandContext) {
 						}),
 					);
 				} catch (error) {
-					console.warn("Vault sync failed.", error);
-					new Notice(tr("notice.vaultSyncFailed"));
+					showCommandError(error, {
+						logMessage: "Vault sync failed.",
+						noticeKey: "notice.vaultSyncFailed",
+					});
 				}
 			});
 		},

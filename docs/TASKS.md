@@ -143,7 +143,7 @@
 
 - [x] `pnpm run lint` passes with provider changes.
 - [x] `pnpm run test` and `pnpm run build` pass with provider changes.
-- [x] One-time legacy settings migration on load, then persist provider-only settings.
+- [x] Remove legacy settings migration path; load and persist provider-only settings directly.
 
 ## Filesystem contract extraction
 

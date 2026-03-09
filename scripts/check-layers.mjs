@@ -16,6 +16,7 @@ const contractAllowedDependencies = new Map([
 	["provider/proton", new Set(["provider/proton", "provider", "filesystem"])],
 	["filesystem", new Set(["filesystem"])],
 	["data", new Set(["data", "filesystem", "plugin"])],
+	["i18n", new Set(["i18n"])],
 	["runtime", new Set(["runtime"])],
 	["ui", new Set(["ui"])],
 ]);
@@ -27,7 +28,9 @@ const implementationAllowedDependencies = new Map([
 			"app",
 			"commands",
 			"data",
+			"errors",
 			"filesystem",
+			"i18n",
 			"provider",
 			"runtime",
 			"sync",
@@ -35,14 +38,19 @@ const implementationAllowedDependencies = new Map([
 			"config",
 		]),
 	],
-	["commands", new Set(["commands", "runtime", "ui", "config"])],
+	["commands", new Set(["commands", "runtime", "ui", "errors", "i18n", "config"])],
 	["config", new Set(["config"])],
 	["data", new Set(["data", "filesystem", "config"])],
+	["errors", new Set(["errors", "config"])],
 	["filesystem", new Set(["filesystem", "config"])],
-	["provider", new Set(["provider", "filesystem", "config"])],
-	["runtime", new Set(["runtime", "provider", "data", "filesystem", "sync", "config"])],
-	["sync", new Set(["sync", "data", "filesystem", "config"])],
-	["ui", new Set(["ui", "filesystem", "config"])],
+	["i18n", new Set(["i18n", "config"])],
+	["provider", new Set(["provider", "filesystem", "errors", "config"])],
+	[
+		"runtime",
+		new Set(["runtime", "provider", "data", "filesystem", "sync", "errors", "i18n", "config"]),
+	],
+	["sync", new Set(["sync", "data", "filesystem", "errors", "config"])],
+	["ui", new Set(["ui", "filesystem", "errors", "i18n", "config"])],
 ]);
 
 const contractFiles = await listTypeScriptFiles(contractsRoot);
@@ -235,6 +243,9 @@ async function isFile(targetPath) {
 
 function classifyContractFile(file) {
 	const relativePath = toPosix(path.relative(contractsRoot, file));
+	if (relativePath === "i18n.ts") {
+		return "i18n";
+	}
 	const [topLevel, secondLevel] = relativePath.split("/");
 	if (topLevel === "provider" && secondLevel === "proton") {
 		return "provider/proton";

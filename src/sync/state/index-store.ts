@@ -84,8 +84,10 @@ export class SyncIndexStore {
 			entries: { ...this.state.entries },
 			jobs: [...this.state.jobs],
 			lastSyncAt: this.state.lastSyncAt,
-			lastError: this.state.lastError,
 			lastErrorAt: this.state.lastErrorAt,
+			lastErrorCode: this.state.lastErrorCode,
+			lastErrorCategory: this.state.lastErrorCategory,
+			lastErrorRetryable: this.state.lastErrorRetryable,
 			remoteEventCursor: this.state.remoteEventCursor,
 			logs: [...(this.state.logs ?? [])],
 			runtimeMetrics: this.state.runtimeMetrics
@@ -98,9 +100,16 @@ export class SyncIndexStore {
 		this.state.lastSyncAt = timestamp;
 	}
 
-	setLastError(lastError?: string, lastErrorAt?: number): void {
-		this.state.lastError = lastError;
-		this.state.lastErrorAt = lastErrorAt;
+	setLastError(
+		error: Pick<
+			SyncState,
+			"lastErrorAt" | "lastErrorCode" | "lastErrorCategory" | "lastErrorRetryable"
+		>,
+	): void {
+		this.state.lastErrorAt = error.lastErrorAt;
+		this.state.lastErrorCode = error.lastErrorCode;
+		this.state.lastErrorCategory = error.lastErrorCategory;
+		this.state.lastErrorRetryable = error.lastErrorRetryable;
 	}
 
 	setRemoteEventCursor(cursor?: string): void {

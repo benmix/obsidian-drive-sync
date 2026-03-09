@@ -43,7 +43,7 @@ export interface ObsidianDriveSyncPluginApi extends Plugin {
 	isAuthPaused(): boolean;
 	getLastAuthError(): string | undefined;
 	buildActiveRemoteSession(): Promise<RemoteProviderSession | null>;
-	connectRemoteClient(): Promise<unknown | null>;
+	connectRemoteClient(): Promise<unknown>;
 	runAutoSync(force?: boolean): Promise<void>;
 	isSyncRunning(): boolean;
 	handleAuthRecovered(scheduleSync?: boolean): void;

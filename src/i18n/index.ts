@@ -41,3 +41,10 @@ function t(locale: SupportedLocale, key: TranslationKey, params?: TranslationPar
 export function tr(key: TranslationKey, params?: TranslationParams): string {
 	return t(resolveLocale(), key, params);
 }
+
+export function trAny(key: string, params?: TranslationParams): string {
+	const locale = resolveLocale();
+	const dict = locale === "zh-CN" ? ZH : EN;
+	const template = dict[key as TranslationKey] ?? EN[key as TranslationKey] ?? key;
+	return interpolate(template, params);
+}

@@ -21,7 +21,7 @@ Recent updates:
 - Sync module reorganized by responsibility (`contracts/planner/engine/state/support/use-cases`).
 - Added `oxlint` import-boundary guards for sync layer dependency direction.
 - Remote provider abstraction Phase C landed (commands + conflict/root modals migrated to provider interfaces; current default provider remains enabled).
-- Legacy settings compatibility layer removed (one-time migration to provider fields, provider-only persistence).
+- Legacy settings compatibility layer removed; runtime now reads and persists provider-only fields directly.
 - Proton SDK/auth implementation moved under provider tree (`provider/providers/proton-drive/sdk`).
 - Provider layering tightened: provider-specific/Obsidian file-system implementations now live under `provider/providers/*`; `sync/` keeps provider-agnostic kernel logic.
 - FileSystem contracts centralized under `src/contracts/filesystem/`; shared path utility remains in `src/filesystem/path.ts`.

@@ -5,6 +5,12 @@ import type {
 	RemoteFileEntry,
 	RemoteFileSystem,
 } from "../../../contracts/filesystem/file-system";
+import {
+	createDriveSyncError,
+	type DriveSyncErrorCode,
+	type ErrorCategory,
+	normalizeUnknownDriveSyncError,
+} from "../../../errors";
 import { basename, dirname, normalizePath, splitPath } from "../../../filesystem/path";
 
 type ProtonDriveClient = {
@@ -217,7 +223,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		onEvent: (event: RemoteEntryChangeEvent) => Promise<void>,
 	): Promise<{ dispose: () => void }> {
 		if (!this.client.subscribeToTreeEvents) {
-			throw new Error("Proton Drive SDK does not expose tree events.");
+			throw unsupportedRemoteOperationError("tree events");
 		}
 		const subscription = await this.client.subscribeToTreeEvents(
 			eventScopeId,
@@ -237,7 +243,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		const getFileUploader = this.client.getFileUploader?.bind(this.client);
 		const getFileRevisionUploader = this.client.getFileRevisionUploader?.bind(this.client);
 		if (!getFileUploader || !getFileRevisionUploader) {
-			throw new Error("Proton Drive SDK does not expose file write methods.");
+			throw unsupportedRemoteOperationError("file write");
 		}
 		const normalized = normalizePath(path);
 		const parentPath = dirname(normalized);
@@ -288,7 +294,11 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		};
 
 		if (existingFolder?.id && !existingFile?.id) {
-			throw new Error(`Remote path conflict: folder exists at ${normalized}`);
+			throw createDriveSyncError("REMOTE_PATH_CONFLICT", {
+				category: "remote_fs",
+				userMessage: "Remote path conflict detected.",
+				details: { path: normalized },
+			});
 		}
 		if (existingFile?.id) {
 			for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -303,7 +313,16 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 						await waitMs(250 * attempt);
 						continue;
 					}
-					throw error;
+					throw mapRemoteOperationError(error, {
+						code: "REMOTE_WRITE_FAILED",
+						category: "remote_fs",
+						userMessage: "Remote write failed.",
+						details: {
+							path: normalized,
+							attempt,
+							fileId: existingFile.id,
+						},
+					});
 				}
 			}
 		}
@@ -313,11 +332,21 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			if (!isAlreadyExistsError(message)) {
-				throw error;
+				throw mapRemoteOperationError(error, {
+					code: "REMOTE_WRITE_FAILED",
+					category: "remote_fs",
+					userMessage: "Remote write failed.",
+					details: { path: normalized, parentId },
+				});
 			}
 			const latestFile = await this.findChildByName(parentId, name, "file");
 			if (!latestFile?.id) {
-				throw error;
+				throw createDriveSyncError("REMOTE_ALREADY_EXISTS", {
+					category: "remote_fs",
+					userMessage: "Remote path conflict detected.",
+					details: { path: normalized, parentId },
+					cause: error,
+				});
 			}
 			return uploadRevision(latestFile.id);
 		}
@@ -325,7 +354,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 
 	async readFile(id: string): Promise<Uint8Array> {
 		if (!this.client.getFileDownloader) {
-			throw new Error("Proton Drive SDK does not expose file read methods.");
+			throw unsupportedRemoteOperationError("file read");
 		}
 		const downloader = await this.client.getFileDownloader(id);
 		const chunks: Uint8Array[] = [];
@@ -348,7 +377,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 
 	async deleteEntry(id: string): Promise<void> {
 		if (!this.client.trashNodes) {
-			throw new Error("Proton Drive SDK does not expose delete methods.");
+			throw unsupportedRemoteOperationError("delete");
 		}
 		for await (const result of this.client.trashNodes([id])) {
 			if (!result.ok) {
@@ -356,18 +385,20 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 				if (isNotFoundError(detail) || isAlreadyDeletedError(detail)) {
 					return;
 				}
-				throw new Error(
-					detail
-						? `Failed to delete remote node: ${detail}`
-						: "Failed to delete remote node.",
-				);
+				throw mapRemoteOperationError(result.error, {
+					code: "REMOTE_WRITE_FAILED",
+					category: "remote_fs",
+					userMessage: "Remote delete failed.",
+					debugMessage: detail || "Failed to delete remote node.",
+					details: { nodeId: id },
+				});
 			}
 		}
 	}
 
 	async moveEntry(id: string, newPath: string): Promise<void> {
 		if (!this.client.renameNode || !this.client.moveNodes) {
-			throw new Error("Proton Drive SDK does not expose move methods.");
+			throw unsupportedRemoteOperationError("move");
 		}
 		const normalized = normalizePath(newPath);
 		const targetParentPath = dirname(normalized);
@@ -375,7 +406,13 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		const parentId = await this.ensureRemoteFolder(targetParentPath);
 		for await (const result of this.client.moveNodes([id], parentId)) {
 			if (!result.ok) {
-				throw new Error("Failed to move remote node.");
+				throw mapRemoteOperationError(result.error, {
+					code: "REMOTE_WRITE_FAILED",
+					category: "remote_fs",
+					userMessage: "Remote move failed.",
+					debugMessage: "Failed to move remote node.",
+					details: { nodeId: id, path: normalized, parentId },
+				});
 			}
 		}
 		await this.client.renameNode(id, targetName);
@@ -392,7 +429,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 
 	private iterateFolderChildren(parentId: string): AsyncIterable<NodeEntity> {
 		if (!this.client.iterateFolderChildren) {
-			throw new Error("Proton Drive SDK does not expose iterateFolderChildren.");
+			throw unsupportedRemoteOperationError("iterate folder children");
 		}
 		const iterator = this.client.iterateFolderChildren(parentId);
 		return {
@@ -435,11 +472,17 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 				continue;
 			}
 			if (!this.client.createFolder) {
-				throw new Error("Proton Drive SDK does not expose createFolder.");
+				throw unsupportedRemoteOperationError("create folder");
 			}
 			const created = (await this.client.createFolder(parentId, part)) as MaybeNode;
 			if (!created.ok) {
-				throw new Error("Failed to create remote folder.");
+				throw mapRemoteOperationError(created.error, {
+					code: "REMOTE_WRITE_FAILED",
+					category: "remote_fs",
+					userMessage: "Failed to create folder.",
+					debugMessage: "Failed to create remote folder.",
+					details: { path: builtPath, parentId },
+				});
 			}
 			this.folderIdCache.set(builtPath, created.value.uid);
 			this.folderPathCache.set(created.value.uid, builtPath);
@@ -500,6 +543,128 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 
 function waitMs(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function unsupportedRemoteOperationError(operation: string) {
+	return createDriveSyncError("REMOTE_UNSUPPORTED", {
+		category: "provider",
+		userMessage: "This remote operation is not supported.",
+		details: { operation },
+	});
+}
+
+function mapRemoteOperationError(
+	error: unknown,
+	mapping: {
+		code: DriveSyncErrorCode;
+		category: ErrorCategory;
+		userMessage: string;
+		debugMessage?: string;
+		details?: Record<string, unknown>;
+	},
+) {
+	const rawMessage = extractErrorMessage(error);
+	const classified = classifyProtonRemoteError(rawMessage);
+	return normalizeUnknownDriveSyncError(error, {
+		code: classified?.code ?? mapping.code,
+		category: classified?.category ?? mapping.category,
+		retryable: classified?.retryable,
+		userMessage: classified?.userMessage ?? mapping.userMessage,
+		userMessageKey: classified?.userMessageKey,
+		debugMessage: mapping.debugMessage,
+		details: mapping.details,
+	});
+}
+
+function classifyProtonRemoteError(message: string):
+	| {
+			code: DriveSyncErrorCode;
+			category: ErrorCategory;
+			retryable?: boolean;
+			userMessage: string;
+			userMessageKey: string;
+	  }
+	| undefined {
+	const normalized = message.toLowerCase().trim();
+	if (!normalized) {
+		return undefined;
+	}
+
+	if (
+		normalized.includes("session key is missing openpgp metadata") ||
+		normalized.includes("missing block file")
+	) {
+		return {
+			code: "REMOTE_TRANSIENT_INCOMPLETE",
+			category: "remote_fs",
+			retryable: true,
+			userMessage: "Remote data is not ready yet. The sync will retry automatically.",
+			userMessageKey: "error.remote.transientIncomplete",
+		};
+	}
+
+	if (normalized.includes("draft revision already exists for this link")) {
+		return {
+			code: "REMOTE_WRITE_FAILED",
+			category: "remote_fs",
+			retryable: true,
+			userMessage: "Remote write was rejected. The sync will retry automatically.",
+			userMessageKey: "error.remote.writeRejectedRetrying",
+		};
+	}
+
+	if (normalized.includes("not found") || normalized.includes("404")) {
+		return {
+			code: "REMOTE_NOT_FOUND",
+			category: "remote_fs",
+			userMessage: "Remote item not found.",
+			userMessageKey: "error.remote.notFound",
+		};
+	}
+
+	if (
+		normalized.includes("too many") ||
+		normalized.includes("rate limit") ||
+		normalized.includes("rate-limited") ||
+		normalized.includes("throttle")
+	) {
+		return {
+			code: "NETWORK_RATE_LIMITED",
+			category: "network",
+			retryable: true,
+			userMessage:
+				"Remote provider rate limited requests. The sync will retry automatically.",
+			userMessageKey: "error.network.rateLimited",
+		};
+	}
+
+	if (normalized.includes("timeout")) {
+		return {
+			code: "NETWORK_TIMEOUT",
+			category: "network",
+			retryable: true,
+			userMessage: "Network request timed out. The sync will retry automatically.",
+			userMessageKey: "error.network.timeout",
+		};
+	}
+
+	if (
+		normalized.includes("network") ||
+		normalized.includes("temporar") ||
+		normalized.includes("503") ||
+		normalized.includes("500") ||
+		normalized.includes("failed to fetch")
+	) {
+		return {
+			code: "NETWORK_TEMPORARY_FAILURE",
+			category: "network",
+			retryable: true,
+			userMessage: "Temporary network failure. The sync will retry automatically.",
+			userMessageKey: "error.network.temporaryFailure",
+		};
+	}
+
+	return undefined;
 }
 
 function getNodeMtimeMs(node: NodeEntity): number | undefined {

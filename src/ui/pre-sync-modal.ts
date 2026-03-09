@@ -3,7 +3,8 @@ import type { App } from "obsidian";
 
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 import type { PreSyncEstimate } from "../contracts/ui/pre-sync";
-import { tr } from "../i18n";
+import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
+import { tr, trAny } from "../i18n";
 
 import { formatBytes } from "./format";
 
@@ -67,8 +68,13 @@ export class SyncPreflightModal extends Modal {
 			await this.onConfirm();
 			this.close();
 		} catch (error) {
+			const normalized = normalizeUnknownDriveSyncError(error, {
+				category: "sync",
+				userMessage: tr("preSync.confirmFailed"),
+				userMessageKey: "preSync.confirmFailed",
+			});
 			console.warn("Pre-sync confirmation failed.", error);
-			new Notice(tr("preSync.confirmFailed"));
+			new Notice(translateDriveSyncErrorUserMessage(normalized, trAny));
 			this.running = false;
 		}
 	}

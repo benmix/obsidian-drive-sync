@@ -31,10 +31,23 @@ type DiagnosticsReport = {
 		entries: number;
 		jobs: number;
 		lastSyncAt?: number;
-		lastError?: string;
 		lastErrorAt?: number;
+		lastErrorCode?: string;
+		lastErrorCategory?: string;
+		lastErrorRetryable?: boolean;
 		remoteEventCursor?: string;
 		conflicts: number;
+		jobErrors: Array<{
+			id: string;
+			op: string;
+			path: string;
+			status?: string;
+			attempt: number;
+			nextRunAt: number;
+			lastErrorCode?: string;
+			lastErrorRetryable?: boolean;
+			lastErrorAt?: number;
+		}>;
 	};
 	runtimeMetrics?: {
 		lastRunAt?: number;
@@ -100,12 +113,27 @@ export async function exportDiagnostics(
 			entries: Object.keys(syncState.entries ?? {}).length,
 			jobs: syncState.jobs?.length ?? 0,
 			lastSyncAt: syncState.lastSyncAt,
-			lastError: syncState.lastError,
 			lastErrorAt: syncState.lastErrorAt,
+			lastErrorCode: syncState.lastErrorCode,
+			lastErrorCategory: syncState.lastErrorCategory,
+			lastErrorRetryable: syncState.lastErrorRetryable,
 			remoteEventCursor: syncState.remoteEventCursor
 				? redactCursor(syncState.remoteEventCursor)
 				: undefined,
 			conflicts,
+			jobErrors: (syncState.jobs ?? [])
+				.filter((job) => job.lastErrorCode)
+				.map((job) => ({
+					id: job.id,
+					op: job.op,
+					path: job.path,
+					status: job.status,
+					attempt: job.attempt,
+					nextRunAt: job.nextRunAt,
+					lastErrorCode: job.lastErrorCode,
+					lastErrorRetryable: job.lastErrorRetryable,
+					lastErrorAt: job.lastErrorAt,
+				})),
 		},
 		runtimeMetrics: runtimeMetrics
 			? {

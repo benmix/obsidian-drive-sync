@@ -5,9 +5,11 @@ import type { RemoteProviderSession } from "../contracts/provider/remote-provide
 import { type SyncRunRequest } from "../contracts/sync/run-request";
 import {
 	createDriveSyncError,
-	getDriveSyncErrorUserMessage,
 	normalizeUnknownDriveSyncError,
+	toDriveSyncErrorSummary,
+	translateDriveSyncErrorUserMessage,
 } from "../errors";
+import { trAny } from "../i18n";
 import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "../internal-config";
 import { getBuiltInExcludePatterns as getBuiltInExcludePatternsUseCase } from "../sync/planner/exclude";
 import { PluginDataStateStore } from "../sync/state/state-store";
@@ -65,12 +67,8 @@ export class PluginRuntime {
 		return await this.sessionManager.buildActiveRemoteSession();
 	}
 
-	async connectRemoteClient(): Promise<unknown | null> {
-		try {
-			return await this.sessionManager.connectClient();
-		} catch {
-			return null;
-		}
+	async connectRemoteClient(): Promise<unknown> {
+		return await this.sessionManager.connectClient();
 	}
 
 	refreshAutoSync(): void {
@@ -163,34 +161,39 @@ export class PluginRuntime {
 			this.networkPolicy.recordSuccess();
 			if (this.sessionManager.isAuthPaused() && request.trigger === "manual") {
 				new Notice(
-					getDriveSyncErrorUserMessage(
+					translateDriveSyncErrorUserMessage(
 						createDriveSyncError("AUTH_REAUTH_REQUIRED", {
 							category: "auth",
 						}),
+						trAny,
 					),
 				);
 			}
 		} catch (error) {
 			const normalized = normalizeUnknownDriveSyncError(error, {
 				userMessage: "Auto sync failed.",
+				userMessageKey: "notice.autoSyncFailed",
 			});
-			const message = getDriveSyncErrorUserMessage(normalized);
+			const message = translateDriveSyncErrorUserMessage(normalized, trAny);
 			console.warn("Auto sync failed.", error);
 			this.networkPolicy.recordFailure(error);
-			await this.recordSyncError(message);
+			await this.recordSyncError(normalized);
 			if (request.trigger === "manual") {
 				new Notice(message);
 			}
 		}
 	}
 
-	private async recordSyncError(message: string): Promise<void> {
+	private async recordSyncError(error: unknown): Promise<void> {
+		const summary = toDriveSyncErrorSummary(error);
 		const stateStore = new PluginDataStateStore();
 		const state = await stateStore.load();
 		await stateStore.save({
 			...state,
-			lastError: message,
 			lastErrorAt: now(),
+			lastErrorCode: summary.code,
+			lastErrorCategory: summary.category,
+			lastErrorRetryable: summary.retryable,
 		});
 	}
 }

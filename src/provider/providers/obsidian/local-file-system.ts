@@ -1,6 +1,7 @@
 import { type App, type TAbstractFile, TFile, TFolder } from "obsidian";
 
 import type { LocalFileEntry, LocalFileSystem } from "../../../contracts/filesystem/file-system";
+import { createDriveSyncError } from "../../../errors";
 
 export class ObsidianLocalFileSystem implements LocalFileSystem {
 	private app: App;
@@ -56,7 +57,10 @@ export class ObsidianLocalFileSystem implements LocalFileSystem {
 	async readFile(path: string): Promise<Uint8Array> {
 		const file = this.app.vault.getFileByPath(path);
 		if (!file) {
-			throw new Error(`Unable to read missing file: ${path}`);
+			throw createDriveSyncError("LOCAL_NOT_FOUND", {
+				category: "local_fs",
+				details: { path },
+			});
 		}
 		const tfile = file as TFile;
 		const data = await this.app.vault.readBinary(tfile);
@@ -79,7 +83,10 @@ export class ObsidianLocalFileSystem implements LocalFileSystem {
 	async moveEntry(fromPath: string, toPath: string): Promise<void> {
 		const file = this.app.vault.getAbstractFileByPath(fromPath);
 		if (!file) {
-			throw new Error(`Unable to move missing path: ${fromPath}`);
+			throw createDriveSyncError("LOCAL_NOT_FOUND", {
+				category: "local_fs",
+				details: { path: fromPath, toPath },
+			});
 		}
 		await this.ensureParentFolder(toPath);
 		await this.app.vault.rename(file, toPath);

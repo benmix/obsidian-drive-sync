@@ -1,9 +1,11 @@
 import { Modal, Setting } from "obsidian";
 import type { App } from "obsidian";
 
+import type { DriveSyncErrorCode } from "../contracts/data/error-types";
 import type { SyncJob } from "../contracts/data/sync-schema";
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import { tr } from "../i18n";
+import { getDriveSyncErrorMessageForCode } from "../errors";
+import { tr, trAny } from "../i18n";
 
 import { formatBytes } from "./format";
 
@@ -151,6 +153,7 @@ export class SyncStatusModal extends Modal {
 			tr("status.inFlightJob"),
 			queueMeta.inFlightJob ?? tr("status.none"),
 		);
+		this.renderSummaryCard(summary, tr("status.lastError"), this.formatLastError(state));
 
 		const metrics = state.runtimeMetrics;
 		if (metrics) {
@@ -343,12 +346,40 @@ export class SyncStatusModal extends Modal {
 			}),
 		});
 
-		if (job.lastError) {
+		if (job.lastErrorCode) {
 			row.createDiv({
 				cls: "drive-sync-queue-error",
-				text: job.lastError,
+				text: this.formatJobError(job),
 			});
 		}
+	}
+
+	private formatLastError(state: {
+		lastErrorCode?: DriveSyncErrorCode;
+		lastErrorAt?: number;
+	}): string {
+		if (!state.lastErrorCode) {
+			return tr("status.none");
+		}
+		const parts = [getDriveSyncErrorMessageForCode(state.lastErrorCode, trAny)];
+		if (state.lastErrorCode) {
+			parts.push(`[${state.lastErrorCode}]`);
+		}
+		if (state.lastErrorAt) {
+			parts.push(new Date(state.lastErrorAt).toLocaleString());
+		}
+		return parts.join(" ");
+	}
+
+	private formatJobError(job: SyncJob): string {
+		const parts = [getDriveSyncErrorMessageForCode(job.lastErrorCode, trAny)];
+		if (job.lastErrorCode) {
+			parts.push(`[${job.lastErrorCode}]`);
+		}
+		if (job.lastErrorAt) {
+			parts.push(new Date(job.lastErrorAt).toLocaleString());
+		}
+		return parts.join(" ");
 	}
 
 	private renderJobStatus(status: SyncJob["status"]): string {

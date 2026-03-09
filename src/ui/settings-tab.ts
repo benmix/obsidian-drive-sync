@@ -4,7 +4,8 @@ import { siProtondrive } from "simple-icons";
 
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 import type { DriveSyncSettings } from "../contracts/plugin/settings";
-import { tr } from "../i18n";
+import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
+import { tr, trAny } from "../i18n";
 
 import { RemoteProviderLoginModal } from "./login-modal";
 import { RemoteFolderPickerModal } from "./remote-root-modal";
@@ -245,13 +246,21 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			};
 		}
 
-		const client = await this.plugin.connectRemoteClient();
-		if (!client) {
-			return {
-				ok: false,
-				message: tr("notice.unableToConnectProvider", {
+		let client: unknown;
+		try {
+			client = await this.plugin.connectRemoteClient();
+		} catch (error) {
+			const normalized = normalizeUnknownDriveSyncError(error, {
+				category: "provider",
+				userMessage: tr("notice.unableToConnectProvider", {
 					provider: provider.label,
 				}),
+				userMessageKey: "error.provider.unableToConnectNamed",
+				userMessageParams: { provider: provider.label },
+			});
+			return {
+				ok: false,
+				message: translateDriveSyncErrorUserMessage(normalized, trAny),
 			};
 		}
 		return await provider.validateScope(client, scopeId);

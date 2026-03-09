@@ -1,47 +1,28 @@
-export type ErrorCategory =
-	| "auth"
-	| "network"
-	| "local_fs"
-	| "remote_fs"
-	| "sync"
-	| "config"
-	| "validation"
-	| "provider"
-	| "internal";
+import type {
+	DriveSyncErrorCode,
+	ErrorCategory,
+	ErrorSeverity,
+} from "../contracts/data/error-types";
+import type { TranslationParams, Translator } from "../contracts/i18n";
 
-export type ErrorSeverity = "info" | "warn" | "error" | "fatal";
-
-export type DriveSyncErrorCode =
-	| "AUTH_SESSION_EXPIRED"
-	| "AUTH_REAUTH_REQUIRED"
-	| "AUTH_SIGN_IN_REQUIRED"
-	| "AUTH_INVALID_CREDENTIALS"
-	| "AUTH_2FA_REQUIRED"
-	| "AUTH_MAILBOX_PASSWORD_REQUIRED"
-	| "NETWORK_TIMEOUT"
-	| "NETWORK_RATE_LIMITED"
-	| "NETWORK_TEMPORARY_FAILURE"
-	| "LOCAL_NOT_FOUND"
-	| "REMOTE_NOT_FOUND"
-	| "REMOTE_ALREADY_EXISTS"
-	| "REMOTE_PATH_CONFLICT"
-	| "REMOTE_UNSUPPORTED"
-	| "REMOTE_WRITE_FAILED"
-	| "REMOTE_TRANSIENT_INCOMPLETE"
-	| "PROVIDER_CONNECT_FAILED"
-	| "SYNC_RETRY_EXHAUSTED"
-	| "SYNC_JOB_INVALID"
-	| "CONFIG_SCOPE_MISSING"
-	| "INTERNAL_UNEXPECTED";
+export type { DriveSyncErrorCode, ErrorCategory, ErrorSeverity };
 
 export type DriveSyncErrorInit = {
 	category: ErrorCategory;
 	severity?: ErrorSeverity;
 	retryable?: boolean;
 	userMessage?: string;
+	userMessageKey?: string;
+	userMessageParams?: TranslationParams;
 	debugMessage?: string;
 	details?: Record<string, unknown>;
 	cause?: unknown;
+};
+
+export type DriveSyncErrorUserMessage = {
+	message: string;
+	key?: string;
+	params?: TranslationParams;
 };
 
 export type DriveSyncErrorSummary = {
@@ -57,6 +38,8 @@ export class DriveSyncError extends Error {
 	readonly severity: ErrorSeverity;
 	readonly retryable: boolean;
 	readonly userMessage: string;
+	readonly userMessageKey?: string;
+	readonly userMessageParams?: TranslationParams;
 	readonly debugMessage?: string;
 	readonly details?: Record<string, unknown>;
 	readonly cause?: unknown;
@@ -70,26 +53,28 @@ export class DriveSyncError extends Error {
 		this.severity = init.severity ?? "error";
 		this.retryable = init.retryable ?? false;
 		this.userMessage = userMessage;
+		this.userMessageKey = init.userMessageKey ?? defaultUserMessageKey(code);
+		this.userMessageParams = init.userMessageParams;
 		this.debugMessage = init.debugMessage;
 		this.details = init.details;
 		this.cause = init.cause;
 	}
 }
 
-type NormalizeFallback = Partial<
+type NormalizeOptions = Partial<
 	Pick<
 		DriveSyncErrorInit,
-		"category" | "severity" | "retryable" | "userMessage" | "debugMessage" | "details"
+		| "category"
+		| "severity"
+		| "retryable"
+		| "userMessage"
+		| "userMessageKey"
+		| "userMessageParams"
+		| "debugMessage"
+		| "details"
 	>
 > & {
 	code?: DriveSyncErrorCode;
-};
-
-type LegacyClassification = {
-	code: DriveSyncErrorCode;
-	category: ErrorCategory;
-	retryable?: boolean;
-	userMessage?: string;
 };
 
 export function createDriveSyncError(
@@ -105,7 +90,7 @@ export function isDriveSyncError(error: unknown): error is DriveSyncError {
 
 export function normalizeUnknownDriveSyncError(
 	error: unknown,
-	fallback: NormalizeFallback = {},
+	options: NormalizeOptions = {},
 ): DriveSyncError {
 	if (isDriveSyncError(error)) {
 		return error;
@@ -116,33 +101,65 @@ export function normalizeUnknownDriveSyncError(
 			? error.message
 			: typeof error === "string"
 				? error
-				: (fallback.debugMessage ?? "Unexpected sync error.");
-	const classified = classifyLegacyError(rawMessage);
-	const code = classified?.code ?? fallback.code ?? "INTERNAL_UNEXPECTED";
-	const userMessage =
-		classified?.userMessage ??
-		fallback.userMessage ??
-		(rawMessage.trim() || defaultUserMessage(code));
+				: (options.debugMessage ?? "Unexpected sync error.");
+	const code = options.code ?? "INTERNAL_UNEXPECTED";
+	const userMessage = options.userMessage ?? defaultUserMessage(code);
 
 	return new DriveSyncError(code, {
-		category: classified?.category ?? fallback.category ?? "internal",
-		severity: fallback.severity ?? "error",
-		retryable: classified?.retryable ?? fallback.retryable ?? false,
+		category: options.category ?? "internal",
+		severity: options.severity ?? "error",
+		retryable: options.retryable ?? false,
 		userMessage,
-		debugMessage: rawMessage.trim() || fallback.debugMessage || defaultUserMessage(code),
-		details: fallback.details,
+		userMessageKey: options.userMessageKey ?? defaultUserMessageKey(code),
+		userMessageParams: options.userMessageParams,
+		debugMessage: rawMessage.trim() || options.debugMessage || defaultUserMessage(code),
+		details: options.details,
 		cause: error,
 	});
 }
 
-export function getDriveSyncErrorUserMessage(error: unknown, fallback?: string): string {
+export function getDriveSyncErrorUserMessage(error: unknown): string {
+	const descriptor = getDriveSyncErrorUserMessageDescriptor(error);
+	return descriptor.message;
+}
+
+export function getDriveSyncErrorUserMessageDescriptor(error: unknown): DriveSyncErrorUserMessage {
 	if (isDriveSyncError(error)) {
-		return error.userMessage;
+		return {
+			message: error.userMessage,
+			key: error.userMessageKey,
+			params: error.userMessageParams,
+		};
 	}
-	const normalized = normalizeUnknownDriveSyncError(error, {
-		userMessage: fallback,
-	});
-	return normalized.userMessage;
+	const normalized = normalizeUnknownDriveSyncError(error);
+	return {
+		message: normalized.userMessage,
+		key: normalized.userMessageKey,
+		params: normalized.userMessageParams,
+	};
+}
+
+export function translateDriveSyncErrorUserMessage(error: unknown, translate: Translator): string {
+	const descriptor = getDriveSyncErrorUserMessageDescriptor(error);
+	if (descriptor.key) {
+		return translate(descriptor.key, descriptor.params);
+	}
+	return descriptor.message;
+}
+
+export function getDriveSyncErrorMessageForCode(
+	code: DriveSyncErrorCode | undefined,
+	translate: Translator,
+	params?: TranslationParams,
+): string {
+	if (!code) {
+		return defaultUserMessage("INTERNAL_UNEXPECTED");
+	}
+	const key = defaultUserMessageKey(code);
+	if (key) {
+		return translate(key, params);
+	}
+	return defaultUserMessage(code);
 }
 
 export function toDriveSyncErrorSummary(error: unknown): DriveSyncErrorSummary {
@@ -208,204 +225,6 @@ export function getRetryDelayForDriveSyncError(error: unknown, attempt: number):
 	}
 }
 
-function classifyLegacyError(message: string): LegacyClassification | null {
-	const normalized = message.toLowerCase().trim();
-	if (!normalized) {
-		return null;
-	}
-
-	if (
-		normalized.includes("session key is missing openpgp metadata") ||
-		normalized.includes("missing block file")
-	) {
-		return {
-			code: "REMOTE_TRANSIENT_INCOMPLETE",
-			category: "remote_fs",
-			retryable: true,
-			userMessage: "Remote data is not ready yet. The sync will retry automatically.",
-		};
-	}
-
-	if (normalized.includes("draft revision already exists for this link")) {
-		return {
-			code: "REMOTE_WRITE_FAILED",
-			category: "remote_fs",
-			retryable: true,
-			userMessage: "Remote write was rejected. The sync will retry automatically.",
-		};
-	}
-
-	if (
-		normalized.includes("two-factor authentication is required") ||
-		normalized.includes("2fa required") ||
-		normalized.includes("two-factor")
-	) {
-		return {
-			code: "AUTH_2FA_REQUIRED",
-			category: "auth",
-			userMessage: "Two-factor authentication is required.",
-		};
-	}
-
-	if (normalized.includes("mailbox password is required")) {
-		return {
-			code: "AUTH_MAILBOX_PASSWORD_REQUIRED",
-			category: "auth",
-			userMessage: "Mailbox password is required for this account.",
-		};
-	}
-
-	if (
-		normalized.includes("sign in to ") &&
-		normalized.includes(" first") &&
-		!normalized.includes("signed in")
-	) {
-		return {
-			code: "AUTH_SIGN_IN_REQUIRED",
-			category: "auth",
-		};
-	}
-
-	if (
-		normalized.includes("invalid_refresh_token") ||
-		normalized.includes("invalid refresh token") ||
-		normalized.includes("parent session expired") ||
-		normalized.includes("session expired") ||
-		normalized.includes("re-authenticate")
-	) {
-		return {
-			code: "AUTH_SESSION_EXPIRED",
-			category: "auth",
-			userMessage: "Session expired. Sign in again to continue.",
-		};
-	}
-
-	if (
-		normalized.includes("unauthorized") ||
-		normalized.includes("forbidden") ||
-		normalized.includes("authentication failed") ||
-		normalized.includes("login failed") ||
-		normalized.includes("token refresh failed")
-	) {
-		return {
-			code: "AUTH_REAUTH_REQUIRED",
-			category: "auth",
-			userMessage: "Authentication required. Sign in again to continue.",
-		};
-	}
-
-	if (
-		normalized.includes("invalid credentials") ||
-		normalized.includes("server proof verification failed") ||
-		normalized.includes("unable to verify server identity")
-	) {
-		return {
-			code: "AUTH_INVALID_CREDENTIALS",
-			category: "auth",
-			userMessage: "Authentication failed. Check your credentials and try again.",
-		};
-	}
-
-	if (normalized.includes("not found") || normalized.includes("404")) {
-		return {
-			code:
-				normalized.includes("local") || normalized.includes("missing file")
-					? "LOCAL_NOT_FOUND"
-					: "REMOTE_NOT_FOUND",
-			category:
-				normalized.includes("local") || normalized.includes("missing file")
-					? "local_fs"
-					: "remote_fs",
-		};
-	}
-
-	if (normalized.includes("missing file") || normalized.includes("missing path")) {
-		return {
-			code: "LOCAL_NOT_FOUND",
-			category: "local_fs",
-		};
-	}
-
-	if (normalized.includes("remote path conflict")) {
-		return {
-			code: "REMOTE_PATH_CONFLICT",
-			category: "remote_fs",
-			userMessage: "Remote path conflict detected.",
-		};
-	}
-
-	if (
-		normalized.includes("already exists") ||
-		normalized.includes("file or folder with that name already exists")
-	) {
-		return {
-			code: "REMOTE_ALREADY_EXISTS",
-			category: "remote_fs",
-			userMessage: "Remote path conflict detected.",
-		};
-	}
-
-	if (
-		normalized.includes("too many") ||
-		normalized.includes("rate limit") ||
-		normalized.includes("rate-limited") ||
-		normalized.includes("throttle")
-	) {
-		return {
-			code: "NETWORK_RATE_LIMITED",
-			category: "network",
-			retryable: true,
-			userMessage:
-				"Remote provider rate limited requests. The sync will retry automatically.",
-		};
-	}
-
-	if (normalized.includes("timeout")) {
-		return {
-			code: "NETWORK_TIMEOUT",
-			category: "network",
-			retryable: true,
-			userMessage: "Network request timed out. The sync will retry automatically.",
-		};
-	}
-
-	if (
-		normalized.includes("network") ||
-		normalized.includes("temporar") ||
-		normalized.includes("503") ||
-		normalized.includes("500") ||
-		normalized.includes("failed to fetch")
-	) {
-		return {
-			code: "NETWORK_TEMPORARY_FAILURE",
-			category: "network",
-			retryable: true,
-			userMessage: "Temporary network failure. The sync will retry automatically.",
-		};
-	}
-
-	if (
-		normalized.includes("does not expose") ||
-		normalized.includes("not supported") ||
-		normalized.includes("unsupported")
-	) {
-		return {
-			code: "REMOTE_UNSUPPORTED",
-			category: "provider",
-			userMessage: "This remote operation is not supported.",
-		};
-	}
-
-	if (normalized.includes("unable to connect to ")) {
-		return {
-			code: "PROVIDER_CONNECT_FAILED",
-			category: "provider",
-		};
-	}
-
-	return null;
-}
-
 function defaultUserMessage(code: DriveSyncErrorCode): string {
 	switch (code) {
 		case "AUTH_SESSION_EXPIRED":
@@ -450,6 +269,54 @@ function defaultUserMessage(code: DriveSyncErrorCode): string {
 		case "INTERNAL_UNEXPECTED":
 		default:
 			return "Unexpected sync error.";
+	}
+}
+
+function defaultUserMessageKey(code: DriveSyncErrorCode): string | undefined {
+	switch (code) {
+		case "AUTH_SESSION_EXPIRED":
+			return "error.auth.sessionExpired";
+		case "AUTH_REAUTH_REQUIRED":
+			return "error.auth.reauthRequired";
+		case "AUTH_SIGN_IN_REQUIRED":
+			return "error.auth.signInFirst";
+		case "AUTH_INVALID_CREDENTIALS":
+			return "error.auth.invalidCredentials";
+		case "AUTH_2FA_REQUIRED":
+			return "error.auth.twoFactorRequired";
+		case "AUTH_MAILBOX_PASSWORD_REQUIRED":
+			return "error.auth.mailboxPasswordRequired";
+		case "NETWORK_TIMEOUT":
+			return "error.network.timeout";
+		case "NETWORK_RATE_LIMITED":
+			return "error.network.rateLimited";
+		case "NETWORK_TEMPORARY_FAILURE":
+			return "error.network.temporaryFailure";
+		case "LOCAL_NOT_FOUND":
+			return "error.local.notFound";
+		case "REMOTE_NOT_FOUND":
+			return "error.remote.notFound";
+		case "REMOTE_ALREADY_EXISTS":
+		case "REMOTE_PATH_CONFLICT":
+			return "error.remote.pathConflict";
+		case "REMOTE_UNSUPPORTED":
+			return "error.provider.unsupportedOperation";
+		case "REMOTE_WRITE_FAILED":
+			return "error.remote.writeFailed";
+		case "REMOTE_TRANSIENT_INCOMPLETE":
+			return "error.remote.transientIncomplete";
+		case "PROVIDER_CONNECT_FAILED":
+			return "error.provider.unableToConnect";
+		case "SYNC_RETRY_EXHAUSTED":
+			return "error.sync.retryExhausted";
+		case "SYNC_JOB_INVALID":
+			return "error.sync.invalidJob";
+		case "CONFIG_SCOPE_MISSING":
+			return "error.config.scopeMissing";
+		case "INTERNAL_UNEXPECTED":
+			return "error.internal.unexpected";
+		default:
+			return undefined;
 	}
 }
 

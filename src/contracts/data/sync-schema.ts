@@ -1,5 +1,6 @@
-import type { DriveSyncErrorCode } from "../../errors";
 import type { EntryType } from "../filesystem/entry";
+
+import type { DriveSyncErrorCode } from "./error-types";
 
 export type SyncEntry = {
 	relPath: string;
@@ -53,13 +54,21 @@ export type SyncJob = {
 	reason?: string;
 	status?: "pending" | "processing" | "blocked";
 	lockedAt?: number;
-	lastError?: string;
 	lastErrorCode?: DriveSyncErrorCode;
+	lastErrorRetryable?: boolean;
+	lastErrorAt?: number;
 };
 
 export type SyncMeta = {
-	key: "lastSyncAt" | "lastError" | "lastErrorAt" | "remoteEventCursor" | "runtimeMetrics";
-	value: number | string | undefined;
+	key:
+		| "lastSyncAt"
+		| "lastErrorAt"
+		| "lastErrorCode"
+		| "lastErrorCategory"
+		| "lastErrorRetryable"
+		| "remoteEventCursor"
+		| "runtimeMetrics";
+	value: number | string | boolean | undefined;
 };
 
 export type SyncLog = {

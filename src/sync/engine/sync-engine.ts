@@ -7,8 +7,9 @@ import type { StateStore } from "../../contracts/sync/state-store";
 import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
 import type { DriveSyncError } from "../../errors";
 import {
+	createDriveSyncError,
+	type DriveSyncErrorSummary,
 	formatDriveSyncErrorForLog,
-	getDriveSyncErrorUserMessage,
 	getRetryDelayForDriveSyncError,
 	isAuthDriveSyncErrorCode,
 	isNotFoundDriveSyncError,
@@ -16,6 +17,7 @@ import {
 	normalizeUnknownDriveSyncError,
 	shouldPauseAuthForError,
 	shouldRetryBlockedDriveSyncErrorCode,
+	toDriveSyncErrorSummary,
 } from "../../errors";
 import { normalizePath } from "../../filesystem/path";
 import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../../internal-config";
@@ -70,8 +72,19 @@ export class SyncEngine {
 
 	async save(overrides?: Partial<SyncState>): Promise<void> {
 		const base = this.index.toJSON();
-		if (overrides && ("lastError" in overrides || "lastErrorAt" in overrides)) {
-			this.index.setLastError(overrides.lastError, overrides.lastErrorAt);
+		if (
+			overrides &&
+			("lastErrorAt" in overrides ||
+				"lastErrorCode" in overrides ||
+				"lastErrorCategory" in overrides ||
+				"lastErrorRetryable" in overrides)
+		) {
+			this.index.setLastError({
+				lastErrorAt: overrides.lastErrorAt,
+				lastErrorCode: overrides.lastErrorCode,
+				lastErrorCategory: overrides.lastErrorCategory,
+				lastErrorRetryable: overrides.lastErrorRetryable,
+			});
 		}
 		if (overrides && "remoteEventCursor" in overrides) {
 			this.index.setRemoteEventCursor(overrides.remoteEventCursor);
@@ -80,8 +93,10 @@ export class SyncEngine {
 			entries: base.entries,
 			jobs: this.queue.list(),
 			lastSyncAt: base.lastSyncAt,
-			lastError: overrides?.lastError ?? base.lastError,
 			lastErrorAt: overrides?.lastErrorAt ?? base.lastErrorAt,
+			lastErrorCode: overrides?.lastErrorCode ?? base.lastErrorCode,
+			lastErrorCategory: overrides?.lastErrorCategory ?? base.lastErrorCategory,
+			lastErrorRetryable: overrides?.lastErrorRetryable ?? base.lastErrorRetryable,
 			remoteEventCursor: overrides?.remoteEventCursor ?? base.remoteEventCursor,
 			logs: base.logs,
 		};
@@ -137,6 +152,7 @@ export class SyncEngine {
 		let uploadBytes = 0;
 		let downloadBytes = 0;
 		const retryJobs: SyncJob[] = [];
+		const runErrorState: { summary?: DriveSyncErrorSummary } = {};
 
 		const concurrency = Math.max(
 			1,
@@ -146,7 +162,9 @@ export class SyncEngine {
 		for (let index = 0; index < buckets.length; index += concurrency) {
 			const parallelBuckets = buckets.slice(index, index + concurrency);
 			const bucketResults = await Promise.all(
-				parallelBuckets.map((bucket) => this.executeBucketSequentially(bucket, retryJobs)),
+				parallelBuckets.map((bucket) =>
+					this.executeBucketSequentially(bucket, retryJobs, runErrorState),
+				),
 			);
 			for (const results of bucketResults) {
 				for (const result of results) {
@@ -192,14 +210,20 @@ export class SyncEngine {
 		});
 
 		if (retryJobs.length > 0) {
+			const lastRunError = runErrorState.summary;
 			await this.save({
-				lastError: this.authPaused
-					? "Authentication required. Sync paused."
-					: "Some jobs failed. Retrying.",
 				lastErrorAt: now(),
+				lastErrorCode: lastRunError?.code,
+				lastErrorCategory: lastRunError?.category,
+				lastErrorRetryable: lastRunError?.retryable,
 			});
 		} else {
-			await this.save({ lastError: undefined, lastErrorAt: undefined });
+			await this.save({
+				lastErrorAt: undefined,
+				lastErrorCode: undefined,
+				lastErrorCategory: undefined,
+				lastErrorRetryable: undefined,
+			});
 		}
 		this.index.addLog(
 			`Run finished: executed=${jobsExecuted}, updated=${entries.length}, retry=${retryJobs.length}`,
@@ -331,13 +355,14 @@ export class SyncEngine {
 	private async executeBucketSequentially(
 		jobs: SyncJob[],
 		retryJobs: SyncJob[],
+		runErrorState: { summary?: DriveSyncErrorSummary },
 	): Promise<ExecuteResult[]> {
 		const results: ExecuteResult[] = [];
 		for (const job of jobs) {
 			if (this.authPaused) {
 				break;
 			}
-			const result = await this.executeJob(job, retryJobs);
+			const result = await this.executeJob(job, retryJobs, runErrorState);
 			if (result) {
 				results.push(result);
 			}
@@ -345,14 +370,19 @@ export class SyncEngine {
 		return results;
 	}
 
-	private async executeJob(job: SyncJob, retryJobs: SyncJob[]): Promise<ExecuteResult | null> {
+	private async executeJob(
+		job: SyncJob,
+		retryJobs: SyncJob[],
+		runErrorState: { summary?: DriveSyncErrorSummary },
+	): Promise<ExecuteResult | null> {
 		try {
 			const activeJob: SyncJob = {
 				...job,
 				status: "processing",
 				lockedAt: now(),
-				lastError: undefined,
 				lastErrorCode: undefined,
+				lastErrorRetryable: undefined,
+				lastErrorAt: undefined,
 			};
 			const result = await executeJobs(this.localFileSystem, this.remoteFileSystem, [
 				activeJob,
@@ -361,8 +391,9 @@ export class SyncEngine {
 			return result;
 		} catch (error) {
 			const normalized = normalizeUnknownDriveSyncError(error);
-			const userMessage = getDriveSyncErrorUserMessage(normalized);
 			const logMessage = formatDriveSyncErrorForLog(normalized);
+			const errorSummary = toDriveSyncErrorSummary(normalized);
+			runErrorState.summary = errorSummary;
 			if (isNotFoundDriveSyncError(normalized) && job.op === "delete-remote") {
 				this.index.addLog(`Done (idempotent): ${describeJob(job)} (${logMessage})`, "task");
 				return {
@@ -393,8 +424,9 @@ export class SyncEngine {
 					...job,
 					status: "blocked",
 					lockedAt: undefined,
-					lastError: userMessage,
 					lastErrorCode: normalized.code,
+					lastErrorRetryable: normalized.retryable,
+					lastErrorAt: now(),
 				});
 				return null;
 			}
@@ -406,8 +438,9 @@ export class SyncEngine {
 					...job,
 					status: "blocked",
 					lockedAt: undefined,
-					lastError: userMessage,
 					lastErrorCode: normalized.code,
+					lastErrorRetryable: normalized.retryable,
+					lastErrorAt: now(),
 				});
 				return null;
 			}
@@ -420,12 +453,26 @@ export class SyncEngine {
 					...job,
 					status: "blocked",
 					lockedAt: undefined,
-					lastError: userMessage,
 					lastErrorCode: normalized.code,
+					lastErrorRetryable: normalized.retryable,
+					lastErrorAt: now(),
 				});
 				return null;
 			}
 			if (job.attempt + 1 >= this.maxRetryAttempts) {
+				const exhausted = createDriveSyncError("SYNC_RETRY_EXHAUSTED", {
+					category: "sync",
+					userMessage: "Sync retries exhausted for this job.",
+					details: {
+						jobId: job.id,
+						op: job.op,
+						path: job.path,
+						causeCode: normalized.code,
+					},
+					cause: normalized,
+				});
+				const exhaustedSummary = toDriveSyncErrorSummary(exhausted);
+				runErrorState.summary = exhaustedSummary;
 				this.index.addLog(
 					`Blocked (max retries): ${describeJob(job)} (${logMessage})`,
 					"task",
@@ -434,8 +481,9 @@ export class SyncEngine {
 					...job,
 					status: "blocked",
 					lockedAt: undefined,
-					lastError: userMessage,
-					lastErrorCode: normalized.code,
+					lastErrorCode: exhaustedSummary.code,
+					lastErrorRetryable: exhaustedSummary.retryable,
+					lastErrorAt: now(),
 				});
 				return null;
 			}
@@ -452,8 +500,9 @@ export class SyncEngine {
 				reason: normalized.code,
 				status: "pending",
 				lockedAt: undefined,
-				lastError: userMessage,
 				lastErrorCode: normalized.code,
+				lastErrorRetryable: normalized.retryable,
+				lastErrorAt: now(),
 			});
 			return null;
 		}
@@ -472,11 +521,7 @@ export class SyncEngine {
 			}
 			if (
 				job.status === "blocked" &&
-				(shouldRetryBlockedDriveSyncErrorCode(job.lastErrorCode) ||
-					(job.lastError &&
-						shouldRetryBlockedDriveSyncErrorCode(
-							normalizeUnknownDriveSyncError(job.lastError).code,
-						)))
+				shouldRetryBlockedDriveSyncErrorCode(job.lastErrorCode)
 			) {
 				return {
 					...job,
@@ -499,11 +544,7 @@ export class SyncEngine {
 			if (job.status !== "blocked") {
 				continue;
 			}
-			if (
-				isAuthDriveSyncErrorCode(job.lastErrorCode) ||
-				(job.lastError &&
-					isAuthDriveSyncErrorCode(normalizeUnknownDriveSyncError(job.lastError).code))
-			) {
+			if (isAuthDriveSyncErrorCode(job.lastErrorCode)) {
 				job.status = "pending";
 				job.lockedAt = undefined;
 			}

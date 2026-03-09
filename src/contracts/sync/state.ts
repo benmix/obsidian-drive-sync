@@ -1,3 +1,4 @@
+import type { DriveSyncErrorCode, ErrorCategory } from "../data/error-types";
 import type { SyncEntry, SyncJob } from "../data/sync-schema";
 
 export type SyncRuntimeMetrics = {
@@ -22,8 +23,10 @@ export type SyncState = {
 	entries: Record<string, SyncEntry>;
 	jobs: SyncJob[];
 	lastSyncAt?: number;
-	lastError?: string;
 	lastErrorAt?: number;
+	lastErrorCode?: DriveSyncErrorCode;
+	lastErrorCategory?: ErrorCategory;
+	lastErrorRetryable?: boolean;
 	remoteEventCursor?: string;
 	logs?: Array<{ at: string; message: string; context?: string }>;
 	runtimeMetrics?: SyncRuntimeMetrics;

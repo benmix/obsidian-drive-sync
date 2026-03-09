@@ -122,8 +122,10 @@ export class SyncRunner {
 
 		if (engine.listJobs().length === 0) {
 			await engine.save({
-				lastError: undefined,
 				lastErrorAt: undefined,
+				lastErrorCode: undefined,
+				lastErrorCategory: undefined,
+				lastErrorRetryable: undefined,
 			});
 			return;
 		}

@@ -2,7 +2,8 @@ import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
 
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import { tr } from "../i18n";
+import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
+import { tr, trAny } from "../i18n";
 
 export class RemoteProviderLoginModal extends Modal {
 	private plugin: ObsidianDriveSyncPluginApi;
@@ -102,10 +103,13 @@ export class RemoteProviderLoginModal extends Modal {
 					);
 					this.close();
 				} catch (error) {
-					const message =
-						error instanceof Error ? error.message : tr("login.unableToSignIn");
+					const normalized = normalizeUnknownDriveSyncError(error, {
+						category: "auth",
+						userMessage: tr("login.unableToSignIn"),
+						userMessageKey: "login.unableToSignIn",
+					});
 					this.plugin.setRemoteAuthSession(false);
-					new Notice(message);
+					new Notice(translateDriveSyncErrorUserMessage(normalized, trAny));
 				}
 			});
 		});

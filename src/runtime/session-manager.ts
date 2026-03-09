@@ -2,10 +2,11 @@ import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api"
 import type { RemoteProviderSession } from "../contracts/provider/remote-provider";
 import {
 	createDriveSyncError,
-	getDriveSyncErrorUserMessage,
 	normalizeUnknownDriveSyncError,
 	shouldPauseAuthForError,
+	translateDriveSyncErrorUserMessage,
 } from "../errors";
+import { trAny } from "../i18n";
 
 export class SessionManager {
 	private authPaused = false;
@@ -30,12 +31,13 @@ export class SessionManager {
 			const normalized = normalizeUnknownDriveSyncError(error, {
 				category: "auth",
 				userMessage: "Authentication required. Sign in again to continue.",
+				userMessageKey: "error.auth.reauthRequired",
 			});
 			console.warn("Failed to restore remote session.", error);
 			this.plugin.clearStoredRemoteSession();
 			await this.plugin.saveSettings();
 			this.authPaused = shouldPauseAuthForError(normalized);
-			this.lastAuthError = getDriveSyncErrorUserMessage(normalized);
+			this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
 		}
 	}
 
@@ -56,9 +58,10 @@ export class SessionManager {
 		const normalized = normalizeUnknownDriveSyncError(error, {
 			category: "auth",
 			userMessage: "Authentication required. Sign in again to continue.",
+			userMessageKey: "error.auth.reauthRequired",
 		});
 		this.authPaused = true;
-		this.lastAuthError = getDriveSyncErrorUserMessage(normalized);
+		this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
 	}
 
 	async buildActiveRemoteSession(): Promise<RemoteProviderSession | null> {
@@ -77,12 +80,13 @@ export class SessionManager {
 				const normalized = normalizeUnknownDriveSyncError(error, {
 					category: "auth",
 					userMessage: "Authentication required. Sign in again to continue.",
+					userMessageKey: "error.auth.reauthRequired",
 				});
 				console.warn("Failed to restore remote session.", error);
 				this.plugin.clearStoredRemoteSession();
 				await this.plugin.saveSettings();
 				this.authPaused = shouldPauseAuthForError(normalized);
-				this.lastAuthError = getDriveSyncErrorUserMessage(normalized);
+				this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
 				return null;
 			}
 		}
@@ -101,6 +105,8 @@ export class SessionManager {
 			throw createDriveSyncError("AUTH_SIGN_IN_REQUIRED", {
 				category: "auth",
 				userMessage: `Sign in to ${provider.label} first.`,
+				userMessageKey: "error.auth.signInToProviderFirst",
+				userMessageParams: { provider: provider.label },
 				details: { providerId: provider.id },
 			});
 		}
@@ -113,6 +119,8 @@ export class SessionManager {
 			throw createDriveSyncError("PROVIDER_CONNECT_FAILED", {
 				category: "provider",
 				userMessage: `Unable to connect to ${provider.label}.`,
+				userMessageKey: "error.provider.unableToConnectNamed",
+				userMessageParams: { provider: provider.label },
 				details: { providerId: provider.id },
 			});
 		}
@@ -132,11 +140,12 @@ export class SessionManager {
 			const normalized = normalizeUnknownDriveSyncError(refreshError, {
 				category: "auth",
 				userMessage: "Authentication required. Sign in again to continue.",
+				userMessageKey: "error.auth.reauthRequired",
 			});
 			console.warn("Failed to refresh remote session.", refreshError);
 			this.plugin.setRemoteAuthSession(false);
 			this.authPaused = shouldPauseAuthForError(normalized);
-			this.lastAuthError = getDriveSyncErrorUserMessage(normalized);
+			this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
 			await this.plugin.saveSettings();
 			throw normalized;
 		}

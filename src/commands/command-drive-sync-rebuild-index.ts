@@ -5,7 +5,7 @@ import { tr } from "../i18n";
 import { rebuildSyncIndex } from "../runtime/use-cases/sync-workflows";
 
 export function registerDriveSyncRebuildIndexCommand(context: CommandContext) {
-	const { plugin, localProvider, runRemoteCommand } = context;
+	const { plugin, localProvider, runRemoteCommand, showCommandError } = context;
 	plugin.addCommand({
 		id: "drive-sync-rebuild-index",
 		name: tr("commands.rebuildIndex.name"),
@@ -17,8 +17,10 @@ export function registerDriveSyncRebuildIndexCommand(context: CommandContext) {
 					});
 					new Notice(tr("notice.indexRebuilt"));
 				} catch (error) {
-					console.warn("Index rebuild failed.", error);
-					new Notice(tr("notice.indexRebuildFailed"));
+					showCommandError(error, {
+						logMessage: "Index rebuild failed.",
+						noticeKey: "notice.indexRebuildFailed",
+					});
 				}
 			});
 		},

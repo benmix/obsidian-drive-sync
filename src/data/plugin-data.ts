@@ -1,11 +1,33 @@
 import type { PluginData, PluginDataStore } from "../contracts/data/plugin-data";
 import { DEFAULT_SETTINGS } from "../contracts/plugin/default-settings";
 import type { DriveSyncSettings } from "../contracts/plugin/settings";
+import { isSupportedRemoteProviderId } from "../contracts/provider/provider-ids";
+import { normalizeSyncStrategy } from "../contracts/sync/strategy";
 
-export function serializeSettings(settings: DriveSyncSettings): DriveSyncSettings {
-	return {
+function normalizeString(value: unknown): string {
+	return typeof value === "string" ? value.trim() : "";
+}
+
+export function serializeSettings(settings: Partial<DriveSyncSettings>): DriveSyncSettings {
+	const merged = {
 		...DEFAULT_SETTINGS,
 		...settings,
+	};
+	const providerId = normalizeString(merged.remoteProviderId);
+	const syncStrategy = normalizeSyncStrategy(merged.syncStrategy);
+	return {
+		...merged,
+		remoteProviderId: isSupportedRemoteProviderId(providerId)
+			? providerId
+			: DEFAULT_SETTINGS.remoteProviderId,
+		remoteScopeId: normalizeString(merged.remoteScopeId),
+		remoteScopePath: normalizeString(merged.remoteScopePath),
+		remoteAccountEmail: normalizeString(merged.remoteAccountEmail),
+		remoteHasAuthSession:
+			typeof merged.remoteHasAuthSession === "boolean"
+				? merged.remoteHasAuthSession
+				: DEFAULT_SETTINGS.remoteHasAuthSession,
+		syncStrategy: syncStrategy ?? DEFAULT_SETTINGS.syncStrategy,
 	};
 }
 

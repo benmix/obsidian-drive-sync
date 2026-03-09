@@ -5,7 +5,7 @@ import { tr } from "../i18n";
 import { pollRemoteSync } from "../runtime/use-cases/sync-workflows";
 
 export function registerDriveSyncPollRemoteCommand(context: CommandContext) {
-	const { plugin, localProvider, runRemoteCommand } = context;
+	const { plugin, localProvider, runRemoteCommand, showCommandError } = context;
 	plugin.addCommand({
 		id: "drive-sync-poll-remote",
 		name: tr("commands.pollRemote.name"),
@@ -26,8 +26,10 @@ export function registerDriveSyncPollRemoteCommand(context: CommandContext) {
 						}),
 					);
 				} catch (error) {
-					console.warn("Remote poll failed.", error);
-					new Notice(tr("notice.remotePollFailed"));
+					showCommandError(error, {
+						logMessage: "Remote poll failed.",
+						noticeKey: "notice.remotePollFailed",
+					});
 				}
 			});
 		},

@@ -6,7 +6,7 @@ import { estimateSyncPlan, planSync, runPlannedSync } from "../runtime/use-cases
 import { SyncPreflightModal } from "../ui/pre-sync-modal";
 
 export function registerDriveSyncPreSyncCheckCommand(context: CommandContext) {
-	const { plugin, localProvider, runRemoteCommand } = context;
+	const { plugin, localProvider, runRemoteCommand, showCommandError } = context;
 	plugin.addCommand({
 		id: "drive-sync-pre-sync-check",
 		name: tr("commands.preSyncCheck.name"),
@@ -41,8 +41,10 @@ export function registerDriveSyncPreSyncCheckCommand(context: CommandContext) {
 						);
 					}).open();
 				} catch (error) {
-					console.warn("Pre-sync check failed.", error);
-					new Notice(tr("notice.preSyncCheckFailed"));
+					showCommandError(error, {
+						logMessage: "Pre-sync check failed.",
+						noticeKey: "notice.preSyncCheckFailed",
+					});
 				}
 			});
 		},

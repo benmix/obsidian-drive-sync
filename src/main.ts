@@ -9,6 +9,7 @@ import type {
 	RemoteProviderCredentials,
 	RemoteProviderSession,
 } from "./contracts/provider/remote-provider";
+import { createDriveSyncError } from "./errors";
 import { PluginRuntime } from "./runtime/plugin-runtime";
 import { PluginState } from "./runtime/plugin-state";
 
@@ -17,10 +18,7 @@ export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianD
 	private runtime: PluginRuntime | null = null;
 
 	async onload(): Promise<void> {
-		const migrated = await this.getState().initializeFromStorage();
-		if (migrated) {
-			await this.saveSettings();
-		}
+		await this.getState().initializeFromStorage();
 
 		this.runtime = this.getRuntime();
 		await this.runtime.restoreSession();
@@ -129,8 +127,15 @@ export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianD
 		return (await this.runtime?.buildActiveRemoteSession()) ?? null;
 	}
 
-	async connectRemoteClient(): Promise<unknown | null> {
-		return (await this.runtime?.connectRemoteClient()) ?? null;
+	async connectRemoteClient(): Promise<unknown> {
+		if (!this.runtime) {
+			throw createDriveSyncError("PROVIDER_CONNECT_FAILED", {
+				category: "provider",
+				userMessage: "Unable to connect to the remote provider.",
+				userMessageKey: "error.provider.unableToConnect",
+			});
+		}
+		return await this.runtime.connectRemoteClient();
 	}
 
 	async runAutoSync(force = false): Promise<void> {

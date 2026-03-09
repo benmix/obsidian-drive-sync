@@ -1,8 +1,14 @@
 import { Notice } from "obsidian";
 
-import type { CommandContext, ConnectedRemoteClient } from "../contracts/plugin/command-context";
+import type {
+	CommandContext,
+	CommandErrorOptions,
+	ConnectedRemoteClient,
+} from "../contracts/plugin/command-context";
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import { tr } from "../i18n";
+import type { DriveSyncErrorCode, ErrorCategory } from "../errors";
+import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
+import { tr, trAny } from "../i18n";
 
 export function createCommandContext(plugin: ObsidianDriveSyncPluginApi): CommandContext {
 	const localProvider = plugin.getLocalProvider();
@@ -31,13 +37,20 @@ export function createCommandContext(plugin: ObsidianDriveSyncPluginApi): Comman
 			return null;
 		}
 
-		const client = await plugin.connectRemoteClient();
-		if (!client) {
-			new Notice(
-				tr("notice.unableToConnectProvider", {
+		let client: unknown;
+		try {
+			client = await plugin.connectRemoteClient();
+		} catch (error) {
+			showCommandError(error, {
+				logMessage: "Failed to connect remote provider for command.",
+				noticeKey: "notice.unableToConnectProvider",
+				noticeParams: { provider: provider.label },
+				category: "provider",
+				userMessage: tr("notice.unableToConnectProvider", {
 					provider: provider.label,
 				}),
-			);
+				userMessageKey: "error.provider.unableToConnectNamed",
+			});
 			return null;
 		}
 
@@ -55,11 +68,24 @@ export function createCommandContext(plugin: ObsidianDriveSyncPluginApi): Comman
 		await onConnected(connection);
 	};
 
+	const showCommandError = (error: unknown, options: CommandErrorOptions): void => {
+		const normalized = normalizeUnknownDriveSyncError(error, {
+			code: options.code as DriveSyncErrorCode | undefined,
+			category: options.category as ErrorCategory | undefined,
+			retryable: options.retryable,
+			userMessage: options.userMessage ?? trAny(options.noticeKey, options.noticeParams),
+			userMessageKey: options.userMessageKey ?? options.noticeKey,
+		});
+		console.warn(options.logMessage, error);
+		new Notice(translateDriveSyncErrorUserMessage(normalized, trAny));
+	};
+
 	return {
 		plugin,
 		localProvider,
 		requireScopeId,
 		requireConnectedRemoteClient,
 		runRemoteCommand,
+		showCommandError,
 	};
 }

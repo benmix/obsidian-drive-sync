@@ -9,6 +9,17 @@ export type ConnectedRemoteClient = {
 	scopeId: string;
 };
 
+export type CommandErrorOptions = {
+	logMessage: string;
+	noticeKey: string;
+	noticeParams?: Record<string, string | number | boolean>;
+	code?: string;
+	category?: string;
+	retryable?: boolean;
+	userMessage?: string;
+	userMessageKey?: string;
+};
+
 export type CommandContext = {
 	plugin: ObsidianDriveSyncPluginApi;
 	localProvider: LocalProvider;
@@ -17,4 +28,5 @@ export type CommandContext = {
 	runRemoteCommand: (
 		onConnected: (connection: ConnectedRemoteClient) => Promise<void>,
 	) => Promise<void>;
+	showCommandError: (error: unknown, options: CommandErrorOptions) => void;
 };

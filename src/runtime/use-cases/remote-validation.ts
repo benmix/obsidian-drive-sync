@@ -3,6 +3,7 @@ import type {
 	RemoteValidationReport,
 	ValidationStep,
 } from "../../contracts/provider/remote-validation";
+import { createDriveSyncError } from "../../errors";
 
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
 	if (a.byteLength !== b.byteLength) {
@@ -117,7 +118,10 @@ export async function validateRemoteOperations(
 
 		try {
 			if (!fileId) {
-				throw new Error("missing file id");
+				throw createDriveSyncError("SYNC_JOB_INVALID", {
+					category: "sync",
+					details: { step: "read file", reason: "missing file id" },
+				});
 			}
 			const downloaded = await remoteFileSystem.readFile(fileId);
 			const expected = encoder.encode(`validation-${suffix}-v1`);
@@ -171,7 +175,13 @@ export async function validateRemoteOperations(
 		} else {
 			try {
 				if (!fileId) {
-					throw new Error("missing file id");
+					throw createDriveSyncError("SYNC_JOB_INVALID", {
+						category: "sync",
+						details: {
+							step: "move/rename file",
+							reason: "missing file id",
+						},
+					});
 				}
 				await remoteFileSystem.moveEntry(fileId, movedPath);
 				const entries = await remoteFileSystem.listEntries();
@@ -200,7 +210,13 @@ export async function validateRemoteOperations(
 		} else {
 			try {
 				if (!fileId) {
-					throw new Error("missing file id");
+					throw createDriveSyncError("SYNC_JOB_INVALID", {
+						category: "sync",
+						details: {
+							step: "delete file",
+							reason: "missing file id",
+						},
+					});
 				}
 				await remoteFileSystem.deleteEntry(fileId);
 				const entries = await remoteFileSystem.listEntries();

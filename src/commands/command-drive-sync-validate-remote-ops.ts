@@ -5,7 +5,7 @@ import { tr } from "../i18n";
 import { validateRemoteOperations } from "../runtime/use-cases/remote-validation";
 
 export function registerDriveSyncValidateRemoteOpsCommand(context: CommandContext) {
-	const { runRemoteCommand } = context;
+	const { runRemoteCommand, showCommandError } = context;
 	context.plugin.addCommand({
 		id: "drive-sync-validate-remote-ops",
 		name: tr("commands.validateOps.name"),
@@ -26,8 +26,10 @@ export function registerDriveSyncValidateRemoteOpsCommand(context: CommandContex
 						);
 					}
 				} catch (error) {
-					console.warn("Remote validation failed.", error);
-					new Notice(tr("notice.remoteValidationFailed"));
+					showCommandError(error, {
+						logMessage: "Remote validation failed.",
+						noticeKey: "notice.remoteValidationFailed",
+					});
 				}
 			});
 		},

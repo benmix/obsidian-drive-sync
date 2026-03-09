@@ -1,7 +1,6 @@
 import { DEFAULT_SETTINGS } from "../contracts/plugin/default-settings";
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 import type { DriveSyncSettings } from "../contracts/plugin/settings";
-import { migrateLoadedSettings } from "../contracts/plugin/settings-migration";
 import type { LocalProvider } from "../contracts/provider/local-provider";
 import {
 	DEFAULT_LOCAL_PROVIDER_ID,
@@ -30,13 +29,11 @@ export class PluginState {
 
 	constructor(private readonly plugin: ObsidianDriveSyncPluginApi) {}
 
-	async initializeFromStorage(): Promise<boolean> {
+	async initializeFromStorage(): Promise<void> {
 		const data = await loadPluginData(this.plugin);
-		const { settings, migrated } = migrateLoadedSettings(data.settings);
-		this.mutableSettings = settings;
+		this.mutableSettings = data.settings;
 		this.localProviderRegistry = createLocalProviderRegistry(this.getLocalProviderId());
 		this.remoteProviderRegistry = createRemoteProviderRegistry(this.getRemoteProviderId());
-		return migrated;
 	}
 
 	get settings(): Readonly<DriveSyncSettings> {

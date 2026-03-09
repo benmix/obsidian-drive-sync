@@ -527,9 +527,9 @@ if localChanged && remoteChanged -> Conflict
     - `remoteHasAuthSession`
 
 - Compatibility policy:
-    - one-time migration from legacy brand-specific fields (`protonSession`, `remoteFolderId`, etc.) to provider fields on load
-    - persist provider-only settings after migration (no dual-write compatibility fields)
-    - remove legacy settings paths from runtime reads/writes
+    - persist provider-only settings directly
+    - keep runtime reads/writes on provider-only fields
+    - do not maintain legacy brand-specific settings migration paths
 
 ### 20.4 Rollout phases
 
@@ -556,7 +556,7 @@ if localChanged && remoteChanged -> Conflict
 - Phase A/B/C completed (provider contracts/registry, runtime, settings/login/commands/modals).
 - Added provider session helper to unify restore/refresh/connect session paths.
 - Added `getRootScope(...)` in provider so remote folder selector no longer depends on concrete SDK details.
-- Removed legacy dual-write settings compatibility path; now one-time migration then provider-only persistence.
+- Removed legacy settings compatibility paths; runtime now uses provider-only persistence without migration glue.
 - Verification result at that point: `pnpm run lint`, `pnpm run test`, and `pnpm run build` all passed.
 
 ---

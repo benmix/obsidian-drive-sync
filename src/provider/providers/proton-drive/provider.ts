@@ -17,6 +17,7 @@ import type {
 	RemoteProviderSession,
 	RemoteScopeRoot,
 } from "../../../contracts/provider/remote-provider";
+import { createDriveSyncError } from "../../../errors";
 
 import { ProtonDriveRemoteFileSystem } from "./remote-file-system";
 import { ProtonDriveAuthService } from "./sdk/auth";
@@ -91,7 +92,10 @@ export class ProtonDriveRemoteProvider implements RemoteProvider {
 					).getMyFilesRootFolder()
 				: null;
 		if (!rootResult || !(rootResult as { ok?: boolean }).ok) {
-			throw new Error("Unable to load root folder.");
+			throw createDriveSyncError("REMOTE_NOT_FOUND", {
+				category: "remote_fs",
+				debugMessage: "Unable to load root folder.",
+			});
 		}
 		const rootNode = (rootResult as { value: { uid: string; name: string } }).value;
 		return {

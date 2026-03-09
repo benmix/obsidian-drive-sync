@@ -527,9 +527,9 @@ if localChanged && remoteChanged -> Conflict
     - `remoteHasAuthSession`
 
 - 兼容策略：
-    - 启动时一次性把旧的品牌专用字段（如 `protonSession`、`remoteFolderId` 等）迁移到 provider 字段
-    - 迁移后只持久化 provider-only 设置（不再做 dual-write 兼容字段）
-    - 从运行时代码里移除旧版设置路径的读写
+    - 直接持久化 provider-only 设置
+    - 运行时代码只读写 provider-only 字段
+    - 不再保留旧品牌专用设置字段的迁移路径
 
 ### 20.4 推进阶段
 
@@ -556,7 +556,7 @@ if localChanged && remoteChanged -> Conflict
 - Phase A / B / C 已完成（provider 契约 / 注册表、运行时、设置 / 登录 / 命令 / 弹窗）。
 - 已增加 provider session helper，以统一 restore / refresh / connect 的会话路径。
 - 已在 provider 中增加 `getRootScope(...)`，因此远端文件夹选择器不再依赖具体 SDK 细节。
-- 已移除旧版 dual-write 设置兼容路径；当前为一次性迁移后仅保留 provider-only 持久化。
+- 已移除旧版设置兼容路径；当前运行时直接使用 provider-only 持久化，不再保留迁移胶水。
 - 当时的验证结果：`pnpm run lint`、`pnpm run test` 与 `pnpm run build` 均已通过。
 
 ---

@@ -1,6 +1,6 @@
 export type SupportedLocale = "en-US" | "zh-CN";
 
-export type TranslationParams = Record<string, string | number>;
+export type TranslationParams = Record<string, string | number | boolean>;
 
 export type TranslationDictionary = Record<string, string>;
 

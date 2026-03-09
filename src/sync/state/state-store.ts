@@ -21,8 +21,10 @@ export class PluginDataStateStore implements StateStore {
 			entries: entriesMap,
 			jobs,
 			lastSyncAt: metaMap.get("lastSyncAt") as number | undefined,
-			lastError: metaMap.get("lastError") as string | undefined,
 			lastErrorAt: metaMap.get("lastErrorAt") as number | undefined,
+			lastErrorCode: metaMap.get("lastErrorCode") as SyncState["lastErrorCode"],
+			lastErrorCategory: metaMap.get("lastErrorCategory") as SyncState["lastErrorCategory"],
+			lastErrorRetryable: metaMap.get("lastErrorRetryable") as boolean | undefined,
 			remoteEventCursor: metaMap.get("remoteEventCursor") as string | undefined,
 			runtimeMetrics: parseRuntimeMetrics(metaMap.get("runtimeMetrics")),
 			logs: logs.map(mapLog),
@@ -57,8 +59,16 @@ export class PluginDataStateStore implements StateStore {
 				}
 				await syncStateDb.meta.bulkPut([
 					{ key: "lastSyncAt", value: state.lastSyncAt },
-					{ key: "lastError", value: state.lastError },
 					{ key: "lastErrorAt", value: state.lastErrorAt },
+					{ key: "lastErrorCode", value: state.lastErrorCode },
+					{
+						key: "lastErrorCategory",
+						value: state.lastErrorCategory,
+					},
+					{
+						key: "lastErrorRetryable",
+						value: state.lastErrorRetryable,
+					},
 					{
 						key: "remoteEventCursor",
 						value: state.remoteEventCursor,
@@ -85,7 +95,7 @@ function toLog(log: { at: string; message: string; context?: string }): SyncLog 
 	return { at: log.at, message: log.message, context: log.context };
 }
 
-function parseRuntimeMetrics(value?: string | number): SyncRuntimeMetrics | undefined {
+function parseRuntimeMetrics(value?: string | number | boolean): SyncRuntimeMetrics | undefined {
 	if (!value || typeof value !== "string") {
 		return undefined;
 	}

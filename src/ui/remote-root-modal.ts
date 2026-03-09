@@ -3,8 +3,9 @@ import type { App } from "obsidian";
 
 import type { RemoteFileEntry, RemoteFileSystem } from "../contracts/filesystem/file-system";
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
 import { normalizePath } from "../filesystem/path";
-import { tr } from "../i18n";
+import { tr, trAny } from "../i18n";
 
 export class RemoteFolderPickerModal extends Modal {
 	private plugin: ObsidianDriveSyncPluginApi;
@@ -50,11 +51,19 @@ export class RemoteFolderPickerModal extends Modal {
 			return;
 		}
 
-		const client = await this.plugin.connectRemoteClient();
-		if (!client) {
-			this.error = tr("notice.unableToConnectProvider", {
-				provider: provider.label,
+		let client: unknown;
+		try {
+			client = await this.plugin.connectRemoteClient();
+		} catch (error) {
+			const normalized = normalizeUnknownDriveSyncError(error, {
+				category: "provider",
+				userMessage: tr("notice.unableToConnectProvider", {
+					provider: provider.label,
+				}),
+				userMessageKey: "error.provider.unableToConnectNamed",
+				userMessageParams: { provider: provider.label },
 			});
+			this.error = translateDriveSyncErrorUserMessage(normalized, trAny);
 			this.loading = false;
 			return;
 		}
