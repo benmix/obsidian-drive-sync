@@ -1,6 +1,7 @@
 import { Notice } from "obsidian";
 
 import type { CommandContext } from "../contracts/plugin/command-context";
+import { tr } from "../i18n";
 import { DriveSyncSettingTab } from "../ui/settings-tab";
 
 export function registerDriveSyncOpenSettingsCommand(context: CommandContext) {
@@ -10,7 +11,7 @@ export function registerDriveSyncOpenSettingsCommand(context: CommandContext) {
 
 	plugin.addCommand({
 		id: "drive-sync-open-settings",
-		name: "Open plugin settings",
+		name: tr("commands.openSettings.name"),
 		callback: () => {
 			const setting = (plugin.app as { setting?: unknown }).setting as
 				| {
@@ -19,7 +20,7 @@ export function registerDriveSyncOpenSettingsCommand(context: CommandContext) {
 				  }
 				| undefined;
 			if (!setting?.open || !setting.openTabById) {
-				new Notice("Unable to open settings view.");
+				new Notice(tr("notice.openSettingsUnavailable"));
 				return;
 			}
 			setting.open();

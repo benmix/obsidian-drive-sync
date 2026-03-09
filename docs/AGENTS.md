@@ -41,8 +41,8 @@ pnpm run build
 - If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder: `eslint ./src/`
 - For this repository, prefer project scripts:
     - Check lint issues: `pnpm run lint`
-    - Auto-fix lint issues where possible: `pnpm run lint-fix`
-    - Fix import order issues directly: `pnpm run fix:imports` (runs `scripts/fix-sort-imports.mjs`)
+    - Auto-fix lint issues where possible: `pnpm run lint:fix`
+    - Format code and sort imports: `pnpm run format`
 
 ## File & folder conventions
 
@@ -52,7 +52,7 @@ pnpm run build
     ```
     src/
       main.ts           # Plugin entry point, lifecycle management
-      settings.ts       # Settings interface and defaults
+      ui/settings-tab.ts # Settings tab UI
       commands/         # Command implementations
         command1.ts
         command2.ts
@@ -186,7 +186,7 @@ export default class MyPlugin extends Plugin {
 }
 ```
 
-**settings.ts**:
+**ui/settings-tab.ts**:
 
 ```ts
 export interface MySettings {

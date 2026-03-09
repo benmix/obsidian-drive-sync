@@ -1,13 +1,14 @@
 import { Notice } from "obsidian";
 
 import type { CommandContext } from "../contracts/plugin/command-context";
+import { tr } from "../i18n";
 import { restoreVaultFromRemote } from "../runtime/use-cases/sync-workflows";
 
 export function registerDriveSyncRestoreVaultCommand(context: CommandContext) {
 	const { plugin, localProvider, runRemoteCommand } = context;
 	plugin.addCommand({
 		id: "drive-sync-restore-vault",
-		name: "Restore vault from remote",
+		name: tr("commands.restoreVault.name"),
 		callback: async () => {
 			await runRemoteCommand(async ({ provider, client, scopeId }) => {
 				try {
@@ -18,10 +19,15 @@ export function registerDriveSyncRestoreVaultCommand(context: CommandContext) {
 						client,
 						scopeId,
 					);
-					new Notice(`Downloaded ${result.downloaded} files from ${provider.label}.`);
+					new Notice(
+						tr("notice.downloadedFilesFromProvider", {
+							count: result.downloaded,
+							provider: provider.label,
+						}),
+					);
 				} catch (error) {
 					console.warn("Vault restore failed.", error);
-					new Notice("Vault restore failed. Check the console for details.");
+					new Notice(tr("notice.vaultRestoreFailed"));
 				}
 			});
 		},

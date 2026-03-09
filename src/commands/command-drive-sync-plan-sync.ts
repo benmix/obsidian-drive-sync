@@ -1,13 +1,14 @@
 import { Notice } from "obsidian";
 
 import type { CommandContext } from "../contracts/plugin/command-context";
+import { tr } from "../i18n";
 import { planSync } from "../runtime/use-cases/sync-workflows";
 
 export function registerDriveSyncPlanSyncCommand(context: CommandContext) {
 	const { plugin, localProvider, runRemoteCommand } = context;
 	plugin.addCommand({
 		id: "drive-sync-plan-sync",
-		name: "Plan remote sync",
+		name: tr("commands.planSync.name"),
 		callback: async () => {
 			await runRemoteCommand(async ({ provider, client, scopeId }) => {
 				try {
@@ -20,11 +21,14 @@ export function registerDriveSyncPlanSyncCommand(context: CommandContext) {
 						{ syncStrategy: plugin.settings.syncStrategy },
 					);
 					new Notice(
-						`Planned ${result.jobsPlanned} jobs across ${result.entries} entries.`,
+						tr("notice.plannedJobsAcrossEntries", {
+							jobs: result.jobsPlanned,
+							entries: result.entries,
+						}),
 					);
 				} catch (error) {
 					console.warn("Sync planning failed.", error);
-					new Notice("Sync planning failed. Check the console for details.");
+					new Notice(tr("notice.syncPlanningFailed"));
 				}
 			});
 		},

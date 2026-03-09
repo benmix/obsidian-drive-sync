@@ -4,13 +4,11 @@ This document describes how commands are organized and what each command does.
 
 ## Structure
 
-Command registration is split by domain under `src/commands/`:
+Command registration lives under `src/commands/` with a flat, per-command layout:
 
-- `index.ts`: composition root. Builds context and registers all command groups.
+- `index.ts`: composition root. Builds context, registers the settings tab, and registers every command directly.
 - `context.ts`: shared command context and remote connection guard.
-- `ui-session-commands.ts`: login/logout/session and UI modal commands.
-- `sync-commands.ts`: sync planning, polling, execution, and vault copy commands.
-- `maintenance-commands.ts`: validation, diagnostics, index rebuild, and runtime toggles.
+- `command-*.ts`: one file per command registration function (`registerDriveSync*Command`).
 
 ## Shared Guarding
 
@@ -24,15 +22,16 @@ All commands that touch remote file system should run inside `runRemoteCommand()
 
 ## Command Catalog
 
-### Session and UI (`ui-session-commands.ts`)
+### Session and UI
 
 - `drive-sync-connect`: connect remote provider.
 - `drive-sync-login`: open provider login modal.
 - `drive-sync-logout`: logout and clear stored session.
 - `drive-sync-review-conflicts`: open conflict review modal.
 - `drive-sync-show-status`: open sync status modal.
+- `drive-sync-open-settings`: open Obsidian settings and focus this plugin tab.
 
-### Sync Flow (`sync-commands.ts`)
+### Sync Flow
 
 - `drive-sync-pre-sync-check`: estimate, then plan + execute from modal.
 - `drive-sync-plan-sync`: plan jobs only.
@@ -42,7 +41,7 @@ All commands that touch remote file system should run inside `runRemoteCommand()
 - `drive-sync-sync-vault`: upload local vault snapshot to remote.
 - `drive-sync-restore-vault`: restore local vault snapshot from remote.
 
-### Maintenance (`maintenance-commands.ts`)
+### Maintenance
 
 - `drive-sync-validate-remote-ops`: run create/list/read/delete remote capability checks.
 - `drive-sync-pause-auto-sync`: pause auto-sync scheduler.
@@ -53,8 +52,8 @@ All commands that touch remote file system should run inside `runRemoteCommand()
 
 ## Add New Command
 
-1. Choose the target module by domain (`ui-session`, `sync`, `maintenance`).
-2. Reuse `CommandContext` helpers instead of duplicating scope/session checks.
-3. Keep command IDs stable once released.
-4. Use concise `Notice` feedback and log detailed errors to console.
-5. If command becomes a new domain, add a new `*-commands.ts` file and register it from `index.ts`.
+1. Create a new file in `src/commands/` named `command-<id>.ts`.
+2. Export one registration function (for example `registerDriveSyncFooCommand(context)`).
+3. Reuse `CommandContext` helpers instead of duplicating scope/session checks.
+4. Register the new command directly in `src/commands/index.ts`.
+5. Keep command IDs stable once released and use concise `Notice` feedback.

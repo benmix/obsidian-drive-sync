@@ -77,6 +77,7 @@ Data Layer
 
 - Directory: `src/runtime/*`
 - Responsibilities:
+    - `plugin-state.ts`: plugin settings/provider state facade (load/migrate/save settings, active provider registries, auth/session fields).
     - `plugin-runtime.ts`: lifecycle orchestration hub.
     - `session-manager.ts`: session restore/refresh and auth-pause control.
     - `trigger-scheduler.ts`: interval + local change debounce + single-flight.
@@ -86,11 +87,11 @@ Data Layer
 ### 3.5 Plugin Facade / UI / Commands (Outer Interaction Layer)
 
 - `main.ts`
-    - Plugin entry facade responsible for loading/migrating/saving settings, initializing registries, attaching runtime, and registering UI/commands.
+    - Plugin entry facade responsible for lifecycle wiring and delegating state/runtime operations.
 - `ui/*`
     - Depend only on plugin API and provider abstractions; do not depend on concrete provider implementations.
 - `commands/*`
-    - Trigger runtime use-cases without coupling to concrete SDK internals.
+    - One command per file under `src/commands/command-*.ts`; `commands/index.ts` composes context, registers settings tab, and registers each command.
 
 ## 4. Core Abstractions
 
@@ -119,11 +120,11 @@ Data Layer
 
 ### 5.1 Plugin Startup Sequence
 
-1. `main.ts` reads plugin data.
-2. Settings migration runs and normalized settings are persisted.
-3. Local/remote registries are built by active provider ID.
+1. `main.ts` initializes `PluginState` and calls `initializeFromStorage()`.
+2. Settings migration runs and normalized settings are persisted if needed.
+3. Local/remote registries are built by active provider ID inside `PluginState`.
 4. `PluginRuntime` is initialized and `restoreSession()` is executed.
-5. Setting tab and commands are registered.
+5. `commands/index.ts` registers the settings tab and all commands.
 6. Scheduler refresh is performed according to `autoSyncEnabled`.
 
 ### 5.2 Auto-Sync Sequence

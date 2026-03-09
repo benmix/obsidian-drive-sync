@@ -82,7 +82,12 @@ export class ProtonAuth {
 				logger.info("Access token expired, attempting refresh...");
 				await this.refreshToken();
 				// Retry with new token
-				return await apiRequest<T>(method, endpoint, data, this.session);
+				return await apiRequest<T>(
+					method,
+					endpoint,
+					data,
+					this.session,
+				);
 			}
 			throw error;
 		}
@@ -97,14 +102,19 @@ export class ProtonAuth {
 		twoFactorCode: string | null = null,
 	): Promise<Session> {
 		// Get auth info
-		const authInfo = await apiRequest<AuthInfo & ApiResponse>("POST", "core/v4/auth/info", {
-			Username: username,
-		});
+		const authInfo = await apiRequest<AuthInfo & ApiResponse>(
+			"POST",
+			"core/v4/auth/info",
+			{
+				Username: username,
+			},
+		);
 
 		// Generate SRP proofs
-		const { clientEphemeral, clientProof, expectedServerProof } = await getSrp(authInfo, {
-			password,
-		});
+		const { clientEphemeral, clientProof, expectedServerProof } =
+			await getSrp(authInfo, {
+				password,
+			});
 
 		// Authenticate
 		const authData: Record<string, unknown> = {
@@ -119,7 +129,11 @@ export class ProtonAuth {
 			authData.TwoFactorCode = twoFactorCode;
 		}
 
-		const authResponse = await apiRequest<AuthResponse>("POST", "core/v4/auth", authData);
+		const authResponse = await apiRequest<AuthResponse>(
+			"POST",
+			"core/v4/auth",
+			authData,
+		);
 
 		// Verify server proof
 		if (authResponse.ServerProof !== expectedServerProof) {
@@ -400,21 +414,15 @@ export class ProtonAuth {
 		this.session.user = userResponse.User;
 
 		// Fetch key salts
-		const saltsResponse = await apiRequest<ApiResponse & { KeySalts?: KeySalt[] }>(
-			"GET",
-			"core/v4/keys/salts",
-			null,
-			this.session,
-		);
+		const saltsResponse = await apiRequest<
+			ApiResponse & { KeySalts?: KeySalt[] }
+		>("GET", "core/v4/keys/salts", null, this.session);
 		const keySalts = saltsResponse.KeySalts || [];
 
 		// Fetch addresses
-		const addressesResponse = await apiRequest<ApiResponse & { Addresses?: Address[] }>(
-			"GET",
-			"core/v4/addresses",
-			null,
-			this.session,
-		);
+		const addressesResponse = await apiRequest<
+			ApiResponse & { Addresses?: Address[] }
+		>("GET", "core/v4/addresses", null, this.session);
 		const addresses = addressesResponse.Addresses || [];
 
 		// Find primary key and its salt
@@ -424,7 +432,10 @@ export class ProtonAuth {
 
 			if (keySalt?.KeySalt) {
 				// Compute key password from password and salt
-				const keyPassword = await computeKeyPassword(password, keySalt.KeySalt);
+				const keyPassword = await computeKeyPassword(
+					password,
+					keySalt.KeySalt,
+				);
 				this.session.keyPassword = keyPassword;
 
 				// Try to decrypt the primary key
@@ -438,7 +449,10 @@ export class ProtonAuth {
 					});
 					this.session.primaryKey = decryptedKey;
 				} catch (error) {
-					logger.warn("Failed to decrypt primary key:", (error as Error).message);
+					logger.warn(
+						"Failed to decrypt primary key:",
+						(error as Error).message,
+					);
 				}
 			}
 		}
@@ -468,7 +482,9 @@ export class ProtonAuth {
 			throw new Error("Not authenticated");
 		}
 		if (!this.session.keyPassword) {
-			throw new Error("No key password available - authentication incomplete");
+			throw new Error(
+				"No key password available - authentication incomplete",
+			);
 		}
 		if (!this.session.UserID) {
 			throw new Error("No user ID available - authentication incomplete");
@@ -505,6 +521,7 @@ export class ProtonAuth {
 			UID: parentUID,
 			AccessToken: parentAccessToken,
 			RefreshToken: parentRefreshToken,
+			UserID: credentials.UserID,
 			keyPassword: SaltedKeyPass,
 			passwordMode: credentials.passwordMode,
 		};
@@ -514,6 +531,7 @@ export class ProtonAuth {
 			UID: childUID,
 			AccessToken: childAccessToken,
 			RefreshToken: childRefreshToken,
+			UserID: credentials.UserID,
 			keyPassword: SaltedKeyPass,
 			passwordMode: credentials.passwordMode,
 		};
@@ -521,10 +539,9 @@ export class ProtonAuth {
 		// Helper to refresh token when needed
 		// Verify the session is still valid by fetching user info
 		try {
-			const userResponse = await this.apiRequestWithRefresh<ApiResponse & { User: User }>(
-				"GET",
-				"core/v4/users",
-			);
+			const userResponse = await this.apiRequestWithRefresh<
+				ApiResponse & { User: User }
+			>("GET", "core/v4/users");
 			this.session.user = userResponse.User;
 
 			// First, decrypt the user's primary key
@@ -546,7 +563,10 @@ export class ProtonAuth {
 							`Failed to decrypt primary user key in two-password mode. Re-authentication required.`,
 						);
 					}
-					logger.warn("Failed to decrypt primary user key:", (error as Error).message);
+					logger.warn(
+						"Failed to decrypt primary user key:",
+						(error as Error).message,
+					);
 				}
 			}
 
@@ -569,7 +589,9 @@ export class ProtonAuth {
 			return this.session;
 		} catch (error) {
 			this.session = null;
-			throw new Error(`Failed to restore session: ${(error as Error).message}`);
+			throw new Error(
+				`Failed to restore session: ${(error as Error).message}`,
+			);
 		}
 	}
 
@@ -655,7 +677,10 @@ export class ProtonAuth {
 	 * Attempt to recover from an expired child session by forking a new one from the parent
 	 */
 	private async attemptForkRecovery(): Promise<Session> {
-		if (!this.parentSession?.RefreshToken || !this.parentSession?.keyPassword) {
+		if (
+			!this.parentSession?.RefreshToken ||
+			!this.parentSession?.keyPassword
+		) {
 			throw new Error(
 				"Parent session not available. Please re-authenticate with: proton-drive-sync auth",
 			);
@@ -672,7 +697,8 @@ export class ProtonAuth {
 			return this.session!;
 		} catch (error) {
 			// If parent refresh or forking fails, user needs to re-authenticate
-			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
 			throw new Error(
 				`Failed to recover session: ${errorMessage}. Please re-authenticate with: proton-drive-sync auth`,
 			);
@@ -696,7 +722,9 @@ export class ProtonAuth {
 			this.parentSession.RefreshToken = tokens.refreshToken;
 		} catch (error) {
 			if (this.isInvalidRefreshTokenError(error)) {
-				throw new Error("Parent session expired. Please re-authenticate.");
+				throw new Error(
+					"Parent session expired. Please re-authenticate.",
+				);
 			}
 			throw error;
 		}
@@ -728,13 +756,14 @@ export class ProtonAuth {
 		parentSession: Session,
 	): Promise<{ selector: string; encryptionKey: Uint8Array }> {
 		if (!parentSession.keyPassword) {
-			throw new Error("Parent session missing keyPassword for fork payload");
+			throw new Error(
+				"Parent session missing keyPassword for fork payload",
+			);
 		}
 
 		// Encrypt the keyPassword for the fork payload
-		const { key: encryptionKey, blob: encryptedPayload } = await createForkEncryptedBlob(
-			parentSession.keyPassword,
-		);
+		const { key: encryptionKey, blob: encryptedPayload } =
+			await createForkEncryptedBlob(parentSession.keyPassword);
 
 		const response = await requestHttp(
 			`${API_BASE_URL}/auth/v4/sessions/forks`,
@@ -808,7 +837,10 @@ export class ProtonAuth {
 		// Decrypt the keyPassword from the payload
 		let keyPassword: string;
 		if (json.Payload) {
-			keyPassword = await decryptForkEncryptedBlob(encryptionKey, json.Payload);
+			keyPassword = await decryptForkEncryptedBlob(
+				encryptionKey,
+				json.Payload,
+			);
 		} else {
 			// Fallback to parent's keyPassword if no payload
 			if (!parentSession.keyPassword) {
@@ -832,7 +864,9 @@ export class ProtonAuth {
 	 */
 	async forkNewChildSession(): Promise<Session> {
 		if (!this.parentSession) {
-			throw new Error("No parent session available - re-authentication required");
+			throw new Error(
+				"No parent session available - re-authentication required",
+			);
 		}
 
 		logger.info("Forking new child session from parent session");
@@ -849,13 +883,17 @@ export class ProtonAuth {
 			} catch (error) {
 				// Parent session is also expired - need full re-auth
 				if (this.isInvalidRefreshTokenError(error)) {
-					throw new Error("Parent session expired - re-authentication required");
+					throw new Error(
+						"Parent session expired - re-authentication required",
+					);
 				}
 				throw error;
 			}
 
 			// Push fork request using parent session
-			const { selector, encryptionKey } = await this.pushForkSession(this.parentSession);
+			const { selector, encryptionKey } = await this.pushForkSession(
+				this.parentSession,
+			);
 
 			// Pull the new child session
 			const childSession = await this.pullForkSession(
@@ -879,7 +917,8 @@ export class ProtonAuth {
 
 			return this.session;
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
+			const message =
+				error instanceof Error ? error.message : String(error);
 			logger.error(`Failed to fork child session: ${message}`);
 
 			// Clear parent session if it's expired

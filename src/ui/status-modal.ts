@@ -1,7 +1,9 @@
 import { Modal, Setting } from "obsidian";
 import type { App } from "obsidian";
 
+import type { SyncJob } from "../contracts/data/sync-schema";
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import { tr } from "../i18n";
 
 import { formatBytes } from "./format";
 
@@ -16,44 +18,408 @@ export class SyncStatusModal extends Modal {
 	async onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-		const provider = this.plugin.getRemoteProvider();
-		contentEl.createEl("h2", { text: `${provider.label} sync status` });
+		contentEl.addClass("drive-sync-status-modal");
 
+		const provider = this.plugin.getRemoteProvider();
 		const state = await this.plugin.loadSyncState();
-		const conflicts = Object.values(state.entries ?? {}).filter((entry) => entry.conflict);
+		const conflicts = Object.values(state.entries ?? {}).filter(
+			(entry) => entry.conflict,
+		);
+		const entriesTracked = Object.keys(state.entries ?? {}).length;
 		const logs = state.logs ?? [];
+		const taskLogs = logs.filter((entry) => entry.context === "task");
+		const jobs = state.jobs ?? [];
+		const nowTs = Date.now();
+
 		const autoSyncStatus = this.plugin.settings.autoSyncEnabled
 			? this.plugin.isAutoSyncPaused()
-				? "Paused"
-				: "Running"
-			: "Disabled";
+				? tr("status.autoSync.paused")
+				: tr("status.autoSync.running")
+			: tr("status.autoSync.disabled");
+		const syncActivity = this.plugin.isSyncRunning()
+			? tr("status.inProgress")
+			: tr("status.idle");
 		const authStatus = this.plugin.isAuthPaused()
-			? (this.plugin.getLastAuthError() ?? "Auth paused")
+			? (this.plugin.getLastAuthError() ?? tr("status.authPaused"))
 			: this.plugin.hasRemoteAuthSession()
 				? provider.isSessionValidated()
-					? "OK"
-					: "Session stored (validation pending)"
-				: "Signed out";
+					? tr("status.authOk")
+					: tr("status.authPending")
+				: tr("status.signedOut");
 
-		const jobCounts = {
-			pending: 0,
-			processing: 0,
-			blocked: 0,
-		};
-		const nowTs = Date.now();
+		const queueMeta = this.collectQueueMeta(jobs, nowTs);
+
+		const layout = contentEl.createDiv({ cls: "drive-sync-status-layout" });
+
+		const header = layout.createDiv({ cls: "drive-sync-status-header" });
+		header.createEl("h2", {
+			text: tr("status.title"),
+		});
+		header.createDiv({
+			cls: "drive-sync-status-header-meta",
+			text: `${tr("status.lastSync")}: ${
+				state.lastSyncAt
+					? new Date(state.lastSyncAt).toLocaleString()
+					: tr("status.never")
+			}`,
+		});
+		const chips = header.createDiv({ cls: "drive-sync-status-chips" });
+		this.renderChip(
+			chips,
+			tr("status.syncActivity"),
+			syncActivity,
+			this.plugin.isSyncRunning() ? "active" : "idle",
+		);
+		this.renderChip(
+			chips,
+			tr("status.authStatus"),
+			authStatus,
+			this.plugin.isAuthPaused() ? "warn" : "ok",
+		);
+		this.renderChip(
+			chips,
+			tr("status.autoSync"),
+			autoSyncStatus,
+			this.plugin.isAutoSyncPaused() ? "warn" : "ok",
+		);
+
+		if (this.plugin.settings.autoSyncEnabled) {
+			const controlWrap = header.createDiv({
+				cls: "drive-sync-status-control",
+			});
+			new Setting(controlWrap).addButton((button) => {
+				button.setButtonText(
+					this.plugin.isAutoSyncPaused()
+						? tr("status.resumeAutoSync")
+						: tr("status.pauseAutoSync"),
+				);
+				button.onClick(() => {
+					if (this.plugin.isAutoSyncPaused()) {
+						this.plugin.resumeAutoSync();
+					} else {
+						this.plugin.pauseAutoSync();
+					}
+					void this.onOpen();
+				});
+			});
+		}
+
+		const summary = layout.createDiv({ cls: "drive-sync-status-summary" });
+		this.renderSummaryCard(
+			summary,
+			tr("status.jobsQueued"),
+			String(jobs.length),
+		);
+		this.renderSummaryCard(
+			summary,
+			tr("status.syncStrategy"),
+			this.plugin.settings.syncStrategy,
+		);
+		this.renderSummaryCard(
+			summary,
+			tr("status.entriesTracked"),
+			String(entriesTracked),
+		);
+		this.renderSummaryCard(
+			summary,
+			tr("status.conflicts"),
+			String(conflicts.length),
+		);
+		this.renderSummaryCard(
+			summary,
+			`${tr("status.jobsByState")} · ${tr("status.pending")}`,
+			String(queueMeta.pending),
+		);
+		this.renderSummaryCard(
+			summary,
+			`${tr("status.jobsByState")} · ${tr("status.inProgress")}`,
+			String(queueMeta.processing),
+		);
+		this.renderSummaryCard(
+			summary,
+			`${tr("status.jobsByState")} · ${tr("status.blocked")}`,
+			String(queueMeta.blocked),
+		);
+		this.renderSummaryCard(
+			summary,
+			tr("status.nextRetry"),
+			queueMeta.nextRetryAt
+				? tr("status.nextRetryValue", {
+						time: new Date(queueMeta.nextRetryAt).toLocaleString(),
+						count: queueMeta.nextRetryCount,
+					})
+				: tr("status.none"),
+		);
+		this.renderSummaryCard(
+			summary,
+			tr("status.inFlightJob"),
+			queueMeta.inFlightJob ?? tr("status.none"),
+		);
+
+		const metrics = state.runtimeMetrics;
+		if (metrics) {
+			this.renderSummaryCard(
+				summary,
+				tr("status.lastRun"),
+				metrics.lastRunAt
+					? new Date(metrics.lastRunAt).toLocaleString()
+					: tr("status.never"),
+			);
+			this.renderSummaryCard(
+				summary,
+				tr("status.lastRunDuration"),
+				tr("status.lastRunDurationMs", {
+					value: metrics.lastRunDurationMs
+						? Math.round(metrics.lastRunDurationMs)
+						: 0,
+				}),
+			);
+			this.renderSummaryCard(
+				summary,
+				tr("status.lastRunThroughput"),
+				metrics.lastRunThroughputBytesPerSec
+					? tr("status.lastRunThroughputValue", {
+							value: formatBytes(
+								metrics.lastRunThroughputBytesPerSec,
+							),
+						})
+					: tr("status.lastRunThroughputValue", { value: "0 B" }),
+			);
+			this.renderSummaryCard(
+				summary,
+				tr("status.lastRunBytes"),
+				tr("status.lastRunBytesValue", {
+					up: formatBytes(metrics.lastRunUploadBytes),
+					down: formatBytes(metrics.lastRunDownloadBytes),
+				}),
+			);
+		}
+
+		const sections = layout.createDiv({
+			cls: "drive-sync-status-sections",
+		});
+
+		const queueSection = this.renderSection(
+			sections,
+			tr("status.queueDetails"),
+		);
+		if (jobs.length === 0) {
+			queueSection.createDiv({
+				cls: "drive-sync-status-empty",
+				text: tr("status.none"),
+			});
+		} else {
+			const queueList = queueSection.createEl("div", {
+				cls: "drive-sync-queue",
+			});
+			for (const job of jobs.slice(0, 12)) {
+				this.renderQueueRow(queueList, job, nowTs);
+			}
+			if (jobs.length > 12) {
+				queueSection.createEl("p", {
+					cls: "drive-sync-status-section-footnote",
+					text: tr("status.showingJobs", { count: jobs.length }),
+				});
+			}
+		}
+
+		if (conflicts.length > 0) {
+			const conflictSection = this.renderSection(
+				sections,
+				tr("status.conflictsNeedReview"),
+			);
+			const conflictList = conflictSection.createDiv({
+				cls: "drive-sync-status-conflicts",
+			});
+			for (const conflict of conflicts.slice(0, 10)) {
+				conflictList.createDiv({
+					cls: "drive-sync-status-conflict-item",
+					text: conflict.relPath,
+				});
+			}
+			if (conflicts.length > 10) {
+				conflictSection.createEl("p", {
+					cls: "drive-sync-status-section-footnote",
+					text: tr("status.andMore", {
+						count: conflicts.length - 10,
+					}),
+				});
+			}
+		}
+
+		const taskStatusSection = this.renderSection(
+			sections,
+			tr("status.recentTasks"),
+		);
+		if (taskLogs.length === 0) {
+			taskStatusSection.createDiv({
+				cls: "drive-sync-status-empty",
+				text: tr("status.none"),
+			});
+		} else {
+			const taskStatusList = taskStatusSection.createDiv({
+				cls: "drive-sync-task-status-list",
+			});
+			for (const entry of taskLogs.slice(-12).reverse()) {
+				const row = taskStatusList.createDiv({
+					cls: "drive-sync-task-status-row",
+				});
+				row.createDiv({
+					cls: "drive-sync-task-status-time",
+					text: new Date(entry.at).toLocaleString(),
+				});
+				row.createDiv({
+					cls: "drive-sync-task-status-message",
+					text: entry.message,
+				});
+			}
+		}
+
+		const logsSection = this.renderSection(sections, tr("status.syncLogs"));
+		if (logs.length === 0) {
+			logsSection.createDiv({
+				cls: "drive-sync-status-empty",
+				text: tr("status.none"),
+			});
+		} else {
+			const logList = logsSection.createEl("div", {
+				cls: "drive-sync-logs",
+			});
+			for (const entry of logs.slice(-20)) {
+				const row = logList.createEl("div", {
+					cls: "drive-sync-log-row",
+				});
+				row.createEl("div", {
+					cls: "drive-sync-log-time",
+					text: entry.at,
+				});
+				row.createEl("div", {
+					cls: "drive-sync-log-context",
+					text: entry.context ?? tr("status.general"),
+				});
+				row.createEl("div", {
+					cls: "drive-sync-log-message",
+					text: entry.message,
+				});
+			}
+		}
+	}
+
+	private renderSection(
+		container: HTMLElement,
+		title: string,
+	): HTMLDivElement {
+		const section = container.createDiv({
+			cls: "drive-sync-status-section",
+		});
+		section.createEl("h3", { text: title });
+		return section;
+	}
+
+	private renderChip(
+		container: HTMLElement,
+		label: string,
+		value: string,
+		tone: "ok" | "warn" | "active" | "idle",
+	): void {
+		const chip = container.createDiv({
+			cls: `drive-sync-status-chip is-${tone}`,
+		});
+		chip.createSpan({
+			cls: "drive-sync-status-chip-label",
+			text: `${label}:`,
+		});
+		chip.createSpan({ cls: "drive-sync-status-chip-value", text: value });
+	}
+
+	private renderSummaryCard(
+		container: HTMLElement,
+		label: string,
+		value: string,
+	): void {
+		const card = container.createDiv({ cls: "drive-sync-status-card" });
+		card.createDiv({ cls: "drive-sync-status-card-label", text: label });
+		card.createDiv({ cls: "drive-sync-status-card-value", text: value });
+	}
+
+	private renderQueueRow(
+		container: HTMLElement,
+		job: SyncJob,
+		nowTs: number,
+	): void {
+		const status = job.status ?? "pending";
+		const statusLabel = this.renderJobStatus(status);
+		const row = container.createEl("div", {
+			cls: `drive-sync-queue-row is-${status}`,
+		});
+
+		const top = row.createDiv({ cls: "drive-sync-queue-top" });
+		top.createDiv({ cls: "drive-sync-queue-op", text: job.op });
+		top.createDiv({ cls: "drive-sync-queue-status", text: statusLabel });
+
+		row.createDiv({ cls: "drive-sync-queue-path", text: job.path });
+
+		const retryAt =
+			job.nextRunAt && job.nextRunAt > nowTs
+				? new Date(job.nextRunAt).toLocaleString()
+				: tr("status.ready");
+		row.createEl("div", {
+			cls: "drive-sync-queue-attempt",
+			text: tr("status.attemptValue", {
+				attempt: job.attempt + 1,
+				retryAt,
+			}),
+		});
+
+		if (job.lastError) {
+			row.createDiv({
+				cls: "drive-sync-queue-error",
+				text: job.lastError,
+			});
+		}
+	}
+
+	private renderJobStatus(status: SyncJob["status"]): string {
+		if (status === "processing") {
+			return tr("status.inProgress");
+		}
+		if (status === "pending" || !status) {
+			return tr("status.pending");
+		}
+		if (status === "blocked") {
+			return tr("status.blocked");
+		}
+		return status;
+	}
+
+	private collectQueueMeta(
+		jobs: SyncJob[],
+		nowTs: number,
+	): {
+		pending: number;
+		processing: number;
+		blocked: number;
+		nextRetryAt: number | null;
+		nextRetryCount: number;
+		inFlightJob: string | null;
+	} {
+		let pending = 0;
+		let processing = 0;
+		let blocked = 0;
 		let nextRetryAt: number | null = null;
 		let nextRetryCount = 0;
 		let inFlightJob: string | null = null;
-		for (const job of state.jobs ?? []) {
+
+		for (const job of jobs) {
 			if (job.status === "processing") {
-				jobCounts.processing += 1;
+				processing += 1;
 				if (!inFlightJob) {
 					inFlightJob = `${job.op} · ${job.path}`;
 				}
 			} else if (job.status === "blocked") {
-				jobCounts.blocked += 1;
+				blocked += 1;
 			} else {
-				jobCounts.pending += 1;
+				pending += 1;
 			}
 			if (job.nextRunAt && job.nextRunAt > nowTs) {
 				nextRetryCount += 1;
@@ -63,139 +429,13 @@ export class SyncStatusModal extends Modal {
 			}
 		}
 
-		const rows: Array<[string, string]> = [
-			["Last sync", state.lastSyncAt ? new Date(state.lastSyncAt).toLocaleString() : "Never"],
-			["Sync activity", this.plugin.isSyncRunning() ? "In progress" : "Idle"],
-			["Sync strategy", this.plugin.settings.syncStrategy],
-			["Auto sync", autoSyncStatus],
-			["Auth status", authStatus],
-			["Last error", state.lastError ?? "None"],
-			["Jobs queued", String(state.jobs?.length ?? 0)],
-			[
-				"Jobs by state",
-				`pending ${jobCounts.pending}, processing ${jobCounts.processing}, blocked ${jobCounts.blocked}`,
-			],
-			["In-flight job", inFlightJob ?? "None"],
-			[
-				"Next retry",
-				nextRetryAt
-					? `${new Date(nextRetryAt).toLocaleString()} (${nextRetryCount})`
-					: "None",
-			],
-			["Entries tracked", String(Object.keys(state.entries ?? {}).length)],
-			["Conflicts", String(conflicts.length)],
-		];
-		const metrics = state.runtimeMetrics;
-		if (metrics) {
-			rows.push([
-				"Last run",
-				metrics.lastRunAt ? new Date(metrics.lastRunAt).toLocaleString() : "Never",
-			]);
-			rows.push([
-				"Last run duration",
-				metrics.lastRunDurationMs ? `${Math.round(metrics.lastRunDurationMs)} ms` : "0 ms",
-			]);
-			rows.push([
-				"Last run throughput",
-				metrics.lastRunThroughputBytesPerSec
-					? `${formatBytes(metrics.lastRunThroughputBytesPerSec)}/s`
-					: "0 B/s",
-			]);
-			rows.push([
-				"Last run bytes",
-				`${formatBytes(metrics.lastRunUploadBytes)} up / ${formatBytes(metrics.lastRunDownloadBytes)} down`,
-			]);
-			rows.push([
-				"Failures (last/total)",
-				`${metrics.lastRunFailures ?? 0} / ${metrics.totalFailures ?? 0}`,
-			]);
-			rows.push([
-				"Queue peaks",
-				`depth ${metrics.peakQueueDepth ?? 0}, pending ${metrics.peakPendingJobs ?? 0}, blocked ${metrics.peakBlockedJobs ?? 0}`,
-			]);
-		}
-
-		const list = contentEl.createEl("dl");
-		for (const [label, value] of rows) {
-			list.createEl("dt", { text: label });
-			list.createEl("dd", { text: value });
-		}
-
-		if (this.plugin.settings.autoSyncEnabled) {
-			const control = new Setting(contentEl);
-			control.addButton((button) => {
-				button.setButtonText(
-					this.plugin.isAutoSyncPaused() ? "Resume auto sync" : "Pause auto sync",
-				);
-				button.onClick(() => {
-					if (this.plugin.isAutoSyncPaused()) {
-						this.plugin.resumeAutoSync();
-					} else {
-						this.plugin.pauseAutoSync();
-					}
-					this.onOpen();
-				});
-			});
-		}
-
-		if (conflicts.length > 0) {
-			contentEl.createEl("h3", { text: "Conflicts needing review" });
-			const list = contentEl.createEl("ul");
-			for (const conflict of conflicts.slice(0, 10)) {
-				list.createEl("li", { text: conflict.relPath });
-			}
-			if (conflicts.length > 10) {
-				contentEl.createEl("p", {
-					text: `And ${conflicts.length - 10} more...`,
-				});
-			}
-		}
-
-		if ((state.jobs?.length ?? 0) > 0) {
-			contentEl.createEl("h3", { text: "Queue details" });
-			const queueTable = contentEl.createEl("div", {
-				cls: "drive-sync-queue",
-			});
-			for (const job of (state.jobs ?? []).slice(0, 12)) {
-				const row = queueTable.createEl("div", {
-					cls: "drive-sync-queue-row",
-				});
-				if (job.status === "processing") {
-					row.addClass("is-processing");
-				}
-				row.createEl("div", { text: job.op });
-				row.createEl("div", { text: job.path });
-				row.createEl("div", { text: job.status ?? "pending" });
-				const retryAt =
-					job.nextRunAt && job.nextRunAt > nowTs
-						? new Date(job.nextRunAt).toLocaleString()
-						: "Ready";
-				const detailText = `Attempt ${job.attempt + 1} · ${retryAt}`;
-				const detail = row.createEl("div", { text: detailText });
-				if (job.lastError) {
-					detail.createSpan({ text: ` · ${job.lastError}` });
-				}
-			}
-			if ((state.jobs?.length ?? 0) > 12) {
-				contentEl.createEl("p", {
-					text: `Showing 12 of ${state.jobs?.length ?? 0} jobs.`,
-				});
-			}
-		}
-
-		if (logs.length > 0) {
-			contentEl.createEl("h3", { text: "Recent logs" });
-			const logList = contentEl.createEl("div", {
-				cls: "drive-sync-logs",
-			});
-			for (const entry of logs.slice(-20)) {
-				const row = logList.createEl("div", {
-					cls: "drive-sync-log-row",
-				});
-				row.createEl("div", { text: entry.at });
-				row.createEl("div", { text: entry.context ?? "general" });
-				row.createEl("div", { text: entry.message });
-			}
-		}
+		return {
+			pending,
+			processing,
+			blocked,
+			nextRetryAt,
+			nextRetryCount,
+			inFlightJob,
+		};
 	}
 }

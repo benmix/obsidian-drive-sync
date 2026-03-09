@@ -2,6 +2,7 @@ import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
 
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import { tr } from "../i18n";
 
 type ConflictItem = {
 	path: string;
@@ -20,6 +21,7 @@ export class SyncConflictModal extends Modal {
 		this.plugin = plugin;
 	}
 
+
 	async onOpen() {
 		await this.loadConflicts();
 		this.render();
@@ -35,7 +37,8 @@ export class SyncConflictModal extends Modal {
 			.map((entry) => ({
 				path: entry.relPath,
 				remoteRev: entry.remoteRev ?? entry.conflict?.remoteRev,
-				localMtimeMs: entry.localMtimeMs ?? entry.conflict?.localMtimeMs,
+				localMtimeMs:
+					entry.localMtimeMs ?? entry.conflict?.localMtimeMs,
 			}));
 		this.loading = false;
 	}
@@ -43,10 +46,12 @@ export class SyncConflictModal extends Modal {
 	private render(): void {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl("h2", { text: "Resolve sync conflicts" });
+		contentEl.createEl("h2", { text: tr("conflicts.title") });
 
 		if (this.loading) {
-			contentEl.createEl("p", { text: "Loading conflicts..." });
+			contentEl.createEl("p", {
+				text: tr("conflicts.loading"),
+			});
 			return;
 		}
 
@@ -56,13 +61,13 @@ export class SyncConflictModal extends Modal {
 		}
 
 		if (this.conflicts.length === 0) {
-			contentEl.createEl("p", { text: "No conflicts to resolve." });
+			contentEl.createEl("p", { text: tr("conflicts.none") });
 			this.renderAutoSyncControls();
 			return;
 		}
 
 		contentEl.createEl("p", {
-			text: "Conflicts are resolved via conflict copies. Merge manually, then clear marker.",
+			text: tr("conflicts.desc"),
 		});
 
 		for (const item of this.conflicts) {
@@ -78,18 +83,22 @@ export class SyncConflictModal extends Modal {
 			});
 			detail.createEl("div", {
 				text: item.localMtimeMs
-					? `Local modified: ${new Date(item.localMtimeMs).toLocaleString()}`
-					: "Local modified: unknown",
+					? tr("conflicts.localModified", {
+							time: new Date(item.localMtimeMs).toLocaleString(),
+						})
+					: tr("conflicts.localModifiedUnknown"),
 			});
 			detail.createEl("div", {
 				text: item.remoteRev
-					? `Remote revision: ${item.remoteRev}`
-					: "Remote revision: unknown",
+					? tr("conflicts.remoteRevision", {
+							rev: item.remoteRev,
+						})
+					: tr("conflicts.remoteRevisionUnknown"),
 			});
 
 			const actions = new Setting(section);
 			actions.addButton((button) => {
-				button.setButtonText("Clear marker");
+				button.setButtonText(tr("conflicts.clearMarker"));
 				button.onClick(async () => {
 					await this.clearConflict(item.path, true);
 				});
@@ -104,26 +113,28 @@ export class SyncConflictModal extends Modal {
 			return;
 		}
 		const { contentEl } = this;
-		const control = new Setting(contentEl).setName("Auto sync");
+		const control = new Setting(contentEl).setName(
+			tr("conflicts.autoSync"),
+		);
 		control.setDesc(
 			this.plugin.isAutoSyncPaused()
-				? "Auto sync is paused while conflicts are resolved."
-				: "Auto sync is running.",
+				? tr("conflicts.autoSyncPaused")
+				: tr("conflicts.autoSyncRunning"),
 		);
 		control.addButton((button) => {
 			if (this.plugin.isAutoSyncPaused()) {
-				button.setButtonText("Resume auto sync");
+				button.setButtonText(tr("conflicts.resumeAutoSync"));
 				button.setCta();
 				button.onClick(() => {
 					this.plugin.resumeAutoSync();
-					new Notice("Auto sync resumed.");
+					new Notice(tr("notice.autoSyncResumed"));
 					this.render();
 				});
 			} else {
-				button.setButtonText("Pause auto sync");
+				button.setButtonText(tr("conflicts.pauseAutoSync"));
 				button.onClick(() => {
 					this.plugin.pauseAutoSync();
-					new Notice("Auto sync paused.");
+					new Notice(tr("notice.autoSyncPaused"));
 					this.render();
 				});
 			}
@@ -136,7 +147,7 @@ export class SyncConflictModal extends Modal {
 			return;
 		}
 		if (announce) {
-			new Notice("Conflict cleared.");
+			new Notice(tr("conflicts.cleared"));
 		}
 		await this.loadConflicts();
 		this.render();

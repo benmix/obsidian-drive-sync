@@ -1,9 +1,13 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
 
-import type { RemoteFileEntry, RemoteFileSystem } from "../contracts/filesystem/file-system";
+import type {
+	RemoteFileEntry,
+	RemoteFileSystem,
+} from "../contracts/filesystem/file-system";
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 import { normalizePath } from "../filesystem/path";
+import { tr } from "../i18n";
 
 export class RemoteFolderPickerModal extends Modal {
 	private plugin: ObsidianDriveSyncPluginApi;
@@ -15,7 +19,7 @@ export class RemoteFolderPickerModal extends Modal {
 	private creating = false;
 	private error: string | null = null;
 	private createError: string | null = null;
-	private rootLabel = "Remote root";
+	private rootLabel = "";
 	private rootFolderId = "";
 	private remoteFileSystem: RemoteFileSystem | null = null;
 
@@ -23,6 +27,7 @@ export class RemoteFolderPickerModal extends Modal {
 		super(app);
 		this.plugin = plugin;
 	}
+
 
 	async onOpen() {
 		await this.loadFolders();
@@ -41,27 +46,40 @@ export class RemoteFolderPickerModal extends Modal {
 		this.selectedFolderId = this.plugin.getRemoteScopeId().trim();
 
 		const provider = this.plugin.getRemoteProvider();
-		if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
-			this.error = `Sign in to ${provider.label} first.`;
+		if (
+			!this.plugin.getStoredProviderCredentials() &&
+			!provider.getSession()
+		) {
+			this.error = tr("notice.signInToProviderFirst", {
+				provider: provider.label,
+			});
 			this.loading = false;
 			return;
 		}
 
 		const client = await this.plugin.connectRemoteClient();
 		if (!client) {
-			this.error = `Unable to connect to ${provider.label}.`;
+			this.error = tr("notice.unableToConnectProvider", {
+				provider: provider.label,
+			});
 			this.loading = false;
 			return;
 		}
 
 		try {
 			const rootScope = await provider.getRootScope(client);
-			this.rootLabel = rootScope.label || "Remote root";
+			this.rootLabel =
+				rootScope.label || tr("remoteFolder.remoteRoot");
 			this.rootFolderId = rootScope.id;
-			this.remoteFileSystem = provider.createRemoteFileSystem(client, rootScope.id);
+			this.remoteFileSystem = provider.createRemoteFileSystem(
+				client,
+				rootScope.id,
+			);
 		} catch (loadRootError) {
 			console.warn("Failed to load remote root folder.", loadRootError);
-			this.error = `Unable to load the ${provider.label} root folder.`;
+			this.error = tr("remoteFolder.unableLoadProviderRoot", {
+				provider: provider.label,
+			});
 			this.loading = false;
 			return;
 		}
@@ -70,7 +88,7 @@ export class RemoteFolderPickerModal extends Modal {
 			await this.refreshFolderList();
 		} catch (loadError) {
 			console.warn("Failed to list remote folders.", loadError);
-			this.error = "Unable to list remote folders.";
+			this.error = tr("remoteFolder.unableList");
 		} finally {
 			this.loading = false;
 		}
@@ -80,10 +98,14 @@ export class RemoteFolderPickerModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl("h2", { text: "Select remote folder" });
+		contentEl.createEl("h2", {
+			text: tr("remoteFolder.title"),
+		});
 
 		if (this.loading) {
-			contentEl.createEl("p", { text: "Loading folders..." });
+			contentEl.createEl("p", {
+				text: tr("remoteFolder.loading"),
+			});
 			return;
 		}
 
@@ -93,11 +115,11 @@ export class RemoteFolderPickerModal extends Modal {
 		}
 
 		new Setting(contentEl)
-			.setName("Create folder")
-			.setDesc("Create a folder path under the remote root and select it.")
+			.setName(tr("remoteFolder.createFolder"))
+			.setDesc(tr("remoteFolder.createFolderDesc"))
 			.addText((text) =>
 				text
-					.setPlaceholder("notes/obsidian/sync")
+					.setPlaceholder(tr("remoteFolder.createPlaceholder"))
 					.setValue(this.createPath)
 					.onChange((value) => {
 						this.createPath = value;
@@ -105,7 +127,11 @@ export class RemoteFolderPickerModal extends Modal {
 					}),
 			)
 			.addButton((button) => {
-				button.setButtonText(this.creating ? "Creating..." : "Create and select");
+				button.setButtonText(
+					this.creating
+						? tr("remoteFolder.creating")
+						: tr("remoteFolder.createAndSelect"),
+				);
 				button.setDisabled(this.creating || this.refreshing);
 				button.onClick(() => {
 					void this.createAndSelectFolder();
@@ -121,20 +147,22 @@ export class RemoteFolderPickerModal extends Modal {
 		const list = this.getSelectableFolders();
 		if (list.length === 0) {
 			contentEl.createEl("p", {
-				text: "No folders available to select.",
+				text: tr("remoteFolder.noFolders"),
 			});
 			return;
 		}
 
 		const selected = this.resolveSelectedFolder(list);
 		if (!selected) {
-			contentEl.createEl("p", { text: "No folder available to select." });
+			contentEl.createEl("p", {
+				text: tr("remoteFolder.noFolderAvailable"),
+			});
 			return;
 		}
 
 		new Setting(contentEl)
-			.setName("Select folder")
-			.setDesc("Choose a folder path from your remote provider.")
+			.setName(tr("remoteFolder.selectFolder"))
+			.setDesc(tr("remoteFolder.selectFolderDesc"))
 			.addDropdown((dropdown) => {
 				for (const folder of list) {
 					dropdown.addOption(folder.id, this.toOptionLabel(folder));
@@ -144,7 +172,7 @@ export class RemoteFolderPickerModal extends Modal {
 				});
 			})
 			.addButton((button) => {
-				button.setButtonText("Select");
+				button.setButtonText(tr("remoteFolder.select"));
 				button.setCta();
 				button.setDisabled(this.refreshing || this.creating);
 				button.onClick(() => {
@@ -152,14 +180,21 @@ export class RemoteFolderPickerModal extends Modal {
 						(folder) => folder.id === this.selectedFolderId,
 					);
 					if (!selectedFolder) {
-						new Notice("Select a folder first.");
+						new Notice(tr("remoteFolder.selectFolderFirst"));
 						return;
 					}
-					void this.selectFolder(selectedFolder.id, selectedFolder.path ?? "");
+					void this.selectFolder(
+						selectedFolder.id,
+						selectedFolder.path ?? "",
+					);
 				});
 			})
 			.addButton((button) => {
-				button.setButtonText(this.refreshing ? "Refreshing..." : "Refresh");
+				button.setButtonText(
+					this.refreshing
+						? tr("remoteFolder.refreshing")
+						: tr("remoteFolder.refresh"),
+				);
 				button.setDisabled(this.refreshing || this.creating);
 				button.onClick(() => {
 					void this.refreshFolders();
@@ -184,7 +219,9 @@ export class RemoteFolderPickerModal extends Modal {
 		}
 
 		const listedFolders = await this.remoteFileSystem.listFolderEntries();
-		const folders = listedFolders.filter((folder) => folder.id !== this.rootFolderId);
+		const folders = listedFolders.filter(
+			(folder) => folder.id !== this.rootFolderId,
+		);
 		this.folders = [
 			{
 				id: this.rootFolderId,
@@ -196,19 +233,25 @@ export class RemoteFolderPickerModal extends Modal {
 		];
 	}
 
-	private resolveSelectedFolder(list: RemoteFileEntry[]): RemoteFileEntry | null {
+	private resolveSelectedFolder(
+		list: RemoteFileEntry[],
+	): RemoteFileEntry | null {
 		if (list.length === 0) {
 			return null;
 		}
 		if (this.selectedFolderId) {
-			const selected = list.find((folder) => folder.id === this.selectedFolderId);
+			const selected = list.find(
+				(folder) => folder.id === this.selectedFolderId,
+			);
 			if (selected) {
 				return selected;
 			}
 		}
 		const configuredId = this.plugin.getRemoteScopeId().trim();
 		if (configuredId) {
-			const configured = list.find((folder) => folder.id === configuredId);
+			const configured = list.find(
+				(folder) => folder.id === configuredId,
+			);
 			if (configured) {
 				this.selectedFolderId = configured.id;
 				return configured;
@@ -225,17 +268,17 @@ export class RemoteFolderPickerModal extends Modal {
 	private async createAndSelectFolder(): Promise<void> {
 		const folderPath = this.normalizeFolderPath(this.createPath.trim());
 		if (!folderPath) {
-			this.createError = "Enter a folder path, for example notes/obsidian/sync.";
+			this.createError = tr("remoteFolder.enterPathExample");
 			this.render();
 			return;
 		}
 		if (!this.remoteFileSystem) {
-			this.createError = "Unable to create folder before remote folders are loaded.";
+			this.createError = tr("remoteFolder.unableBeforeLoaded");
 			this.render();
 			return;
 		}
 		if (!this.remoteFileSystem.ensureFolder) {
-			this.createError = "Current remote provider does not support folder creation.";
+			this.createError = tr("remoteFolder.providerNoCreateSupport");
 			this.render();
 			return;
 		}
@@ -247,20 +290,20 @@ export class RemoteFolderPickerModal extends Modal {
 		try {
 			const result = await this.remoteFileSystem.ensureFolder(folderPath);
 			if (!result.id) {
-				throw new Error("Created folder has no ID.");
+				throw new Error(tr("remoteFolder.createdFolderNoId"));
 			}
 			await this.selectFolder(result.id, folderPath);
 		} catch (error) {
 			console.warn("Failed to create remote folder.", error);
 			this.creating = false;
-			this.createError = "Failed to create folder. Check console for details.";
+			this.createError = tr("remoteFolder.createFailed");
 			this.render();
 		}
 	}
 
 	private async refreshFolders(): Promise<void> {
 		if (!this.remoteFileSystem) {
-			new Notice("Unable to refresh folders right now.");
+			new Notice(tr("remoteFolder.unableRefreshNow"));
 			return;
 		}
 
@@ -276,21 +319,28 @@ export class RemoteFolderPickerModal extends Modal {
 				new Notice(this.error);
 				return;
 			}
-			new Notice("Folder list refreshed.");
+			new Notice(tr("remoteFolder.listRefreshed"));
 		} catch (error) {
 			console.warn("Failed to refresh remote folders.", error);
-			new Notice("Failed to refresh folder list.");
+			new Notice(tr("remoteFolder.listRefreshFailed"));
 		} finally {
 			this.refreshing = false;
 			this.render();
 		}
 	}
 
-	private async selectFolder(folderId: string, folderPath: string): Promise<void> {
+	private async selectFolder(
+		folderId: string,
+		folderPath: string,
+	): Promise<void> {
 		const absolutePath = this.toAbsolutePath(folderPath);
 		this.plugin.setRemoteScope(folderId, absolutePath);
 		await this.plugin.saveSettings();
-		new Notice(`Remote folder selected: ${absolutePath}`);
+		new Notice(
+			tr("remoteFolder.selectedPath", {
+				path: absolutePath,
+			}),
+		);
 		this.close();
 	}
 
@@ -302,7 +352,7 @@ export class RemoteFolderPickerModal extends Modal {
 	private toOptionLabel(folder: RemoteFileEntry): string {
 		const path = this.toAbsolutePath(folder.path ?? "");
 		if (path === "/") {
-			return "/ (root)";
+			return tr("remoteFolder.optionRoot");
 		}
 		return path;
 	}

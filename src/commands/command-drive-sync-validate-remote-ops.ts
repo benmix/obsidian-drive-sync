@@ -1,30 +1,42 @@
 import { Notice } from "obsidian";
 
 import type { CommandContext } from "../contracts/plugin/command-context";
+import { tr } from "../i18n";
 import { validateRemoteOperations } from "../runtime/use-cases/remote-validation";
 
-export function registerDriveSyncValidateRemoteOpsCommand(context: CommandContext) {
+export function registerDriveSyncValidateRemoteOpsCommand(
+	context: CommandContext,
+) {
 	const { runRemoteCommand } = context;
 	context.plugin.addCommand({
 		id: "drive-sync-validate-remote-ops",
-		name: "Validate remote operations",
+		name: tr("commands.validateOps.name"),
 		callback: async () => {
 			await runRemoteCommand(async ({ provider, client, scopeId }) => {
 				try {
-					const remoteFileSystem = provider.createRemoteFileSystem(client, scopeId);
+					const remoteFileSystem = provider.createRemoteFileSystem(
+						client,
+						scopeId,
+					);
 					const prefix = `__${provider.id.replace(/[^A-Za-z0-9_]+/g, "_")}_sync_validation`;
-					const report = await validateRemoteOperations(remoteFileSystem, prefix);
+					const report = await validateRemoteOperations(
+						remoteFileSystem,
+						prefix,
+					);
 					const failed = report.steps.filter((step) => !step.ok);
 					if (failed.length === 0) {
-						new Notice("Remote operations validated successfully.");
+						new Notice(tr("notice.remoteOpsValidated"));
 					} else {
 						new Notice(
-							`Remote validation failed: ${failed[0]?.name ?? "unknown step"}`,
+							tr("notice.remoteValidationFailedStep", {
+								step:
+									failed[0]?.name ?? tr("notice.unknownStep"),
+							}),
 						);
 					}
 				} catch (error) {
 					console.warn("Remote validation failed.", error);
-					new Notice("Remote validation failed. Check the console for details.");
+					new Notice(tr("notice.remoteValidationFailed"));
 				}
 			});
 		},

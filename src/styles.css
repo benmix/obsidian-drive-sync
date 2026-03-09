@@ -53,6 +53,52 @@ If your plugin does not need CSS, delete this file.
 	color: var(--text-muted);
 }
 
+.drive-sync-account-identity {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 600;
+}
+
+.drive-sync-account-name {
+	word-break: break-all;
+}
+
+.drive-sync-account-status {
+	margin-top: 4px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.drive-sync-brand-name {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.drive-sync-provider-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	color: var(--interactive-accent);
+}
+
+.drive-sync-provider-icon svg {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+.drive-sync-provider-icon-button {
+	min-width: 34px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
 .drive-sync-conflict-row {
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
@@ -75,40 +121,314 @@ If your plugin does not need CSS, delete this file.
 	gap: 4px;
 }
 
-.drive-sync-logs {
-	display: grid;
+.drive-sync-status-modal .modal-content {
+	padding-top: 12px;
+}
+
+.drive-sync-status-layout {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.drive-sync-status-header {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	padding: 14px;
+	background: linear-gradient(
+		180deg,
+		color-mix(
+			in srgb,
+			var(--background-secondary) 88%,
+			var(--interactive-accent) 12%
+		),
+		var(--background-secondary)
+	);
+}
+
+.drive-sync-status-header h2 {
+	margin: 0;
+}
+
+.drive-sync-status-header-meta {
+	margin-top: 6px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.drive-sync-status-chips {
+	margin-top: 12px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.drive-sync-status-chip {
+	display: inline-flex;
+	align-items: center;
 	gap: 6px;
-	margin-top: 8px;
+	padding: 4px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+}
+
+.drive-sync-status-chip.is-ok {
+	border-color: color-mix(
+		in srgb,
+		var(--color-green) 60%,
+		var(--background-modifier-border) 40%
+	);
+}
+
+.drive-sync-status-chip.is-warn {
+	border-color: color-mix(
+		in srgb,
+		var(--color-orange) 70%,
+		var(--background-modifier-border) 30%
+	);
+}
+
+.drive-sync-status-chip.is-active {
+	border-color: color-mix(
+		in srgb,
+		var(--interactive-accent) 70%,
+		var(--background-modifier-border) 30%
+	);
+}
+
+.drive-sync-status-chip.is-idle {
+	border-color: var(--background-modifier-border);
+}
+
+.drive-sync-status-chip-label {
+	color: var(--text-muted);
+}
+
+.drive-sync-status-chip-value {
+	font-weight: 600;
+}
+
+.drive-sync-status-control {
+	margin-top: 10px;
+}
+
+.drive-sync-status-control .setting-item {
+	border: none;
+	padding: 0;
+}
+
+.drive-sync-status-summary {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 8px;
+}
+
+.drive-sync-status-card {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	padding: 10px;
+	background: var(--background-primary-alt);
+}
+
+.drive-sync-status-card-label {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.drive-sync-status-card-value {
+	margin-top: 6px;
+	font-weight: 600;
+	line-height: 1.35;
+	word-break: break-word;
+}
+
+.drive-sync-status-sections {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 10px;
+	align-items: start;
+}
+
+@media (max-width: 900px) {
+	.drive-sync-status-summary {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 640px) {
+	.drive-sync-status-summary {
+		grid-template-columns: 1fr;
+	}
+}
+
+.drive-sync-status-section {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	padding: 10px;
+	background: var(--background-primary);
+}
+
+.drive-sync-status-section h3 {
+	margin: 0 0 10px;
+	font-size: 14px;
+}
+
+.drive-sync-status-empty {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.drive-sync-status-section-footnote {
+	margin: 8px 0 0;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.drive-sync-logs {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
 }
 
 .drive-sync-log-row {
 	display: grid;
-	grid-template-columns: minmax(140px, 200px) minmax(80px, 120px) 1fr;
+	grid-template-columns: minmax(120px, 180px) minmax(70px, 110px) 1fr;
 	gap: 8px;
 	padding: 6px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
 	font-size: 12px;
+	background: var(--background-primary-alt);
+}
+
+.drive-sync-log-time,
+.drive-sync-log-context {
+	color: var(--text-muted);
+}
+
+.drive-sync-log-message {
+	word-break: break-word;
 }
 
 .drive-sync-queue {
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
-	margin-top: 8px;
 }
 
 .drive-sync-queue-row {
-	display: grid;
-	grid-template-columns: minmax(90px, 130px) 1fr minmax(80px, 120px) minmax(180px, 260px);
-	gap: 8px;
-	padding: 6px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
 	font-size: 12px;
+	background: var(--background-primary-alt);
+}
+
+.drive-sync-queue-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.drive-sync-queue-op {
+	font-family: var(--font-monospace);
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-muted);
+}
+
+.drive-sync-queue-status {
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-weight: 600;
+	background: var(--background-modifier-hover);
+}
+
+.drive-sync-queue-path {
+	font-weight: 600;
+	word-break: break-word;
+}
+
+.drive-sync-queue-attempt {
+	color: var(--text-muted);
+}
+
+.drive-sync-queue-error {
+	color: var(--text-error);
+	word-break: break-word;
 }
 
 .drive-sync-queue-row.is-processing {
-	border-color: var(--interactive-accent);
-	box-shadow: inset 0 0 0 1px var(--interactive-accent);
+	border-color: color-mix(
+		in srgb,
+		var(--interactive-accent) 70%,
+		var(--background-modifier-border) 30%
+	);
+}
+
+.drive-sync-queue-row.is-processing .drive-sync-queue-status {
+	background: color-mix(in srgb, var(--interactive-accent) 22%, transparent);
+	color: var(--text-normal);
+}
+
+.drive-sync-queue-row.is-blocked {
+	border-color: color-mix(
+		in srgb,
+		var(--text-error) 55%,
+		var(--background-modifier-border) 45%
+	);
+}
+
+.drive-sync-queue-row.is-blocked .drive-sync-queue-status {
+	background: color-mix(in srgb, var(--text-error) 20%, transparent);
+}
+
+.drive-sync-queue-row.is-pending .drive-sync-queue-status {
+	background: var(--background-modifier-hover);
+}
+
+.drive-sync-status-conflicts {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.drive-sync-status-conflict-item {
+	padding: 6px 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	font-size: 12px;
+	background: var(--background-primary-alt);
+	word-break: break-word;
+}
+
+.drive-sync-task-status-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.drive-sync-task-status-row {
+	padding: 6px 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-primary-alt);
+	font-size: 12px;
+}
+
+.drive-sync-task-status-time {
+	color: var(--text-muted);
+	font-size: 11px;
+}
+
+.drive-sync-task-status-message {
+	margin-top: 4px;
+	word-break: break-word;
 }

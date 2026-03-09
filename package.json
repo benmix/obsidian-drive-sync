@@ -29,7 +29,8 @@
 		"dexie": "^4.2.1",
 		"mime-types": "^3.0.2",
 		"obsidian": "latest",
-		"openpgp": "^6.3.0"
+		"openpgp": "^6.3.0",
+		"simple-icons": "^16.11.0"
 	},
 	"devDependencies": {
 		"@types/mime-types": "^3.0.1",
