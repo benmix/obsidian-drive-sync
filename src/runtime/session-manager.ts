@@ -4,9 +4,12 @@ import {
 	createDriveSyncError,
 	normalizeUnknownDriveSyncError,
 	shouldPauseAuthForError,
+	toDriveSyncErrorSummary,
 	translateDriveSyncErrorUserMessage,
 } from "../errors";
 import { trAny } from "../i18n";
+import { PluginDataStateStore } from "../sync/state/state-store";
+import { now } from "../sync/support/utils";
 
 export class SessionManager {
 	private authPaused = false;
@@ -38,6 +41,7 @@ export class SessionManager {
 			await this.plugin.saveSettings();
 			this.authPaused = shouldPauseAuthForError(normalized);
 			this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
+			await this.recordAuthError(normalized, "Remote session restore failed");
 		}
 	}
 
@@ -62,6 +66,7 @@ export class SessionManager {
 		});
 		this.authPaused = true;
 		this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
+		void this.recordAuthError(normalized, "Auth paused");
 	}
 
 	async buildActiveRemoteSession(): Promise<RemoteProviderSession | null> {
@@ -87,6 +92,7 @@ export class SessionManager {
 				await this.plugin.saveSettings();
 				this.authPaused = shouldPauseAuthForError(normalized);
 				this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
+				await this.recordAuthError(normalized, "Remote session restore failed");
 				return null;
 			}
 		}
@@ -147,7 +153,33 @@ export class SessionManager {
 			this.authPaused = shouldPauseAuthForError(normalized);
 			this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
 			await this.plugin.saveSettings();
+			await this.recordAuthError(normalized, "Remote session refresh failed");
 			throw normalized;
 		}
+	}
+
+	private async recordAuthError(error: unknown, message: string): Promise<void> {
+		const summary = toDriveSyncErrorSummary(error);
+		const stateStore = new PluginDataStateStore();
+		const state = await stateStore.load();
+		const logs = [
+			...(state.logs ?? []),
+			{
+				at: new Date().toISOString(),
+				message,
+				context: "auth" as const,
+				code: summary.code,
+				category: summary.category,
+				retryable: summary.retryable,
+			},
+		].slice(-200);
+		await stateStore.save({
+			...state,
+			lastErrorAt: now(),
+			lastErrorCode: summary.code,
+			lastErrorCategory: summary.category,
+			lastErrorRetryable: summary.retryable,
+			logs,
+		});
 	}
 }

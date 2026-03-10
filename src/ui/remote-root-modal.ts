@@ -3,7 +3,11 @@ import type { App } from "obsidian";
 
 import type { RemoteFileEntry, RemoteFileSystem } from "../contracts/filesystem/file-system";
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
+import {
+	createDriveSyncError,
+	normalizeUnknownDriveSyncError,
+	translateDriveSyncErrorUserMessage,
+} from "../errors";
 import { normalizePath } from "../filesystem/path";
 import { tr, trAny } from "../i18n";
 
@@ -275,13 +279,22 @@ export class RemoteFolderPickerModal extends Modal {
 		try {
 			const result = await this.remoteFileSystem.ensureFolder(folderPath);
 			if (!result.id) {
-				throw new Error(tr("remoteFolder.createdFolderNoId"));
+				throw createDriveSyncError("REMOTE_WRITE_FAILED", {
+					category: "remote_fs",
+					userMessage: tr("remoteFolder.createFailed"),
+					debugMessage: tr("remoteFolder.createdFolderNoId"),
+					details: { path: folderPath },
+				});
 			}
 			await this.selectFolder(result.id, folderPath);
 		} catch (error) {
+			const normalized = normalizeUnknownDriveSyncError(error, {
+				category: "remote_fs",
+				userMessage: tr("remoteFolder.createFailed"),
+			});
 			console.warn("Failed to create remote folder.", error);
 			this.creating = false;
-			this.createError = tr("remoteFolder.createFailed");
+			this.createError = translateDriveSyncErrorUserMessage(normalized, trAny);
 			this.render();
 		}
 	}

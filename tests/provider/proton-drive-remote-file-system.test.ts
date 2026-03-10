@@ -99,4 +99,64 @@ describe("ProtonDriveRemoteFileSystem", () => {
 			category: "provider",
 		});
 	});
+
+	test("treats status-based 404 delete errors as idempotent success", async () => {
+		const fileSystem = new ProtonDriveRemoteFileSystem(
+			{
+				trashNodes: async function* () {
+					yield {
+						ok: false,
+						uid: "file-a",
+						error: {
+							status: 404,
+						},
+					};
+				},
+			},
+			"root",
+		);
+
+		await expect(fileSystem.deleteEntry?.("file-a")).resolves.toBeUndefined();
+	});
+
+	test("maps status-based 429 remote errors without relying on message text", async () => {
+		const fileSystem = new ProtonDriveRemoteFileSystem(
+			{
+				getFileUploader: async () => {
+					throw new Error("should not upload");
+				},
+				getFileRevisionUploader: async () => {
+					throw {
+						status: 429,
+					};
+				},
+				iterateFolderChildren: async function* () {
+					yield {
+						ok: true,
+						value: {
+							uid: "file-a",
+							parentUid: "root",
+							name: "a.md",
+							type: "file",
+						},
+					};
+				},
+			},
+			"root",
+		);
+
+		let caught: unknown;
+		try {
+			await fileSystem.writeFile("a.md", new Uint8Array([1, 2, 3]));
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(isDriveSyncError(caught)).toBe(true);
+		expect(caught).toMatchObject({
+			code: "NETWORK_RATE_LIMITED",
+			category: "network",
+			retryable: true,
+		});
+	});
 });

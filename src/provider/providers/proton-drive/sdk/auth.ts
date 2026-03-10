@@ -1,4 +1,5 @@
 import type { AuthSession } from "../../../../contracts/provider/proton/auth-session";
+import { INVALID_REFRESH_TOKEN_CODE } from "../../../../contracts/provider/proton/auth-types";
 import type {
 	ApiError,
 	ReusableCredentials,
@@ -207,10 +208,7 @@ function normalizeAuthError(
 		userMessage: string;
 	},
 ) {
-	const rawMessage =
-		error instanceof Error ? error.message : typeof error === "string" ? error : "";
-	const normalized = rawMessage.toLowerCase().trim();
-	const classified = classifyProtonAuthError(normalized);
+	const classified = classifyProtonAuthError(error);
 	return normalizeUnknownDriveSyncError(error, {
 		code: classified?.code,
 		category: classified?.category ?? "auth",
@@ -220,7 +218,7 @@ function normalizeAuthError(
 	});
 }
 
-function classifyProtonAuthError(message: string):
+function classifyProtonAuthError(error: unknown):
 	| {
 			code:
 				| "AUTH_SESSION_EXPIRED"
@@ -235,6 +233,62 @@ function classifyProtonAuthError(message: string):
 			userMessageKey: string;
 	  }
 	| undefined {
+	const apiError = error as Partial<ApiError> | undefined;
+	const status = typeof apiError?.status === "number" ? apiError.status : undefined;
+	const code =
+		typeof apiError?.code === "number"
+			? apiError.code
+			: typeof apiError?.response?.Code === "number"
+				? apiError.response.Code
+				: undefined;
+	if (code === INVALID_REFRESH_TOKEN_CODE) {
+		return {
+			code: "AUTH_SESSION_EXPIRED",
+			category: "auth",
+			userMessage: "Session expired. Sign in again to continue.",
+			userMessageKey: "error.auth.sessionExpired",
+		};
+	}
+	if (status === 401 || status === 403) {
+		return {
+			code: "AUTH_REAUTH_REQUIRED",
+			category: "auth",
+			userMessage: "Authentication required. Sign in again to continue.",
+			userMessageKey: "error.auth.reauthRequired",
+		};
+	}
+	if (status === 429) {
+		return {
+			code: "NETWORK_RATE_LIMITED",
+			category: "network",
+			retryable: true,
+			userMessage:
+				"Remote provider rate limited requests. The sync will retry automatically.",
+			userMessageKey: "error.network.rateLimited",
+		};
+	}
+	if (status === 408 || status === 425) {
+		return {
+			code: "NETWORK_TIMEOUT",
+			category: "network",
+			retryable: true,
+			userMessage: "Network request timed out. The sync will retry automatically.",
+			userMessageKey: "error.network.timeout",
+		};
+	}
+	if (status !== undefined && status >= 500) {
+		return {
+			code: "NETWORK_TEMPORARY_FAILURE",
+			category: "network",
+			retryable: true,
+			userMessage: "Temporary network failure. The sync will retry automatically.",
+			userMessageKey: "error.network.temporaryFailure",
+		};
+	}
+
+	const rawMessage =
+		error instanceof Error ? error.message : typeof error === "string" ? error : "";
+	const message = rawMessage.toLowerCase().trim();
 	if (!message) {
 		return undefined;
 	}

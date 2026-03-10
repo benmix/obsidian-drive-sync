@@ -121,4 +121,30 @@ describe("SyncIndexStore", () => {
 		expect(logs[0]?.message).toBe("log-5");
 		expect(logs[199]?.message).toBe("log-204");
 	});
+
+	test("stores structured error log fields", () => {
+		const store = new SyncIndexStore(createState());
+		store.addStructuredLog({
+			message: "Job blocked",
+			context: "task",
+			code: "REMOTE_PATH_CONFLICT",
+			category: "remote_fs",
+			retryable: false,
+			path: "notes/a.md",
+			jobId: "job-1",
+			jobOp: "upload",
+		});
+
+		const log = store.toJSON().logs?.[0];
+		expect(log).toMatchObject({
+			message: "Job blocked",
+			context: "task",
+			code: "REMOTE_PATH_CONFLICT",
+			category: "remote_fs",
+			retryable: false,
+			path: "notes/a.md",
+			jobId: "job-1",
+			jobOp: "upload",
+		});
+	});
 });

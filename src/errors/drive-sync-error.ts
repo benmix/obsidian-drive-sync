@@ -93,7 +93,17 @@ export function normalizeUnknownDriveSyncError(
 	options: NormalizeOptions = {},
 ): DriveSyncError {
 	if (isDriveSyncError(error)) {
-		return error;
+		return new DriveSyncError(options.code ?? error.code, {
+			category: options.category ?? error.category,
+			severity: options.severity ?? error.severity,
+			retryable: options.retryable ?? error.retryable,
+			userMessage: options.userMessage ?? error.userMessage,
+			userMessageKey: options.userMessageKey ?? error.userMessageKey,
+			userMessageParams: options.userMessageParams ?? error.userMessageParams,
+			debugMessage: options.debugMessage ?? error.debugMessage,
+			details: options.details ?? error.details,
+			cause: error.cause ?? error,
+		});
 	}
 
 	const rawMessage =
@@ -208,6 +218,17 @@ export function shouldRetryBlockedDriveSyncErrorCode(code?: DriveSyncErrorCode):
 	return code === "REMOTE_TRANSIENT_INCOMPLETE";
 }
 
+export function isTransientNetworkDriveSyncError(error: unknown): boolean {
+	const normalized = normalizeUnknownDriveSyncError(error);
+	return (
+		normalized.category === "network" &&
+		normalized.retryable &&
+		(normalized.code === "NETWORK_TIMEOUT" ||
+			normalized.code === "NETWORK_RATE_LIMITED" ||
+			normalized.code === "NETWORK_TEMPORARY_FAILURE")
+	);
+}
+
 export function getRetryDelayForDriveSyncError(error: unknown, attempt: number): number {
 	const normalized = normalizeUnknownDriveSyncError(error);
 	switch (normalized.code) {
@@ -264,6 +285,8 @@ function defaultUserMessage(code: DriveSyncErrorCode): string {
 			return "Sync retries exhausted.";
 		case "SYNC_JOB_INVALID":
 			return "Sync job is invalid.";
+		case "CONFIG_PROVIDER_MISSING":
+			return "Selected provider is not available.";
 		case "CONFIG_SCOPE_MISSING":
 			return "Select a remote folder first.";
 		case "INTERNAL_UNEXPECTED":
@@ -311,6 +334,8 @@ function defaultUserMessageKey(code: DriveSyncErrorCode): string | undefined {
 			return "error.sync.retryExhausted";
 		case "SYNC_JOB_INVALID":
 			return "error.sync.invalidJob";
+		case "CONFIG_PROVIDER_MISSING":
+			return "error.config.providerMissing";
 		case "CONFIG_SCOPE_MISSING":
 			return "error.config.scopeMissing";
 		case "INTERNAL_UNEXPECTED":

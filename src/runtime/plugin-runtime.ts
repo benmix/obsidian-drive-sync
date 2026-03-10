@@ -176,7 +176,7 @@ export class PluginRuntime {
 			});
 			const message = translateDriveSyncErrorUserMessage(normalized, trAny);
 			console.warn("Auto sync failed.", error);
-			this.networkPolicy.recordFailure(error);
+			this.networkPolicy.recordFailure(normalized);
 			await this.recordSyncError(normalized);
 			if (request.trigger === "manual") {
 				new Notice(message);

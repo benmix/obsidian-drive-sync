@@ -79,6 +79,7 @@ export const ZH: Record<keyof typeof EN, string> = {
 	"error.provider.unableToConnectNamed": "无法连接到 {provider}。",
 	"error.sync.retryExhausted": "同步重试次数已耗尽。",
 	"error.sync.invalidJob": "同步任务无效。",
+	"error.config.providerMissing": "所选提供方当前不可用。",
 	"error.config.scopeMissing": "请先选择远端文件夹。",
 	"error.internal.unexpected": "发生了未预期的同步错误。",
 

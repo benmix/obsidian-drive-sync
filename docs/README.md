@@ -25,6 +25,7 @@ Recent updates:
 - Proton SDK/auth implementation moved under provider tree (`provider/providers/proton-drive/sdk`).
 - Provider layering tightened: provider-specific/Obsidian file-system implementations now live under `provider/providers/*`; `sync/` keeps provider-agnostic kernel logic.
 - FileSystem contracts centralized under `src/contracts/filesystem/`; shared path utility remains in `src/filesystem/path.ts`.
+- Error system rollout completed for project-owned layers (`DriveSyncError`, structured persisted error state, structured sync logs, and diagnostics `recentErrors[]`).
 
 ## Goals
 
@@ -125,6 +126,7 @@ src/
 
 - `SPECS.md` — technical specification
 - `ARCHITECTURE.md` — implementation-oriented architecture design
+- `ERROR_SYSTEM_DESIGN.md` — current error system implementation reference
 - `SYNC_STRATEGY.md` — runtime sync strategy baseline (post-initialization)
 - `SYNC_INITIALIZATION_STRATEGY.md` — first-sync initialization strategy baseline
 - `COMMANDS.md` — command module structure and command catalog

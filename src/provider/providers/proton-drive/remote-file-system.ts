@@ -9,6 +9,7 @@ import {
 	createDriveSyncError,
 	type DriveSyncErrorCode,
 	type ErrorCategory,
+	isNotFoundDriveSyncError,
 	normalizeUnknownDriveSyncError,
 } from "../../../errors";
 import { basename, dirname, normalizePath, splitPath } from "../../../filesystem/path";
@@ -305,11 +306,23 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 				try {
 					return await uploadRevision(existingFile.id);
 				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
-					if (isNotFoundError(message)) {
+					if (
+						isNotFoundDriveSyncError(
+							mapRemoteOperationError(error, {
+								code: "REMOTE_WRITE_FAILED",
+								category: "remote_fs",
+								userMessage: "Remote write failed.",
+								details: {
+									path: normalized,
+									attempt,
+									fileId: existingFile.id,
+								},
+							}),
+						)
+					) {
 						break;
 					}
-					if (isDraftRevisionExistsError(message) && attempt < 3) {
+					if (isDraftRevisionExistsError(error) && attempt < 3) {
 						await waitMs(250 * attempt);
 						continue;
 					}
@@ -330,8 +343,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		try {
 			return await uploadNewFile();
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			if (!isAlreadyExistsError(message)) {
+			if (!isAlreadyExistsError(error)) {
 				throw mapRemoteOperationError(error, {
 					code: "REMOTE_WRITE_FAILED",
 					category: "remote_fs",
@@ -382,7 +394,18 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		for await (const result of this.client.trashNodes([id])) {
 			if (!result.ok) {
 				const detail = extractErrorMessage(result.error);
-				if (isNotFoundError(detail) || isAlreadyDeletedError(detail)) {
+				if (
+					isNotFoundDriveSyncError(
+						mapRemoteOperationError(result.error, {
+							code: "REMOTE_WRITE_FAILED",
+							category: "remote_fs",
+							userMessage: "Remote delete failed.",
+							debugMessage: detail || "Failed to delete remote node.",
+							details: { nodeId: id },
+						}),
+					) ||
+					isAlreadyDeletedError(result.error)
+				) {
 					return;
 				}
 				throw mapRemoteOperationError(result.error, {
@@ -563,8 +586,7 @@ function mapRemoteOperationError(
 		details?: Record<string, unknown>;
 	},
 ) {
-	const rawMessage = extractErrorMessage(error);
-	const classified = classifyProtonRemoteError(rawMessage);
+	const classified = classifyProtonRemoteError(error);
 	return normalizeUnknownDriveSyncError(error, {
 		code: classified?.code ?? mapping.code,
 		category: classified?.category ?? mapping.category,
@@ -576,7 +598,7 @@ function mapRemoteOperationError(
 	});
 }
 
-function classifyProtonRemoteError(message: string):
+function classifyProtonRemoteError(error: unknown):
 	| {
 			code: DriveSyncErrorCode;
 			category: ErrorCategory;
@@ -585,6 +607,45 @@ function classifyProtonRemoteError(message: string):
 			userMessageKey: string;
 	  }
 	| undefined {
+	const status = extractStatus(error);
+	if (status === 404) {
+		return {
+			code: "REMOTE_NOT_FOUND",
+			category: "remote_fs",
+			userMessage: "Remote item not found.",
+			userMessageKey: "error.remote.notFound",
+		};
+	}
+	if (status === 408 || status === 425) {
+		return {
+			code: "NETWORK_TIMEOUT",
+			category: "network",
+			retryable: true,
+			userMessage: "Network request timed out. The sync will retry automatically.",
+			userMessageKey: "error.network.timeout",
+		};
+	}
+	if (status === 429) {
+		return {
+			code: "NETWORK_RATE_LIMITED",
+			category: "network",
+			retryable: true,
+			userMessage:
+				"Remote provider rate limited requests. The sync will retry automatically.",
+			userMessageKey: "error.network.rateLimited",
+		};
+	}
+	if (status !== undefined && status >= 500) {
+		return {
+			code: "NETWORK_TEMPORARY_FAILURE",
+			category: "network",
+			retryable: true,
+			userMessage: "Temporary network failure. The sync will retry automatically.",
+			userMessageKey: "error.network.temporaryFailure",
+		};
+	}
+
+	const message = extractErrorMessage(error);
 	const normalized = message.toLowerCase().trim();
 	if (!normalized) {
 		return undefined;
@@ -675,34 +736,48 @@ function getNodeMtimeMs(node: NodeEntity): number | undefined {
 	);
 }
 
-function isAlreadyExistsError(message: string): boolean {
-	const normalized = message.toLowerCase();
+function isAlreadyExistsError(error: unknown): boolean {
+	const normalized = extractErrorMessage(error).toLowerCase();
 	return (
 		normalized.includes("already exists") ||
 		normalized.includes("file or folder with that name already exists")
 	);
 }
 
-function isDraftRevisionExistsError(message: string): boolean {
-	const normalized = message.toLowerCase();
+function isDraftRevisionExistsError(error: unknown): boolean {
+	const normalized = extractErrorMessage(error).toLowerCase();
 	return (
 		normalized.includes("draft revision already exists for this link") ||
 		(normalized.includes("draft revision") && normalized.includes("already exists"))
 	);
 }
 
-function isNotFoundError(message: string): boolean {
-	const normalized = message.toLowerCase();
-	return normalized.includes("not found") || normalized.includes("404");
-}
-
-function isAlreadyDeletedError(message: string): boolean {
-	const normalized = message.toLowerCase();
+function isAlreadyDeletedError(error: unknown): boolean {
+	const normalized = extractErrorMessage(error).toLowerCase();
 	return (
 		normalized.includes("already in trash") ||
 		normalized.includes("already trashed") ||
 		(normalized.includes("already") && normalized.includes("deleted"))
 	);
+}
+
+function extractStatus(error: unknown): number | undefined {
+	if (!error || typeof error !== "object") {
+		return undefined;
+	}
+	const record = error as {
+		status?: unknown;
+		response?: {
+			status?: unknown;
+		};
+	};
+	if (typeof record.status === "number") {
+		return record.status;
+	}
+	if (typeof record.response?.status === "number") {
+		return record.response.status;
+	}
+	return undefined;
 }
 
 function extractErrorMessage(error: unknown): string {

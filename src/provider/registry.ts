@@ -1,6 +1,7 @@
 import type { LocalProvider } from "../contracts/provider/local-provider";
 import type { LocalProviderId, RemoteProviderId } from "../contracts/provider/provider-ids";
 import type { RemoteProvider } from "../contracts/provider/remote-provider";
+import { createDriveSyncError } from "../errors";
 
 export class RemoteProviderRegistry {
 	private readonly providers = new Map<RemoteProviderId, RemoteProvider>();
@@ -20,7 +21,13 @@ export class RemoteProviderRegistry {
 		if (provider) {
 			return provider;
 		}
-		throw new Error(`Remote provider is not registered: ${providerId}`);
+		throw createDriveSyncError("CONFIG_PROVIDER_MISSING", {
+			category: "config",
+			userMessage: "Selected provider is not available.",
+			userMessageKey: "error.config.providerMissing",
+			debugMessage: `Remote provider is not registered: ${providerId}`,
+			details: { providerId, providerType: "remote" },
+		});
 	}
 
 	list(): RemoteProvider[] {
@@ -46,7 +53,13 @@ export class LocalProviderRegistry {
 		if (provider) {
 			return provider;
 		}
-		throw new Error(`Local provider is not registered: ${providerId}`);
+		throw createDriveSyncError("CONFIG_PROVIDER_MISSING", {
+			category: "config",
+			userMessage: "Selected provider is not available.",
+			userMessageKey: "error.config.providerMissing",
+			debugMessage: `Local provider is not registered: ${providerId}`,
+			details: { providerId, providerType: "local" },
+		});
 	}
 
 	list(): LocalProvider[] {

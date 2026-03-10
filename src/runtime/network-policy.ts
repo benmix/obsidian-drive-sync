@@ -1,4 +1,9 @@
 import type { NetworkDecision } from "../contracts/runtime/network-policy";
+import {
+	createDriveSyncError,
+	isTransientNetworkDriveSyncError,
+	normalizeUnknownDriveSyncError,
+} from "../errors";
 
 type NetworkPolicyOptions = {
 	enabled: boolean;
@@ -26,17 +31,29 @@ export class NetworkPolicy {
 		}
 
 		if (options.onlineOnly && !options.isOnline()) {
+			const offlineError = createDriveSyncError("NETWORK_TEMPORARY_FAILURE", {
+				category: "network",
+				retryable: true,
+				userMessage: "Network offline. Sync deferred by policy.",
+				userMessageKey: undefined,
+			});
 			return {
 				allowed: false,
-				reason: "Network offline. Sync deferred by policy.",
+				reason: offlineError.userMessage,
 			};
 		}
 
 		const nowTs = options.now();
 		if (!gate.force && nowTs < this.cooldownUntil) {
+			const cooldownError = createDriveSyncError("NETWORK_TEMPORARY_FAILURE", {
+				category: "network",
+				retryable: true,
+				userMessage: "Network cooling down after transient errors.",
+				userMessageKey: undefined,
+			});
 			return {
 				allowed: false,
-				reason: "Network cooling down after transient errors.",
+				reason: cooldownError.userMessage,
 				retryAfterMs: Math.max(0, this.cooldownUntil - nowTs),
 			};
 		}
@@ -46,7 +63,11 @@ export class NetworkPolicy {
 
 	recordFailure(error: unknown): void {
 		const options = this.resolveOptions();
-		if (!options.enabled || !isTransientNetworkError(error)) {
+		if (!options.enabled) {
+			return;
+		}
+		const normalized = normalizeUnknownDriveSyncError(error, classifyTransientFailure(error));
+		if (!isTransientNetworkDriveSyncError(normalized)) {
 			return;
 		}
 		const until = options.now() + options.failureCooldownMs;
@@ -83,36 +104,40 @@ function defaultIsOnline(): boolean {
 	return navigatorRef.onLine;
 }
 
-function isTransientNetworkError(error: unknown): boolean {
-	const status = extractStatus(error);
-	if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) {
-		return true;
-	}
-
-	const message = error instanceof Error ? error.message : String(error ?? "");
-	const normalized = message.toLowerCase();
-
-	return (
-		normalized.includes("failed to fetch") ||
-		normalized.includes("network error") ||
-		normalized.includes("networkerror") ||
-		normalized.includes("timeout") ||
-		normalized.includes("timed out") ||
-		normalized.includes("etimedout") ||
-		normalized.includes("econnreset") ||
-		normalized.includes("econnrefused") ||
-		normalized.includes("rate limit") ||
-		normalized.includes("too many requests") ||
-		normalized.includes("429") ||
-		normalized.includes("503") ||
-		normalized.includes("504")
-	);
-}
-
 function extractStatus(error: unknown): number | undefined {
 	if (!error || typeof error !== "object") {
 		return undefined;
 	}
 	const statusValue = (error as { status?: unknown }).status;
 	return typeof statusValue === "number" ? statusValue : undefined;
+}
+
+function classifyTransientFailure(error: unknown): {
+	code?: "NETWORK_TIMEOUT" | "NETWORK_RATE_LIMITED" | "NETWORK_TEMPORARY_FAILURE";
+	category?: "network";
+	retryable?: true;
+} {
+	const status = extractStatus(error);
+	if (status === 429) {
+		return {
+			code: "NETWORK_RATE_LIMITED",
+			category: "network",
+			retryable: true,
+		};
+	}
+	if (
+		status === 408 ||
+		status === 425 ||
+		status === 500 ||
+		status === 502 ||
+		status === 503 ||
+		status === 504
+	) {
+		return {
+			code: "NETWORK_TEMPORARY_FAILURE",
+			category: "network",
+			retryable: true,
+		};
+	}
+	return {};
 }

@@ -1,6 +1,6 @@
 import type { EntryType } from "../filesystem/entry";
 
-import type { DriveSyncErrorCode } from "./error-types";
+import type { DriveSyncErrorCode, ErrorCategory } from "./error-types";
 
 export type SyncEntry = {
 	relPath: string;
@@ -76,6 +76,14 @@ export type SyncLog = {
 	at: string;
 	message: string;
 	context?: string;
+	code?: DriveSyncErrorCode;
+	category?: ErrorCategory;
+	retryable?: boolean;
+	path?: string;
+	jobId?: string;
+	jobOp?: JobOp;
+	provider?: string;
+	details?: Record<string, unknown>;
 };
 
 export type SyncEntryTable = SyncEntry;

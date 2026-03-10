@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { createDriveSyncError } from "../../src/errors";
 import { NetworkPolicy } from "../../src/runtime/network-policy";
 
 describe("NetworkPolicy", () => {
@@ -12,7 +13,12 @@ describe("NetworkPolicy", () => {
 		}));
 
 		expect(policy.canRun({ force: false })).toEqual({ allowed: true });
-		policy.recordFailure(new Error("failed to fetch"));
+		policy.recordFailure(
+			createDriveSyncError("NETWORK_TEMPORARY_FAILURE", {
+				category: "network",
+				retryable: true,
+			}),
+		);
 		nowTs += 5000;
 		expect(policy.canRun({ force: false })).toEqual({ allowed: true });
 	});
@@ -40,7 +46,12 @@ describe("NetworkPolicy", () => {
 			isOnline: () => true,
 		}));
 
-		policy.recordFailure(new Error("failed to fetch"));
+		policy.recordFailure(
+			createDriveSyncError("NETWORK_TEMPORARY_FAILURE", {
+				category: "network",
+				retryable: true,
+			}),
+		);
 		nowTs = 2500;
 		expect(policy.canRun({ force: false })).toEqual({
 			allowed: false,
@@ -62,7 +73,11 @@ describe("NetworkPolicy", () => {
 			isOnline: () => true,
 		}));
 
-		policy.recordFailure(new Error("authentication failed"));
+		policy.recordFailure(
+			createDriveSyncError("AUTH_REAUTH_REQUIRED", {
+				category: "auth",
+			}),
+		);
 		expect(policy.canRun({ force: false })).toEqual({ allowed: true });
 	});
 });

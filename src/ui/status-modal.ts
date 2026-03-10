@@ -285,7 +285,7 @@ export class SyncStatusModal extends Modal {
 				});
 				row.createEl("div", {
 					cls: "drive-sync-log-message",
-					text: entry.message,
+					text: entry.code ? `${entry.message} [${entry.code}]` : entry.message,
 				});
 			}
 		}

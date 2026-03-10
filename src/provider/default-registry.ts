@@ -1,6 +1,7 @@
 import type { LocalProvider } from "../contracts/provider/local-provider";
 import { type LocalProviderId, type RemoteProviderId } from "../contracts/provider/provider-ids";
 import type { RemoteProvider } from "../contracts/provider/remote-provider";
+import { createDriveSyncError } from "../errors";
 
 import { createObsidianLocalProvider } from "./providers/obsidian/provider";
 import { createProtonDriveRemoteProvider } from "./providers/proton-drive/provider";
@@ -23,7 +24,13 @@ export function createRemoteProviderRegistry(
 	const providerId = activeProviderId.trim();
 	const providerFactory = REMOTE_PROVIDER_FACTORIES[providerId];
 	if (!providerFactory) {
-		throw new Error(`Unsupported remote provider: ${providerId}`);
+		throw createDriveSyncError("CONFIG_PROVIDER_MISSING", {
+			category: "config",
+			userMessage: "Selected provider is not available.",
+			userMessageKey: "error.config.providerMissing",
+			debugMessage: `Unsupported remote provider: ${providerId}`,
+			details: { providerId, providerType: "remote" },
+		});
 	}
 	const registry = new RemoteProviderRegistry();
 	registry.register(providerFactory());
@@ -36,7 +43,13 @@ export function createLocalProviderRegistry(
 	const providerId = activeProviderId.trim();
 	const providerFactory = LOCAL_PROVIDER_FACTORIES[providerId];
 	if (!providerFactory) {
-		throw new Error(`Unsupported local provider: ${providerId}`);
+		throw createDriveSyncError("CONFIG_PROVIDER_MISSING", {
+			category: "config",
+			userMessage: "Selected provider is not available.",
+			userMessageKey: "error.config.providerMissing",
+			debugMessage: `Unsupported local provider: ${providerId}`,
+			details: { providerId, providerType: "local" },
+		});
 	}
 	const registry = new LocalProviderRegistry();
 	registry.register(providerFactory());

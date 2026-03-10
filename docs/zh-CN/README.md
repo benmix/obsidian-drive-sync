@@ -25,6 +25,7 @@
 - Proton SDK / 认证实现已迁移到 provider 树下（`provider/providers/proton-drive/sdk`）。
 - 收紧 provider 分层：provider 专用与 Obsidian 文件系统实现现在位于 `provider/providers/*`；`sync/` 仅保留 provider 无关内核逻辑。
 - 文件系统 contract 集中到 `src/contracts/filesystem/`；共享路径工具仍保留在 `src/filesystem/path.ts`。
+- 项目自有层的错误系统已完成收敛（`DriveSyncError`、结构化错误持久化状态、结构化同步日志、diagnostics `recentErrors[]`）。
 
 ## 目标
 
@@ -125,6 +126,7 @@ src/
 
 - `SPECS.md` — 技术规格说明
 - `ARCHITECTURE.md` — 面向实现的架构设计
+- `ERROR_SYSTEM_DESIGN.md` — 当前错误系统实现说明
 - `SYNC_STRATEGY.md` — 运行时同步策略基线（初始化后）
 - `SYNC_INITIALIZATION_STRATEGY.md` — 首次同步初始化策略基线
 - `COMMANDS.md` — 命令模块结构与命令目录

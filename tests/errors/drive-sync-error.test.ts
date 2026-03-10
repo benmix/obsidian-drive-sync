@@ -80,4 +80,26 @@ describe("DriveSyncError", () => {
 			"error.remote.pathConflict:",
 		);
 	});
+
+	test("allows callers to override user-facing fields on existing DriveSyncError values", () => {
+		const original = createDriveSyncError("AUTH_REAUTH_REQUIRED", {
+			category: "auth",
+			userMessage: "Authentication required. Sign in again to continue.",
+			userMessageKey: "error.auth.reauthRequired",
+		});
+
+		const normalized = normalizeUnknownDriveSyncError(original, {
+			userMessage: "Auto sync failed.",
+			userMessageKey: "notice.autoSyncFailed",
+		});
+
+		expect(normalized).not.toBe(original);
+		expect(getDriveSyncErrorUserMessageDescriptor(normalized)).toEqual({
+			message: "Auto sync failed.",
+			key: "notice.autoSyncFailed",
+			params: undefined,
+		});
+		expect(normalized.code).toBe("AUTH_REAUTH_REQUIRED");
+		expect(normalized.category).toBe("auth");
+	});
 });

@@ -83,16 +83,36 @@ export class PluginDataStateStore implements StateStore {
 	}
 }
 
-function mapLog(log: SyncLog): {
-	at: string;
-	message: string;
-	context?: string;
-} {
-	return { at: log.at, message: log.message, context: log.context };
+function mapLog(log: SyncLog): SyncLog {
+	return {
+		at: log.at,
+		message: log.message,
+		context: log.context,
+		code: log.code,
+		category: log.category,
+		retryable: log.retryable,
+		path: log.path,
+		jobId: log.jobId,
+		jobOp: log.jobOp,
+		provider: log.provider,
+		details: log.details,
+	};
 }
 
-function toLog(log: { at: string; message: string; context?: string }): SyncLog {
-	return { at: log.at, message: log.message, context: log.context };
+function toLog(log: SyncLog): SyncLog {
+	return {
+		at: log.at,
+		message: log.message,
+		context: log.context,
+		code: log.code,
+		category: log.category,
+		retryable: log.retryable,
+		path: log.path,
+		jobId: log.jobId,
+		jobOp: log.jobOp,
+		provider: log.provider,
+		details: log.details,
+	};
 }
 
 function parseRuntimeMetrics(value?: string | number | boolean): SyncRuntimeMetrics | undefined {

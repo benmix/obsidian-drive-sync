@@ -25,7 +25,19 @@ vi.mock("../../src/sync/state/state-store", () => ({
 				lastErrorCode: "AUTH_SESSION_EXPIRED",
 				lastErrorCategory: "auth",
 				lastErrorRetryable: false,
-				logs: [],
+				logs: [
+					{
+						at: "2026-03-10T00:00:00.000Z",
+						message: "Job blocked by auth",
+						context: "auth",
+						code: "AUTH_REAUTH_REQUIRED",
+						category: "auth",
+						retryable: false,
+						path: "notes/a.md",
+						jobId: "job-1",
+						jobOp: "upload",
+					},
+				],
 				runtimeMetrics: {},
 			};
 		}
@@ -64,10 +76,18 @@ describe("exportDiagnostics", () => {
 
 		expect(writtenPath).toBe("diagnostics.json");
 		const report = JSON.parse(writtenContent) as {
+			settings: {
+				accountEmail: string;
+			};
 			syncState: {
 				lastErrorCode?: string;
 				lastErrorCategory?: string;
 				lastErrorRetryable?: boolean;
+				recentErrors: Array<{
+					code?: string;
+					path?: string;
+					jobId?: string;
+				}>;
 				jobErrors: Array<{
 					lastErrorCode?: string;
 					lastErrorRetryable?: boolean;
@@ -75,6 +95,7 @@ describe("exportDiagnostics", () => {
 				}>;
 			};
 		};
+		expect(report.settings.accountEmail).toBe("u***r@e***e.com");
 		expect(report.syncState.lastErrorCode).toBe("AUTH_SESSION_EXPIRED");
 		expect(report.syncState.lastErrorCategory).toBe("auth");
 		expect(report.syncState.lastErrorRetryable).toBe(false);
@@ -83,6 +104,14 @@ describe("exportDiagnostics", () => {
 				lastErrorCode: "REMOTE_PATH_CONFLICT",
 				lastErrorRetryable: false,
 				lastErrorAt: 111111,
+				path: "***.md",
+			}),
+		]);
+		expect(report.syncState.recentErrors).toEqual([
+			expect.objectContaining({
+				code: "AUTH_REAUTH_REQUIRED",
+				path: "***.md",
+				jobId: "job-1",
 			}),
 		]);
 	});

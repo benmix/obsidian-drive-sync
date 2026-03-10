@@ -48,6 +48,18 @@ type DiagnosticsReport = {
 			lastErrorRetryable?: boolean;
 			lastErrorAt?: number;
 		}>;
+		recentErrors: Array<{
+			at: string;
+			message: string;
+			context?: string;
+			code?: string;
+			category?: string;
+			retryable?: boolean;
+			path?: string;
+			jobId?: string;
+			jobOp?: string;
+			provider?: string;
+		}>;
 	};
 	runtimeMetrics?: {
 		lastRunAt?: number;
@@ -74,7 +86,18 @@ type DiagnosticsReport = {
 			totalDownload?: string;
 		};
 	};
-	logs: Array<{ at: string; message: string; context?: string }>;
+	logs: Array<{
+		at: string;
+		message: string;
+		context?: string;
+		code?: string;
+		category?: string;
+		retryable?: boolean;
+		path?: string;
+		jobId?: string;
+		jobOp?: string;
+		provider?: string;
+	}>;
 };
 
 export async function exportDiagnostics(
@@ -98,7 +121,7 @@ export async function exportDiagnostics(
 		settings: {
 			remoteProviderId: providerId,
 			remoteScopeId: redactRemoteFolderId(scopeId),
-			accountEmail,
+			accountEmail: redactEmail(accountEmail),
 			hasSession: Boolean(credentials),
 			hasAuthSession,
 			builtInExcludePatterns: getBuiltInExcludePatterns(),
@@ -126,7 +149,7 @@ export async function exportDiagnostics(
 				.map((job) => ({
 					id: job.id,
 					op: job.op,
-					path: job.path,
+					path: redactPath(job.path),
 					status: job.status,
 					attempt: job.attempt,
 					nextRunAt: job.nextRunAt,
@@ -134,6 +157,9 @@ export async function exportDiagnostics(
 					lastErrorRetryable: job.lastErrorRetryable,
 					lastErrorAt: job.lastErrorAt,
 				})),
+			recentErrors: redactLogs(syncState.logs ?? [])
+				.filter((log) => log.code)
+				.slice(-20),
 		},
 		runtimeMetrics: runtimeMetrics
 			? {
@@ -176,11 +202,69 @@ function redactCursor(cursor: string): string {
 	return `${cursor.slice(0, 3)}...${cursor.slice(-3)}`;
 }
 
+function redactEmail(email: string): string {
+	if (!email) {
+		return "";
+	}
+	const [localPart = "", domain = ""] = email.split("@");
+	if (!domain) {
+		return "***";
+	}
+	const [domainName = "", ...rest] = domain.split(".");
+	const suffix = rest.length > 0 ? `.${rest.join(".")}` : "";
+	return `${redactFragment(localPart)}@${redactFragment(domainName)}${suffix}`;
+}
+
+function redactFragment(value: string): string {
+	if (!value) {
+		return "***";
+	}
+	if (value.length <= 2) {
+		return `${value[0] ?? "*"}***`;
+	}
+	return `${value[0]}***${value.slice(-1)}`;
+}
+
+function redactPath(path?: string): string | undefined {
+	if (!path) {
+		return path;
+	}
+	const extensionIndex = path.lastIndexOf(".");
+	if (extensionIndex <= 0 || extensionIndex === path.length - 1) {
+		return "***";
+	}
+	return `***${path.slice(extensionIndex)}`;
+}
+
 function redactLogs(
-	logs: Array<{ at: string; message: string; context?: string }>,
-): Array<{ at: string; message: string; context?: string }> {
+	logs: Array<{
+		at: string;
+		message: string;
+		context?: string;
+		code?: string;
+		category?: string;
+		retryable?: boolean;
+		path?: string;
+		jobId?: string;
+		jobOp?: string;
+		provider?: string;
+	}>,
+): Array<{
+	at: string;
+	message: string;
+	context?: string;
+	code?: string;
+	category?: string;
+	retryable?: boolean;
+	path?: string;
+	jobId?: string;
+	jobOp?: string;
+	provider?: string;
+}> {
 	return logs.map((log) => ({
 		...log,
 		message: log.message.replace(/[A-Za-z0-9_-]{12,}/g, "***"),
+		path: redactPath(log.path),
+		jobId: log.jobId?.replace(/[A-Za-z0-9_-]{12,}/g, "***"),
 	}));
 }

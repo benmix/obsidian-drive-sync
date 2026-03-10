@@ -1,4 +1,4 @@
-import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
+import type { SyncEntry, SyncJob, SyncLog } from "../../contracts/data/sync-schema";
 import type { SyncRuntimeMetrics, SyncState } from "../../contracts/sync/state";
 
 export const DEFAULT_SYNC_STATE: SyncState = {
@@ -154,10 +154,31 @@ export class SyncIndexStore {
 	}
 
 	addLog(message: string, context?: string): void {
-		const entry = {
+		const entry: SyncLog = {
 			at: new Date().toISOString(),
 			message,
 			context,
+		};
+		this.state.logs = [...(this.state.logs ?? []), entry].slice(-200);
+	}
+
+	addStructuredLog(
+		log: Omit<SyncLog, "id" | "at"> & {
+			at?: string;
+		},
+	): void {
+		const entry: SyncLog = {
+			at: log.at ?? new Date().toISOString(),
+			message: log.message,
+			context: log.context,
+			code: log.code,
+			category: log.category,
+			retryable: log.retryable,
+			path: log.path,
+			jobId: log.jobId,
+			jobOp: log.jobOp,
+			provider: log.provider,
+			details: log.details,
 		};
 		this.state.logs = [...(this.state.logs ?? []), entry].slice(-200);
 	}

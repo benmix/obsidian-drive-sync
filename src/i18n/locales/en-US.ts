@@ -82,6 +82,7 @@ export const EN = {
 	"error.provider.unableToConnectNamed": "Unable to connect to {provider}.",
 	"error.sync.retryExhausted": "Sync retries exhausted.",
 	"error.sync.invalidJob": "Sync job is invalid.",
+	"error.config.providerMissing": "Selected provider is not available.",
 	"error.config.scopeMissing": "Select a remote folder first.",
 	"error.internal.unexpected": "Unexpected sync error.",
 

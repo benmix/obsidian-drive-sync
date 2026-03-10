@@ -175,7 +175,13 @@ export class SyncEngine {
 				}
 			}
 			if (this.authPaused) {
-				this.index.addLog("Authentication required. Sync paused.", "auth");
+				this.index.addStructuredLog({
+					message: "Auth paused",
+					context: "auth",
+					code: "AUTH_REAUTH_REQUIRED",
+					category: "auth",
+					retryable: false,
+				});
 				break;
 			}
 		}
@@ -395,7 +401,17 @@ export class SyncEngine {
 			const errorSummary = toDriveSyncErrorSummary(normalized);
 			runErrorState.summary = errorSummary;
 			if (isNotFoundDriveSyncError(normalized) && job.op === "delete-remote") {
-				this.index.addLog(`Done (idempotent): ${describeJob(job)} (${logMessage})`, "task");
+				this.index.addStructuredLog({
+					message: "Job completed idempotently",
+					context: "task",
+					code: normalized.code,
+					category: normalized.category,
+					retryable: normalized.retryable,
+					path: job.path,
+					jobId: job.id,
+					jobOp: job.op,
+					details: { logMessage },
+				});
 				return {
 					entries: [
 						{
@@ -419,7 +435,17 @@ export class SyncEngine {
 				};
 			}
 			if (isNotFoundDriveSyncError(normalized) && job.op !== "upload") {
-				this.index.addLog(`Blocked: ${describeJob(job)} (${logMessage})`, "task");
+				this.index.addStructuredLog({
+					message: "Job blocked",
+					context: "task",
+					code: normalized.code,
+					category: normalized.category,
+					retryable: normalized.retryable,
+					path: job.path,
+					jobId: job.id,
+					jobOp: job.op,
+					details: { logMessage },
+				});
 				retryJobs.push({
 					...job,
 					status: "blocked",
@@ -433,7 +459,17 @@ export class SyncEngine {
 			if (shouldPauseAuthForError(normalized)) {
 				this.authPaused = true;
 				this.options.onAuthError?.(normalized);
-				this.index.addLog(`Auth blocked: ${describeJob(job)} (${logMessage})`, "auth");
+				this.index.addStructuredLog({
+					message: "Job blocked by auth",
+					context: "auth",
+					code: normalized.code,
+					category: normalized.category,
+					retryable: normalized.retryable,
+					path: job.path,
+					jobId: job.id,
+					jobOp: job.op,
+					details: { logMessage },
+				});
 				retryJobs.push({
 					...job,
 					status: "blocked",
@@ -445,10 +481,17 @@ export class SyncEngine {
 				return null;
 			}
 			if (isPathConflictDriveSyncError(normalized)) {
-				this.index.addLog(
-					`Blocked (path conflict): ${describeJob(job)} (${logMessage})`,
-					"task",
-				);
+				this.index.addStructuredLog({
+					message: "Job blocked by remote path conflict",
+					context: "task",
+					code: normalized.code,
+					category: normalized.category,
+					retryable: normalized.retryable,
+					path: job.path,
+					jobId: job.id,
+					jobOp: job.op,
+					details: { logMessage },
+				});
 				retryJobs.push({
 					...job,
 					status: "blocked",
@@ -473,10 +516,17 @@ export class SyncEngine {
 				});
 				const exhaustedSummary = toDriveSyncErrorSummary(exhausted);
 				runErrorState.summary = exhaustedSummary;
-				this.index.addLog(
-					`Blocked (max retries): ${describeJob(job)} (${logMessage})`,
-					"task",
-				);
+				this.index.addStructuredLog({
+					message: "Job blocked after max retries",
+					context: "task",
+					code: exhaustedSummary.code,
+					category: exhaustedSummary.category,
+					retryable: exhaustedSummary.retryable,
+					path: job.path,
+					jobId: job.id,
+					jobOp: job.op,
+					details: { logMessage, causeCode: normalized.code },
+				});
 				retryJobs.push({
 					...job,
 					status: "blocked",
@@ -489,10 +539,21 @@ export class SyncEngine {
 			}
 			const nextAttempt = job.attempt + 1;
 			const delay = getRetryDelayForDriveSyncError(normalized, nextAttempt);
-			this.index.addLog(
-				`Retry scheduled: ${describeJob(job)} (#${nextAttempt}, ${Math.ceil(delay / 1000)}s)`,
-				"task",
-			);
+			this.index.addStructuredLog({
+				message: "Job retry scheduled",
+				context: "task",
+				code: normalized.code,
+				category: normalized.category,
+				retryable: normalized.retryable,
+				path: job.path,
+				jobId: job.id,
+				jobOp: job.op,
+				details: {
+					logMessage,
+					nextAttempt,
+					delayMs: delay,
+				},
+			});
 			retryJobs.push({
 				...job,
 				attempt: nextAttempt,
