@@ -73,6 +73,14 @@ If your plugin does not need CSS, delete this file.
 	min-width: 0;
 }
 
+.drive-sync-account-setting .setting-item-name {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 12px;
+	line-height: 1.2;
+}
+
 .drive-sync-account-setting .setting-item-description {
 	width: 100%;
 }
@@ -131,19 +139,32 @@ If your plugin does not need CSS, delete this file.
 	);
 }
 
-.drive-sync-brand-name {
+.drive-sync-account-provider {
 	display: inline-flex;
 	align-items: center;
-	gap: 8px;
+	gap: 10px;
+	padding: 5px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--background-primary) 86%, transparent);
+	vertical-align: middle;
+}
+
+.drive-sync-account-provider-label {
+	line-height: 1;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--text-muted);
 }
 
 .drive-sync-provider-icon {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 18px;
-	height: 18px;
+	width: 20px;
+	height: 20px;
 	color: var(--interactive-accent);
+	flex: 0 0 auto;
 }
 
 .drive-sync-provider-icon svg {

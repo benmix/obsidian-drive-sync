@@ -27,7 +27,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		const hasAuthSession = this.plugin.hasRemoteAuthSession();
 
 		const accountSetting = new Setting(containerEl)
-			.setName(hasAuthSession ? provider.label : tr("settings.remoteAccount"))
+			.setName(tr("settings.remoteAccount"))
 			.setDesc("");
 		accountSetting.settingEl.addClass("drive-sync-account-setting");
 		const accountStatus = accountSetting.descEl.createDiv({
@@ -36,8 +36,14 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		});
 		const authPaused = this.plugin.isAuthPaused();
 		if (hasAuthSession) {
-			accountSetting.nameEl.addClass("drive-sync-brand-name");
-			renderProviderIcon(accountSetting.nameEl, provider.id, provider.label);
+			const providerChip = accountSetting.nameEl.createSpan({
+				cls: "drive-sync-account-provider",
+			});
+			renderProviderIcon(providerChip, provider.id, provider.label);
+			providerChip.createSpan({
+				cls: "drive-sync-account-provider-label",
+				text: provider.label,
+			});
 		}
 		if (authPaused) {
 			accountSetting.settingEl.addClass("drive-sync-setting-callout", "is-auth-warning");
