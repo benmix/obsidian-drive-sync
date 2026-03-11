@@ -7,129 +7,35 @@ If your plugin does not need CSS, delete this file.
 
 */
 
-.drive-sync-folder-list {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	margin-top: 8px;
-}
-
-.drive-sync-remote-folder-loading-state {
-	margin-top: 12px;
-	padding: 16px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 14px;
-	background: linear-gradient(
-		180deg,
-		color-mix(
-			in srgb,
-			var(--background-secondary) 84%,
-			var(--interactive-accent) 16%
-		),
-		var(--background-primary)
-	);
-}
-
-.drive-sync-remote-folder-loading-label {
-	font-size: 13px;
-	font-weight: 700;
-}
-
-.drive-sync-remote-folder-loading-hint {
-	margin-top: 4px;
-	font-size: 12px;
-	color: var(--text-muted);
-}
-
-.drive-sync-remote-folder-skeleton-list {
-	margin-top: 14px;
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-}
-
-.drive-sync-remote-folder-skeleton-row {
-	padding: 12px;
-	border: 1px solid
-		color-mix(
-			in srgb,
-			var(--background-modifier-border) 86%,
-			var(--interactive-accent) 14%
-		);
-	border-radius: 12px;
-	background: color-mix(in srgb, var(--background-primary) 88%, transparent);
-}
-
-.drive-sync-remote-folder-skeleton-bar {
+.drive-sync-remote-folder-placeholder {
+	width: 100%;
 	position: relative;
 	overflow: hidden;
-	height: 10px;
-	border-radius: 999px;
-	background: color-mix(
-		in srgb,
-		var(--background-modifier-border) 72%,
-		transparent
-	);
-}
-
-.drive-sync-remote-folder-skeleton-bar
-	+ .drive-sync-remote-folder-skeleton-bar {
-	margin-top: 8px;
-}
-
-.drive-sync-remote-folder-skeleton-bar::after {
-	content: "";
-	position: absolute;
-	inset: 0;
-	transform: translateX(-100%);
+	height: 34px;
+	border-radius: 12px;
 	background: linear-gradient(
 		90deg,
-		transparent,
-		color-mix(in srgb, var(--interactive-accent) 28%, white),
-		transparent
+		rgba(120, 120, 120, 0.22),
+		rgba(170, 170, 170, 0.18),
+		rgba(120, 120, 120, 0.22)
 	);
-	animation: drive-sync-skeleton-shimmer 1.4s ease-in-out infinite;
+	background-size: 220% 100%;
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+	animation: drive-sync-control-shimmer 2.2s linear infinite;
 }
 
-.drive-sync-remote-folder-skeleton-bar.is-long {
-	width: 72%;
+.drive-sync-remote-folder-placeholder-create {
+	max-width: 100%;
 }
 
-.drive-sync-remote-folder-skeleton-bar.is-short {
-	width: 38%;
+.drive-sync-remote-folder-placeholder-select {
+	max-width: 100%;
 }
 
-@keyframes drive-sync-skeleton-shimmer {
+@keyframes drive-sync-control-shimmer {
 	100% {
-		transform: translateX(100%);
+		background-position: -220% 0;
 	}
-}
-
-.drive-sync-folder-row {
-	display: grid;
-	grid-template-columns: 1fr minmax(160px, 240px) auto;
-	gap: 8px;
-	align-items: center;
-	padding: 8px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
-}
-
-.drive-sync-folder-path {
-	font-weight: 600;
-}
-
-.drive-sync-folder-id {
-	font-family: var(--font-monospace);
-	font-size: 12px;
-	color: var(--text-muted);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.drive-sync-folder-action button {
-	white-space: nowrap;
 }
 
 .drive-sync-folder-create-error {

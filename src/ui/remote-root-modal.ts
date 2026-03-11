@@ -109,44 +109,21 @@ export class RemoteFolderPickerModal extends Modal {
 			text: tr("remoteFolder.title"),
 		});
 
-		if (this.loading) {
-			this.renderLoadingState(contentEl);
-			return;
-		}
-
 		if (this.error) {
 			contentEl.createEl("p", { text: this.error });
 			return;
 		}
 
-		new Setting(contentEl)
-			.setName(tr("remoteFolder.createFolder"))
-			.setDesc(tr("remoteFolder.createFolderDesc"))
-			.addText((text) =>
-				text
-					.setPlaceholder(tr("remoteFolder.createPlaceholder"))
-					.setValue(this.createPath)
-					.onChange((value) => {
-						this.createPath = value;
-						this.createError = null;
-					}),
-			)
-			.addButton((button) => {
-				button.setButtonText(
-					this.creating
-						? tr("remoteFolder.creating")
-						: tr("remoteFolder.createAndSelect"),
-				);
-				button.setDisabled(this.creating || this.refreshing);
-				button.onClick(() => {
-					void this.createAndSelectFolder();
-				});
-			});
-		if (this.createError) {
+		this.renderCreateFolderSetting(contentEl, this.loading);
+		if (!this.loading && this.createError) {
 			contentEl.createEl("p", {
 				text: this.createError,
 				cls: "drive-sync-folder-create-error",
 			});
+		}
+		if (this.loading) {
+			this.renderSelectFolderSetting(contentEl, [], null, true);
+			return;
 		}
 
 		const list = this.getSelectableFolders();
@@ -165,14 +142,65 @@ export class RemoteFolderPickerModal extends Modal {
 			return;
 		}
 
-		new Setting(contentEl)
+		this.renderSelectFolderSetting(contentEl, list, selected, false);
+	}
+
+	private renderCreateFolderSetting(containerEl: HTMLElement, isLoading: boolean): void {
+		const setting = new Setting(containerEl)
+			.setName(tr("remoteFolder.createFolder"))
+			.setDesc(tr("remoteFolder.createFolderDesc"));
+		setting.settingEl.addClass("drive-sync-remote-folder-setting");
+		if (isLoading) {
+			this.renderLoadingControl(setting.controlEl, "create");
+			return;
+		}
+		setting
+			.addText((text) => {
+				text.setPlaceholder(tr("remoteFolder.createPlaceholder"));
+				text.setValue(this.createPath);
+				text.setDisabled(this.creating || this.refreshing);
+				text.onChange((value) => {
+					this.createPath = value;
+					this.createError = null;
+				});
+			})
+			.addButton((button) => {
+				button.setButtonText(
+					this.creating
+						? tr("remoteFolder.creating")
+						: tr("remoteFolder.createAndSelect"),
+				);
+				button.setDisabled(this.creating || this.refreshing);
+				button.onClick(() => {
+					void this.createAndSelectFolder();
+				});
+			});
+	}
+
+	private renderSelectFolderSetting(
+		containerEl: HTMLElement,
+		list: RemoteFileEntry[],
+		selected: RemoteFileEntry | null,
+		isLoading: boolean,
+	): void {
+		const setting = new Setting(containerEl)
 			.setName(tr("remoteFolder.selectFolder"))
-			.setDesc(tr("remoteFolder.selectFolderDesc"))
+			.setDesc(tr("remoteFolder.selectFolderDesc"));
+		setting.settingEl.addClass("drive-sync-remote-folder-setting");
+		if (isLoading) {
+			this.renderLoadingControl(setting.controlEl, "select");
+			return;
+		}
+		setting
 			.addDropdown((dropdown) => {
 				for (const folder of list) {
 					dropdown.addOption(folder.id, this.toOptionLabel(folder));
 				}
-				dropdown.setValue(selected.id).onChange((value) => {
+				if (selected) {
+					dropdown.setValue(selected.id);
+				}
+				dropdown.setDisabled(this.refreshing || this.creating);
+				dropdown.onChange((value) => {
 					this.selectedFolderId = value;
 				});
 			})
@@ -202,33 +230,11 @@ export class RemoteFolderPickerModal extends Modal {
 			});
 	}
 
-	private renderLoadingState(contentEl: HTMLElement): void {
-		const loadingState = contentEl.createDiv({
-			cls: "drive-sync-remote-folder-loading-state",
+	private renderLoadingControl(containerEl: HTMLElement, variant: "create" | "select"): void {
+		containerEl.empty();
+		containerEl.createDiv({
+			cls: `drive-sync-remote-folder-placeholder drive-sync-remote-folder-placeholder-${variant}`,
 		});
-		loadingState.createDiv({
-			cls: "drive-sync-remote-folder-loading-label",
-			text: this.refreshing ? tr("remoteFolder.refreshing") : tr("remoteFolder.loading"),
-		});
-		loadingState.createDiv({
-			cls: "drive-sync-remote-folder-loading-hint",
-			text: tr("remoteFolder.selectFolderDesc"),
-		});
-
-		const skeletonList = loadingState.createDiv({
-			cls: "drive-sync-remote-folder-skeleton-list",
-		});
-		for (let index = 0; index < 4; index += 1) {
-			const row = skeletonList.createDiv({
-				cls: "drive-sync-remote-folder-skeleton-row",
-			});
-			row.createDiv({
-				cls: "drive-sync-remote-folder-skeleton-bar is-long",
-			});
-			row.createDiv({
-				cls: "drive-sync-remote-folder-skeleton-bar is-short",
-			});
-		}
 	}
 
 	private getSelectableFolders(): RemoteFileEntry[] {
