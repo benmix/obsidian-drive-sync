@@ -94,6 +94,7 @@ export const EN = {
 	"login.twoFactorCode": "Two-factor code",
 	"login.twoFactorDesc": "Leave empty if two-factor authentication is not enabled.",
 	"login.twoFactorPlaceholder": "123456",
+	"login.twoFactorPrompt": "Two-factor authentication is enabled. Enter the 6-digit code.",
 	"login.mailboxPassword": "Mailbox password",
 	"login.mailboxPasswordDesc":
 		"Only required if your provider uses a secondary mailbox password.",
@@ -101,6 +102,7 @@ export const EN = {
 	"login.signIn": "Sign in",
 	"login.cancel": "Cancel",
 	"login.missingCredentials": "Enter your account email and password.",
+	"login.missingTwoFactorCode": "Enter the 6-digit two-factor code.",
 	"login.signedInToProvider": "Signed in to {provider}.",
 	"login.unableToSignIn": "Unable to sign in.",
 

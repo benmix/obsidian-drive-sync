@@ -225,6 +225,8 @@ function redactFragment(value: string): string {
 	return `${value[0]}***${value.slice(-1)}`;
 }
 
+function redactPath(path: string): string;
+function redactPath(path?: string): string | undefined;
 function redactPath(path?: string): string | undefined {
 	if (!path) {
 		return path;
