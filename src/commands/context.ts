@@ -9,6 +9,7 @@ import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api"
 import type { DriveSyncErrorCode, ErrorCategory } from "../errors";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
 import { tr, trAny } from "../i18n";
+import { RemoteAuthRequiredModal } from "../ui/auth-required-modal";
 
 export function createCommandContext(plugin: ObsidianDriveSyncPluginApi): CommandContext {
 	const localProvider = plugin.getLocalProvider();
@@ -29,11 +30,7 @@ export function createCommandContext(plugin: ObsidianDriveSyncPluginApi): Comman
 		}
 		const provider = plugin.getRemoteProvider();
 		if (!plugin.getStoredProviderCredentials() && !provider.getSession()) {
-			new Notice(
-				tr("notice.signInToProviderFirst", {
-					provider: provider.label,
-				}),
-			);
+			new RemoteAuthRequiredModal(plugin.app, plugin).open();
 			return null;
 		}
 

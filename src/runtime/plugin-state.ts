@@ -33,7 +33,8 @@ export class PluginState {
 		const data = await loadPluginData(this.plugin);
 		this.mutableSettings = data.settings;
 		this.localProviderRegistry = createLocalProviderRegistry(this.getLocalProviderId());
-		this.remoteProviderRegistry = createRemoteProviderRegistry(this.getRemoteProviderId());
+		this.remoteProviderRegistry = createRemoteProviderRegistry();
+		this.remoteProviderRegistry.get(this.getRemoteProviderId());
 	}
 
 	get settings(): Readonly<DriveSyncSettings> {
@@ -52,8 +53,31 @@ export class PluginState {
 		return providerId || DEFAULT_REMOTE_PROVIDER_ID;
 	}
 
+	listRemoteProviders(): RemoteProvider[] {
+		return this.remoteProviderRegistry.list();
+	}
+
 	getRemoteProvider(): RemoteProvider {
 		return this.remoteProviderRegistry.get(this.getRemoteProviderId());
+	}
+
+	setRemoteProviderId(providerId: string): void {
+		const nextProviderId = providerId.trim() || DEFAULT_REMOTE_PROVIDER_ID;
+		if (nextProviderId === this.getRemoteProviderId()) {
+			return;
+		}
+		const nextRegistry = createRemoteProviderRegistry();
+		nextRegistry.get(nextProviderId);
+		this.remoteProviderRegistry = nextRegistry;
+		this.mutableSettings = {
+			...this.mutableSettings,
+			remoteProviderId: nextProviderId,
+			remoteScopeId: "",
+			remoteScopePath: "",
+			remoteProviderCredentials: undefined,
+			remoteAccountEmail: "",
+			remoteHasAuthSession: false,
+		};
 	}
 
 	getLocalProviderId(): string {

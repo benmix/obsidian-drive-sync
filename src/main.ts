@@ -35,8 +35,16 @@ export default class ObsidianDriveSyncPlugin extends Plugin implements ObsidianD
 		return this.getState().getRemoteProviderId();
 	}
 
+	listRemoteProviders(): RemoteProvider[] {
+		return this.getState().listRemoteProviders();
+	}
+
 	getRemoteProvider(): RemoteProvider {
 		return this.getState().getRemoteProvider();
+	}
+
+	setRemoteProviderId(providerId: string): void {
+		this.getState().setRemoteProviderId(providerId);
 	}
 
 	getLocalProviderId(): string {

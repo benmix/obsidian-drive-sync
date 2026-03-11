@@ -16,7 +16,9 @@ export interface ObsidianDriveSyncPluginApi extends Plugin {
 	updateSettings(patch: Partial<DriveSyncSettings>): void;
 
 	getRemoteProviderId(): string;
+	listRemoteProviders(): RemoteProvider[];
 	getRemoteProvider(): RemoteProvider;
+	setRemoteProviderId(providerId: string): void;
 	getLocalProviderId(): string;
 	getLocalProvider(): LocalProvider;
 	getRemoteScopeId(): string;

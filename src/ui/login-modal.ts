@@ -2,11 +2,23 @@ import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
 
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import type { RemoteProvider } from "../contracts/provider/remote-provider";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
 import { tr, trAny } from "../i18n";
 
+import { renderProviderIcon } from "./provider-icon";
+
+type RemoteProviderLoginModalOptions = {
+	providerId?: string;
+	onCancel?: () => void;
+	onSuccess?: () => void;
+};
+
 export class RemoteProviderLoginModal extends Modal {
 	private plugin: ObsidianDriveSyncPluginApi;
+	private providerId: string;
+	private onCancel?: () => void;
+	private onSuccess?: () => void;
 	private username = "";
 	private password = "";
 	private mailboxPassword = "";
@@ -16,20 +28,32 @@ export class RemoteProviderLoginModal extends Modal {
 	private isSubmitting = false;
 	private flashTwoFactorErrorOnRender = false;
 	private twoFactorInputEls: HTMLInputElement[] = [];
+	private loginCompleted = false;
 
-	constructor(app: App, plugin: ObsidianDriveSyncPluginApi) {
+	constructor(
+		app: App,
+		plugin: ObsidianDriveSyncPluginApi,
+		options: RemoteProviderLoginModalOptions = {},
+	) {
 		super(app);
 		this.plugin = plugin;
+		this.providerId = options.providerId ?? plugin.getRemoteProviderId();
+		this.onCancel = options.onCancel;
+		this.onSuccess = options.onSuccess;
 	}
 
 	onOpen() {
-		this.username = this.plugin.getRemoteAccountEmail();
+		this.username =
+			this.providerId === this.plugin.getRemoteProviderId()
+				? this.plugin.getRemoteAccountEmail()
+				: "";
 		this.password = "";
 		this.mailboxPassword = "";
 		this.requiresTwoFactor = false;
 		this.requiresMailboxPassword = false;
 		this.isSubmitting = false;
 		this.flashTwoFactorErrorOnRender = false;
+		this.loginCompleted = false;
 		this.resetTwoFactorDigits();
 		this.render();
 	}
@@ -37,21 +61,68 @@ export class RemoteProviderLoginModal extends Modal {
 	onClose() {
 		this.twoFactorInputEls = [];
 		this.contentEl.empty();
+		if (!this.loginCompleted) {
+			this.onCancel?.();
+		}
 	}
 
 	private render(): void {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass("drive-sync-login-modal");
-		const remoteProvider = this.plugin.getRemoteProvider();
-
-		contentEl.createEl("h2", {
+		const remoteProvider = this.getTargetProvider();
+		const loginUi = this.getLoginUi(remoteProvider.id);
+		const shell = contentEl.createDiv({
+			cls: "drive-sync-login-shell",
+		});
+		const hero = shell.createDiv({
+			cls: "drive-sync-login-hero",
+		});
+		const providerRow = hero.createDiv({
+			cls: "drive-sync-login-provider-row",
+		});
+		renderProviderIcon(
+			providerRow,
+			remoteProvider.id,
+			remoteProvider.label,
+			"drive-sync-provider-icon drive-sync-login-provider-icon",
+		);
+		providerRow.createDiv({
+			cls: "drive-sync-login-provider-pill",
+			text: remoteProvider.label,
+		});
+		hero.createEl("h2", {
 			text: tr("login.title", {
 				provider: remoteProvider.label,
 			}),
 		});
+		hero.createDiv({
+			cls: "drive-sync-login-subtitle",
+			text: loginUi.subtitle,
+		});
+		const chips = hero.createDiv({
+			cls: "drive-sync-login-chips",
+		});
+		if (this.requiresTwoFactor) {
+			this.renderChip(chips, tr("login.verificationStep"), true);
+		}
+		if (this.requiresMailboxPassword) {
+			this.renderChip(chips, tr("login.extraSecurityStep"), true);
+		}
 
-		new Setting(contentEl).setName(tr("login.email")).addText((text) =>
+		const card = shell.createDiv({
+			cls: "drive-sync-login-card",
+		});
+		if (this.requiresTwoFactor || this.requiresMailboxPassword) {
+			card.createDiv({
+				cls: "drive-sync-login-card-title",
+				text: this.requiresTwoFactor
+					? tr("login.verificationStep")
+					: tr("login.extraSecurityStep"),
+			});
+		}
+
+		const emailSetting = new Setting(card).setName(tr("login.email")).addText((text) =>
 			text
 				.setPlaceholder(tr("login.emailPlaceholder"))
 				.setValue(this.username)
@@ -60,8 +131,9 @@ export class RemoteProviderLoginModal extends Modal {
 					this.username = value;
 				}),
 		);
+		emailSetting.settingEl.addClass("drive-sync-login-field");
 
-		new Setting(contentEl).setName(tr("login.password")).addText((text) => {
+		const passwordSetting = new Setting(card).setName(tr("login.password")).addText((text) => {
 			text.inputEl.type = "password";
 			text.setPlaceholder(tr("login.passwordPlaceholder"));
 			text.setValue(this.password);
@@ -70,9 +142,10 @@ export class RemoteProviderLoginModal extends Modal {
 				this.password = value;
 			});
 		});
+		passwordSetting.settingEl.addClass("drive-sync-login-field");
 
 		if (this.requiresMailboxPassword) {
-			new Setting(contentEl)
+			const mailboxSetting = new Setting(card)
 				.setName(tr("login.mailboxPassword"))
 				.setDesc(tr("login.mailboxPasswordDesc"))
 				.addText((text) => {
@@ -84,11 +157,12 @@ export class RemoteProviderLoginModal extends Modal {
 						this.mailboxPassword = value;
 					});
 				});
+			mailboxSetting.settingEl.addClass("drive-sync-login-field");
 		}
 
 		this.twoFactorInputEls = [];
 		if (this.requiresTwoFactor) {
-			const tokenSection = contentEl.createDiv({
+			const tokenSection = card.createDiv({
 				cls: "drive-sync-login-token-section",
 			});
 			tokenSection.createDiv({
@@ -198,9 +272,10 @@ export class RemoteProviderLoginModal extends Modal {
 			}
 		}
 
-		const actionRow = new Setting(contentEl);
+		const actionRow = new Setting(card);
+		actionRow.settingEl.addClass("drive-sync-login-actions");
 		actionRow.addButton((button) => {
-			button.setButtonText(tr("login.signIn"));
+			button.setButtonText(this.isSubmitting ? tr("login.signingIn") : tr("login.signIn"));
 			button.setCta();
 			button.setDisabled(this.isSubmitting);
 			button.onClick(() => void this.submitLogin(false));
@@ -214,6 +289,28 @@ export class RemoteProviderLoginModal extends Modal {
 
 		if (this.requiresTwoFactor && !this.isSubmitting) {
 			this.focusTwoFactorInput(this.firstEmptyTwoFactorIndex());
+		}
+	}
+
+	private renderChip(container: HTMLElement, label: string, active: boolean): void {
+		container.createDiv({
+			cls: `drive-sync-login-chip${active ? " is-active" : ""}`,
+			text: label,
+		});
+	}
+
+	private getLoginUi(providerId: string): {
+		subtitle: string;
+	} {
+		switch (providerId) {
+			case "proton-drive":
+				return {
+					subtitle: tr("login.subtitle"),
+				};
+			default:
+				return {
+					subtitle: tr("login.subtitle"),
+				};
 		}
 	}
 
@@ -240,7 +337,7 @@ export class RemoteProviderLoginModal extends Modal {
 		this.isSubmitting = true;
 		this.render();
 		try {
-			const provider = this.plugin.getRemoteProvider();
+			const provider = this.getTargetProvider();
 			const result = await provider.login({
 				username: normalizedUsername,
 				password: this.password,
@@ -250,6 +347,9 @@ export class RemoteProviderLoginModal extends Modal {
 					: undefined,
 			});
 
+			if (this.providerId !== this.plugin.getRemoteProviderId()) {
+				this.plugin.setRemoteProviderId(this.providerId);
+			}
 			this.plugin.setStoredProviderCredentials(result.credentials);
 			this.plugin.setRemoteAccountEmail(result.userEmail ?? normalizedUsername);
 			this.plugin.setRemoteAuthSession(true);
@@ -261,7 +361,9 @@ export class RemoteProviderLoginModal extends Modal {
 					provider: provider.label,
 				}),
 			);
+			this.loginCompleted = true;
 			this.close();
+			this.onSuccess?.();
 		} catch (error) {
 			const normalized = normalizeUnknownDriveSyncError(error, {
 				category: "auth",
@@ -317,5 +419,15 @@ export class RemoteProviderLoginModal extends Modal {
 		}
 		input.focus();
 		input.select();
+	}
+
+	private getTargetProvider(): RemoteProvider {
+		const provider = this.plugin
+			.listRemoteProviders()
+			.find((item) => item.id === this.providerId);
+		if (!provider) {
+			throw new Error(`Remote provider not found: ${this.providerId}`);
+		}
+		return provider;
 	}
 }

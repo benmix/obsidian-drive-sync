@@ -1,13 +1,13 @@
 import { PluginSettingTab, Setting } from "obsidian";
 import type { App } from "obsidian";
-import { siProtondrive } from "simple-icons";
 
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
 import type { DriveSyncSettings } from "../contracts/plugin/settings";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
 import { tr, trAny } from "../i18n";
 
-import { RemoteProviderLoginModal } from "./login-modal";
+import { openProviderLoginModal, openRemoteLoginModal } from "./auth-required-modal";
+import { renderProviderIcon } from "./provider-icon";
 import { RemoteFolderPickerModal } from "./remote-root-modal";
 
 export class DriveSyncSettingTab extends PluginSettingTab {
@@ -29,18 +29,19 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		const accountSetting = new Setting(containerEl)
 			.setName(hasAuthSession ? provider.label : tr("settings.remoteAccount"))
 			.setDesc("");
-		const authPaused = this.plugin.isAuthPaused();
-		if (hasAuthSession) {
-			accountSetting.nameEl.addClass("drive-sync-brand-name");
-			this.renderProviderIcon(accountSetting.nameEl, provider.id, provider.label);
-		}
-		accountSetting.descEl.createDiv({
+		accountSetting.settingEl.addClass("drive-sync-account-setting");
+		const accountStatus = accountSetting.descEl.createDiv({
 			cls: "drive-sync-account-status",
 			text: this.getAuthStatusText(),
 		});
+		const authPaused = this.plugin.isAuthPaused();
+		if (hasAuthSession) {
+			accountSetting.nameEl.addClass("drive-sync-brand-name");
+			renderProviderIcon(accountSetting.nameEl, provider.id, provider.label);
+		}
 		if (authPaused) {
 			accountSetting.settingEl.addClass("drive-sync-setting-callout", "is-auth-warning");
-			accountSetting.descEl.addClass("is-error");
+			accountStatus.addClass("is-error");
 		}
 		if (hasAuthSession) {
 			accountSetting.addButton((button) => {
@@ -55,16 +56,8 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 				});
 			});
 		} else {
-			accountSetting.addButton((button) => {
-				button.setClass("drive-sync-provider-icon-button");
-				button.setTooltip(
-					tr("settings.signInToProviderTooltip", {
-						provider: provider.label,
-					}),
-				);
-				this.renderProviderIcon(button.buttonEl, provider.id, provider.label);
-				button.onClick(() => this.openLoginModal());
-			});
+			accountSetting.settingEl.addClass("drive-sync-setting-callout");
+			this.renderProviderLoginOptions(accountSetting.controlEl);
 		}
 
 		const remoteFolderPath = this.plugin.getRemoteScopePath();
@@ -76,20 +69,12 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 				: tr("settings.remoteFolderPath.notSelected");
 		const remoteFolderSetting = new Setting(containerEl)
 			.setName(tr("settings.remoteFolder"))
-			.setDesc(
-				tr("settings.remoteFolderDesc", {
-					provider: provider.label,
-				}),
-			)
+			.setDesc(tr("settings.remoteFolderDesc"))
 			.addText((text) => text.setValue(remotePathLabel).setDisabled(true))
 			.addButton((button) => {
 				button.setButtonText(tr("settings.remoteFolderChoose"));
 				button.onClick(() => {
-					const modal = new RemoteFolderPickerModal(this.app, this.plugin);
-					modal.onClose = () => {
-						this.display();
-					};
-					modal.open();
+					void this.openRemoteFolderPicker();
 				});
 			});
 		const remoteValidationStatus = remoteFolderSetting.descEl.createDiv({
@@ -177,38 +162,62 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		return tr("settings.authStatus.signInHint");
 	}
 
-	private openLoginModal(): void {
-		const modal = new RemoteProviderLoginModal(this.app, this.plugin);
+	private renderProviderLoginOptions(containerEl: HTMLElement): void {
+		const providers = this.plugin.listRemoteProviders();
+		const optionGrid = containerEl.createDiv({
+			cls: "drive-sync-settings-provider-grid",
+		});
+		for (const provider of providers) {
+			const button = optionGrid.createEl("button", {
+				cls: "drive-sync-settings-provider-option",
+			});
+			renderProviderIcon(
+				button,
+				provider.id,
+				provider.label,
+				"drive-sync-provider-icon drive-sync-settings-provider-option-icon",
+			);
+			button.setAttribute(
+				"aria-label",
+				tr("settings.signInToProviderTooltip", {
+					provider: provider.label,
+				}),
+			);
+			button.addEventListener("click", () => {
+				void openProviderLoginModal(this.plugin, provider.id, {
+					onCancel: () => {
+						this.display();
+					},
+					onSuccess: () => {
+						this.display();
+					},
+				});
+			});
+		}
+	}
+
+	private async openRemoteFolderPicker(): Promise<void> {
+		const provider = this.plugin.getRemoteProvider();
+		if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
+			openRemoteLoginModal(this.plugin, {
+				onCancel: () => {
+					this.display();
+				},
+				onSuccess: () => {
+					const modal = new RemoteFolderPickerModal(this.app, this.plugin);
+					modal.onClose = () => {
+						this.display();
+					};
+					modal.open();
+				},
+			});
+			return;
+		}
+		const modal = new RemoteFolderPickerModal(this.app, this.plugin);
 		modal.onClose = () => {
 			this.display();
 		};
 		modal.open();
-	}
-
-	private renderProviderIcon(
-		containerEl: HTMLElement,
-		providerId: string,
-		providerLabel: string,
-	): void {
-		const iconSvg = this.getProviderIconSvg(providerId);
-		if (!iconSvg) {
-			return;
-		}
-		const iconEl = containerEl.createSpan({
-			cls: "drive-sync-provider-icon",
-			attr: { "aria-label": providerLabel },
-		});
-		iconEl.innerHTML = iconSvg;
-		containerEl.insertBefore(iconEl, containerEl.firstChild);
-	}
-
-	private getProviderIconSvg(providerId: string): string | null {
-		if (providerId === "proton-drive") {
-			return `<svg viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false">
-				<path fill="currentColor" d="${siProtondrive.path}"/>
-			</svg>`;
-		}
-		return null;
 	}
 
 	private async autoValidateRemoteFolder(statusEl: HTMLDivElement): Promise<void> {
@@ -240,9 +249,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
 			return {
 				ok: false,
-				message: tr("notice.signInToProviderFirst", {
-					provider: provider.label,
-				}),
+				message: tr("error.auth.signInFirst"),
 			};
 		}
 
@@ -252,11 +259,8 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		} catch (error) {
 			const normalized = normalizeUnknownDriveSyncError(error, {
 				category: "provider",
-				userMessage: tr("notice.unableToConnectProvider", {
-					provider: provider.label,
-				}),
-				userMessageKey: "error.provider.unableToConnectNamed",
-				userMessageParams: { provider: provider.label },
+				userMessage: tr("error.provider.unableToConnect"),
+				userMessageKey: "error.provider.unableToConnect",
 			});
 			return {
 				ok: false,

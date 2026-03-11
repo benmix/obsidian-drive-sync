@@ -18,22 +18,11 @@ const LOCAL_PROVIDER_FACTORIES: Record<LocalProviderId, LocalProviderFactory> = 
 	["obsidian-local"]: () => createObsidianLocalProvider(),
 };
 
-export function createRemoteProviderRegistry(
-	activeProviderId: RemoteProviderId,
-): RemoteProviderRegistry {
-	const providerId = activeProviderId.trim();
-	const providerFactory = REMOTE_PROVIDER_FACTORIES[providerId];
-	if (!providerFactory) {
-		throw createDriveSyncError("CONFIG_PROVIDER_MISSING", {
-			category: "config",
-			userMessage: "Selected provider is not available.",
-			userMessageKey: "error.config.providerMissing",
-			debugMessage: `Unsupported remote provider: ${providerId}`,
-			details: { providerId, providerType: "remote" },
-		});
-	}
+export function createRemoteProviderRegistry(): RemoteProviderRegistry {
 	const registry = new RemoteProviderRegistry();
-	registry.register(providerFactory());
+	for (const providerFactory of Object.values(REMOTE_PROVIDER_FACTORIES)) {
+		registry.register(providerFactory());
+	}
 	return registry;
 }
 
