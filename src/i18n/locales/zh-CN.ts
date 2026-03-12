@@ -114,6 +114,7 @@ export const ZH: Record<keyof typeof EN, string> = {
 	"login.unableToSignIn": "登录失败。",
 
 	"settings.remoteAccount": "远端账号",
+	"settings.accountChip": "账号：{email}",
 	"settings.signOut": "退出登录",
 	"settings.signInToProviderTooltip": "登录到 {provider}",
 	"settings.remoteFolder": "远端文件夹",
@@ -134,6 +135,7 @@ export const ZH: Record<keyof typeof EN, string> = {
 	"settings.networkPolicy": "实验功能：网络策略",
 	"settings.networkPolicyDesc": "根据在线状态与网络冷却时间决定是否执行同步。默认关闭。",
 	"settings.authStatus.pendingValidation": "会话已保存，等待校验。",
+	"settings.authStatus.signedIn": "已登录。",
 	"settings.authStatus.signedInAs": "已登录为 {email}。",
 	"settings.authStatus.signedInToProvider": "已登录到 {provider}。",
 	"settings.authStatus.needsAttention": "会话需要处理，请重新登录恢复访问。",

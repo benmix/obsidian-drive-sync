@@ -118,6 +118,7 @@ export const EN = {
 	"login.unableToSignIn": "Unable to sign in.",
 
 	"settings.remoteAccount": "Remote account",
+	"settings.accountChip": "Account: {email}",
 	"settings.signOut": "Sign out",
 	"settings.signInToProviderTooltip": "Sign in to {provider}",
 	"settings.remoteFolder": "Remote folder",
@@ -139,6 +140,7 @@ export const EN = {
 	"settings.networkPolicyDesc":
 		"Gate sync runs by online status and transient-network cooldown. Disabled by default.",
 	"settings.authStatus.pendingValidation": "Session stored. Validation pending.",
+	"settings.authStatus.signedIn": "Signed in.",
 	"settings.authStatus.signedInAs": "Signed in as {email}.",
 	"settings.authStatus.signedInToProvider": "Signed in to {provider}.",
 	"settings.authStatus.needsAttention":

@@ -1,6 +1,6 @@
 ---
 
-# Obsidian Drive Sync
+# Obsidian 云盘同步
 
 **技术规格说明（Specs v1.0）**
 
@@ -10,7 +10,7 @@
 
 ### 1.1 产品名称
 
-**Obsidian Drive Sync Plugin**
+**Obsidian 云盘同步插件**
 
 ### 1.2 目标
 

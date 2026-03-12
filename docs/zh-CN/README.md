@@ -1,4 +1,4 @@
-# Obsidian Drive Sync
+# Obsidian 云盘同步
 
 将 Obsidian 仓库与远端文件夹进行同步。该插件仍在持续开发中，当前重点是保证同步操作安全、可观察且可回滚。
 

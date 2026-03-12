@@ -1,4 +1,4 @@
-# Obsidian Drive Sync Agent 指南
+# Obsidian 云盘同步 Agent 指南
 
 ## 目的
 

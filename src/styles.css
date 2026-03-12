@@ -139,15 +139,21 @@ If your plugin does not need CSS, delete this file.
 	);
 }
 
-.drive-sync-account-provider {
+.drive-sync-account-provider,
+.drive-sync-account-user {
 	display: inline-flex;
 	align-items: center;
+	box-sizing: border-box;
+	min-height: 32px;
 	gap: 10px;
 	padding: 5px 12px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 999px;
-	background: color-mix(in srgb, var(--background-primary) 86%, transparent);
 	vertical-align: middle;
+}
+
+.drive-sync-account-provider {
+	background: color-mix(in srgb, var(--background-primary) 86%, transparent);
 }
 
 .drive-sync-account-provider-label {
@@ -155,6 +161,22 @@ If your plugin does not need CSS, delete this file.
 	font-size: 13px;
 	font-weight: 700;
 	color: var(--text-muted);
+}
+
+.drive-sync-account-user {
+	background: color-mix(
+		in srgb,
+		var(--background-secondary) 88%,
+		transparent
+	);
+	line-height: 1;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-muted);
+	max-width: min(46vw, 320px);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .drive-sync-provider-icon {

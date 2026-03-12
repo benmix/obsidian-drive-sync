@@ -44,6 +44,15 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 				cls: "drive-sync-account-provider-label",
 				text: provider.label,
 			});
+			const accountEmail = this.plugin.getRemoteAccountEmail();
+			if (accountEmail) {
+				accountSetting.nameEl.createSpan({
+					cls: "drive-sync-account-user",
+					text: tr("settings.accountChip", {
+						email: accountEmail,
+					}),
+				});
+			}
 		}
 		if (authPaused) {
 			accountSetting.settingEl.addClass("drive-sync-setting-callout", "is-auth-warning");
@@ -148,14 +157,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			return tr("settings.authStatus.pendingValidation");
 		}
 		if (this.plugin.hasRemoteAuthSession()) {
-			const email = this.plugin.getRemoteAccountEmail();
-			return email
-				? tr("settings.authStatus.signedInAs", {
-						email,
-					})
-				: tr("settings.authStatus.signedInToProvider", {
-						provider: provider.label,
-					});
+			return tr("settings.authStatus.signedIn");
 		}
 		if (this.plugin.isAuthPaused()) {
 			return (

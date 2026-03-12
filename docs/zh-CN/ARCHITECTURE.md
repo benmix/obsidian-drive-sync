@@ -1,4 +1,4 @@
-# Obsidian Drive Sync 架构设计
+# Obsidian 云盘同步 架构设计
 
 ## 1. 文档目标
 
