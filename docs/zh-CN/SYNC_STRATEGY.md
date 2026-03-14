@@ -1,122 +1,135 @@
 # 运行时同步策略规范
 
 > 生效日期：2026-03-07
-> 本文档定义初始化完成后的运行时行为。
-> 首次初始化策略请参见 `SYNC_INITIALIZATION_STRATEGY.md`。
+> 本文只约束初始化完成后的常规同步行为。首次同步规则见 [`SYNC_INITIALIZATION_STRATEGY.md`](./SYNC_INITIALIZATION_STRATEGY.md)。
 
-## 1. 目标与范围
+## 1. 目的
 
-1. 定义三种统一策略：`local_win` / `remote_win` / `bidirectional`。
-2. 定义运行时对文件、文件夹、冲突和缺失确认的决策规则。
-3. 约束实现边界，避免策略分叉和隐蔽的高风险行为。
-4. 提供可执行的验收标准，确保实现符合文档。
+这份文档定义常规运行时同步的决策规则，主要为了明确三件事：
+
+- 每种同步策略到底意味着什么
+- 哪些特殊保护规则优先于普通决策矩阵
+- 哪些地方允许做实现分支
 
 ## 2. 术语
 
-- `local`：Obsidian vault 的本地文件系统视图。
-- `remote`：远端存储的文件系统视图。
-- `tracked`：已经存在同步状态映射（`SyncEntry`）的路径。
-- `tombstone`：等待与远端收敛的本地删除标记。
-- `conflict_pending`：等待用户手动合并的冲突挂起状态。
+- `local`：Obsidian vault 的本地视图
+- `remote`：远端文件系统视图
+- `tracked`：已经有同步状态映射的路径
+- `tombstone`：等待与远端收敛的本地删除标记
+- `conflict_pending`：等待人工处理冲突的路径
 
-## 3. 全局规则（优先级从高到低）
+## 3. 全局规则
 
-1. 冲突保护优先：处于 `conflict_pending` 的路径不得自动执行规范化 upload/download。
-2. 墓碑收敛优先：存在 `tombstone` 时，应优先处理删除收敛，而不是普通增量更新。
-3. 远端缺失双重确认：远端缺失必须连续两轮确认后，才能执行破坏性收敛。
-4. 常规策略决策：按 `local_win` / `remote_win` / `bidirectional` 矩阵执行。
+以下规则按优先级从高到低执行：
+
+1. 冲突保护优先。处于 `conflict_pending` 的路径不得自动进入常规上传或下载。
+2. 墓碑收敛优先于普通增量更新。
+3. 远端缺失必须连续确认两次，才允许做破坏性收敛。
+4. 如果没有命中特殊规则，则由当前 `syncStrategy` 决定行为。
 
 ## 4. 策略定义
 
 ### 4.1 `local_win`
 
-- 本地是权威来源；远端镜像本地。
-- 原则：除冲突副本外，远端内容不得覆盖本地的规范文件。
+本地为事实来源，远端镜像本地。
+
+约束：
+
+- 除冲突副本外，远端内容不得覆盖本地 canonical 文件
 
 ### 4.2 `remote_win`
 
-- 远端是权威来源；本地镜像远端。
-- 原则：除本地冲突备份外，本地内容不得覆盖远端的规范文件。
+远端为事实来源，本地镜像远端。
+
+约束：
+
+- 除本地冲突备份外，本地内容不得覆盖远端 canonical 文件
 
 ### 4.3 `bidirectional`
 
-- 双向同步；发生冲突时不自动选择某一侧。
-- 原则：冲突时生成冲突副本并进入 `conflict_pending`，待手动合并后再恢复。
+本地和远端在冲突发生前都可视为权威来源。
+
+约束：
+
+- 当两边都发生变化时，系统不会自动选边，而是生成冲突副本并进入 `conflict_pending`
 
 ## 5. 决策矩阵
 
-| 场景                 | `local_win`                         | `remote_win`                     | `bidirectional`                        |
-| -------------------- | ----------------------------------- | -------------------------------- | -------------------------------------- |
-| 仅本地存在（文件）   | `upload`                            | `delete-local`                   | `upload`                               |
-| 仅远端存在（文件）   | `delete-remote`                     | `download`                       | `download`                             |
-| 双端都变化（文件）   | `download` 远端副本 + `upload` 本地 | 备份本地副本 + `download` 远端   | 创建冲突副本 + 标记 `conflict_pending` |
-| 仅本地存在（文件夹） | `create-remote-folder`              | `delete-local`                   | `create-remote-folder`                 |
-| 仅远端存在（文件夹） | `delete-remote`                     | `create-local-folder`            | `create-local-folder`                  |
-| 双端都缺失且已跟踪   | 清理映射（并执行所需的清理删除）    | 清理映射（并执行所需的清理删除） | 清理映射（并执行所需的清理删除）       |
+| 场景                 | `local_win`                             | `remote_win`                            | `bidirectional`                                  |
+| -------------------- | --------------------------------------- | --------------------------------------- | ------------------------------------------------ |
+| 仅本地存在的文件     | `upload`                                | `delete-local`                          | `upload`                                         |
+| 仅远端存在的文件     | `delete-remote`                         | `download`                              | `download`                                       |
+| 两边都改过的文件     | `download remote copy` + `upload local` | `backup local copy` + `download remote` | `create conflict copy` + `mark conflict_pending` |
+| 仅本地存在的文件夹   | `create-remote-folder`                  | `delete-local`                          | `create-remote-folder`                           |
+| 仅远端存在的文件夹   | `delete-remote`                         | `create-local-folder`                   | `create-local-folder`                            |
+| 已跟踪但两边都不存在 | 清理映射及残留状态                      | 清理映射及残留状态                      | 清理映射及残留状态                               |
 
 ## 6. 特殊规则
 
 ### 6.1 远端缺失双重确认
 
-1. 对已跟踪且远端缺失的路径，第一轮仅增加 `remoteMissingCount`，不执行破坏性动作。
-2. 只有在连续两轮确认后，才允许执行策略驱动的收敛（删除本地或重建远端）。
+- 对于已跟踪路径，第一次观察到远端缺失时，只增加 `remoteMissingCount`。
+- 只有第二次连续确认后，才允许执行 delete-local 或 recreate-remote 之类的破坏性收敛。
 
 ### 6.2 墓碑收敛
 
-1. `tombstone` 表示“本地已删除，等待远端删除”。
-2. 在非 `remote_win` 下，如果远端对象仍存在，应优先规划 `delete-remote` 收敛。
+- tombstone 表示本地已经删除，而远端仍需跟进收敛。
+- 在 `remote_win` 之外的策略下，planner 应优先规划 `delete-remote`，而不是继续普通增量同步。
 
 ### 6.3 `conflict_pending` 抑制
 
-1. 当 `conflict_pending` 仍然生效时，不得为同一路径重复生成冲突作业。
-2. 用户清理冲突标记并完成手工合并后，该路径恢复到普通增量同步流程。
+- 当路径已处于 `conflict_pending` 时，不要为同一路径重复生成冲突任务。
+- 用户处理完成并清除标记后，该路径才恢复正常增量同步。
 
-## 7. 冲突处理规范（统一副本模型）
+## 7. 冲突副本模型
 
-1. 冲突处理不再暴露“直接按某一侧覆盖”的策略路径。
-2. 始终保留一个可编辑的规范文件。
-3. 将对侧版本写入一个冲突副本，命名格式如下：
+冲突处理统一采用一套模型：
+
+1. 保留一个 canonical 可编辑文件
+2. 把另一侧版本写入冲突副本
+3. 将路径标记为 `conflict_pending`
+4. 只有人工处理完成后才恢复常规同步
+
+冲突副本命名：
 
 ```text
 <filename> (conflicted <source> YYYY-MM-DD HHmm).<ext>
 ```
 
-4. `<source>` 只能取：
-    - `remote`
-    - `local`
+允许的 `<source>` 值：
 
-## 8. 实现约束（代码级）
+- `local`
+- `remote`
 
-1. 使用统一配置字段 `syncStrategy`，枚举值仅允许：
-    - `local_win`
-    - `remote_win`
-    - `bidirectional`
-2. 不得新增任何 `manual` 冲突策略分支。
-3. 将策略分支集中在 planner 层（`presence-policy` / `reconciler` / `remote-poller`）；执行层只消费作业，不得再按策略分叉。
-4. 任何可能造成批量删除的动作，必须在 preflight 中可见且可中止。
+## 8. 实现约束
 
-## 9. 测试与验收标准
+- `syncStrategy` 只能使用 `local_win`、`remote_win`、`bidirectional`。
+- 不要重新引入单独的 `manual` 冲突策略路径。
+- 策略分支必须放在 planner 级逻辑里，而不是执行层里。
+- 执行层负责消费任务，不负责再次判定策略。
+- 任何可能导致大规模删除的操作都必须在 preflight 中可见且可取消。
 
-### 9.1 最低单元测试覆盖
+## 9. 验证要求
 
-1. 三种策略下 `local-only` / `remote-only` 行为（文件 + 文件夹）。
-2. `both changed` 时冲突副本生成与作业类型正确。
-3. 远端缺失双重确认行为。
-4. 墓碑收敛行为。
-5. `conflict_pending` 的抑制与解除。
-6. 初始化后清空本地的行为：
-    - 不得再走初始化硬规则捷径；
-    - 必须严格遵循当前 `syncStrategy`。
+### 9.1 最低单元覆盖
 
-### 9.2 集成验收
+- 三种策略下本地独有和远端独有的行为
+- 双边都修改时的任务类型和冲突副本行为
+- 远端缺失双重确认行为
+- 墓碑收敛行为
+- `conflict_pending` 的抑制与释放
+- 初始化完成后本地清空场景不应回退到初始化硬规则
 
-1. `planSync -> runPlannedSync` 的行为与决策矩阵一致。
-2. `runAutoSync` 与 `pollRemoteSync` 不得出现策略反转。
-3. 在“初始化完成后本地被清空”的场景下，行为必须严格遵循矩阵。
+### 9.2 集成覆盖
+
+- `planSync` 与 `runPlannedSync` 的结果符合决策矩阵
+- `runAutoSync` 和 `pollRemoteSync` 不得出现策略语义反转
+- 初始化后的本地清空场景应严格遵循运行时策略，而不是初始化规则
 
 ### 9.3 发布门槛
 
-1. `pnpm run lint` 通过。
-2. `pnpm run test` 通过。
-3. `pnpm run build` 通过。
-4. 手工验证至少覆盖一个“初始化完成后本地被清空”的场景。
+- `pnpm run lint` 通过
+- `pnpm run test` 通过
+- `pnpm run build` 通过
+- 人工验证至少覆盖一次初始化完成后本地被清空的场景

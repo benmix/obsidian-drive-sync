@@ -1,161 +1,163 @@
 # Tasks
 
-## Feasibility and SDK research
+This file tracks notable completed work and the most visible remaining gaps. It is not a full project-management system. Its purpose is to keep repository-level priorities visible next to the code.
 
-### SDK client bootstrapping
+## Feasibility And SDK Research
 
-- [x] Define SDK initialization requirements (httpClient/account/crypto/srp/cache/telemetry).
-- [x] Build internal httpClient adapter with auth headers and refresh handling.
-- [x] Refactor remote provider service to construct client internally (no user SDK JSON).
+### SDK Client Bootstrapping
 
-### Authentication and session lifecycle
+- [x] Define SDK initialization requirements: `httpClient`, `account`, `crypto`, `srp`, `cache`, `telemetry`.
+- [x] Build the internal `httpClient` adapter with auth headers and refresh handling.
+- [x] Refactor remote provider service construction so users no longer supply raw SDK JSON.
 
-- [x] Implement session lifecycle (login, persist, restore, refresh, logout).
-- [x] Validate login flow with injected `httpClient`.
-- [x] Add auth flow UX (login modal -> ready state -> logout).
-- [x] Update settings UI to remove SDK JSON input and show auth status.
-- [x] Update auth diagnostics and logging (redacted).
+### Authentication And Session Lifecycle
 
-### Remote operations validation
+- [x] Implement login, persist, restore, refresh, and logout.
+- [x] Validate login flow with the injected `httpClient`.
+- [x] Add auth UX for login, ready state, and logout.
+- [x] Remove obsolete SDK JSON input from settings and show auth status instead.
+- [x] Add redacted auth diagnostics and logging.
 
-- [x] Verify `list`, `create`, `upload`, `download`, `delete`, `move` on a scoped Remote Root.
-- [x] Confirm node `uid` stability across rename/move and new revision uploads.
-- [x] Collect remote metadata for change detection (`activeRevision.uid`, `modificationTime`, `storageSize`).
+### Remote Operations Validation
+
+- [x] Verify `list`, `create`, `upload`, `download`, `delete`, and `move` inside a scoped remote root.
+- [x] Confirm node `uid` stability across rename, move, and new revision uploads.
+- [x] Collect remote metadata for change detection.
 
 ### Documentation
 
-- [x] Document verification steps for login/CRUD/uid stability.
+- [x] Document verification steps for login, CRUD validation, and UID stability.
 
-## Core sync
+## Core Sync
 
-- [x] Implement LocalFS adapter (Obsidian vault events + snapshot).
-- [x] Implement RemoteFS adapter using SDK public API only.
-- [x] Build Index DB (entries + jobs) with Dexie-backed IndexedDB.
-- [x] Build reconciler and job queue with idempotent ops.
-- [x] Manual sync command: one-shot reconcile + execute queue.
-- [x] Incremental local changes (debounce + rename handling).
-- [x] Remote polling snapshot diff (no official cursor).
-- [x] Remote change cursor/feed support with snapshot fallback.
-- [x] Conflict detection and default resolution (local wins + conflicted copy).
-- [x] Health & status view (queue size, last error, pause/resume, logs).
+- [x] Implement the local filesystem adapter over Obsidian vault events and snapshot reads.
+- [x] Implement the remote filesystem adapter using public SDK APIs.
+- [x] Build the Dexie-backed index and job queue.
+- [x] Build reconciliation and idempotent queue execution.
+- [x] Add a one-shot manual sync command.
+- [x] Handle incremental local changes with debounce and rename support.
+- [x] Add remote snapshot diff polling.
+- [x] Add remote cursor or feed support with snapshot fallback.
+- [x] Add conflict detection and default conflict-copy behavior.
+- [x] Add a status view for queue state, pause or resume, errors, and logs.
 
-## Reliability and recovery
+## Reliability And Recovery
 
-- [x] Retry policy with backoff and auth pause.
-- [x] Priority-aware scheduling and max retry caps.
-- [x] Auth error pause and status reporting.
-- [x] Crash recovery and resume (tombstones, pending jobs).
-- [x] Queue state machine with retry scheduling (pending/processing/blocked).
-- [x] Persist and reuse remote event cursors (avoid short polling sleep).
-- [x] Background reconciliation pass with throttled scanning and skip-on-busy.
-- [x] Rename/parent-change edge cases (conflicts, ordering).
-- [x] Startup cleanup for stale processing jobs and orphaned state.
-- [x] Refine retry policy by error class (auth/rate/network/404).
-- [x] Add background reconciliation pass with throttled scanning and skip-on-busy (15m cadence in auto sync).
-- [x] Surface job state counts in status view (pending/processing/blocked).
+- [x] Add retry policy with backoff and auth pause.
+- [x] Add priority-aware scheduling and retry caps.
+- [x] Persist auth-pause state and surface it in the UI.
+- [x] Support crash recovery and resumable queue work.
+- [x] Add queue states for pending, processing, and blocked jobs.
+- [x] Persist and reuse remote event cursors.
+- [x] Add background reconciliation with throttled scanning and skip-on-busy behavior.
+- [x] Handle rename and parent-change edge cases.
+- [x] Clean up stale processing jobs and orphaned state on startup.
+- [x] Differentiate retry policy by error class.
+- [x] Surface pending, processing, and blocked counts in the status view.
 
 ## Performance
 
-- [x] Optimize large-vault performance (hash laziness, batching, throttling).
-- [x] Introduce mtime+size change tokens to reduce hash cost.
+- [x] Improve large-vault behavior through lazy hashing, batching, and throttling.
+- [x] Add `mtime + size` change tokens to reduce hash work.
 
-## UX and UI
+## UX And UI
 
-- [x] Build a remote root selector UI instead of manual folder ID input.
-- [x] Implement a manual conflict resolution UI/flow.
-- [x] Expand manual conflict resolution UI (keep local/remote, resume).
-- [x] Add pre-sync checks (job counts, size estimates, confirm/abort).
-- [x] Improve sync visibility (queue details, in-flight job, retry schedule).
-- [x] Validate settings inputs (remote folder selection).
+- [x] Replace manual folder ID input with a remote root selector.
+- [x] Add manual conflict review and resolution flow.
+- [x] Expand conflict review options to keep local, keep remote, and resume sync.
+- [x] Add pre-sync checks with job counts, size estimates, and confirmation.
+- [x] Improve queue visibility and retry timing in the UI.
+- [x] Validate remote-folder settings input.
 
 ## Observability
 
-- [x] Add structured logs and a log viewer in UI.
-- [x] Diagnostics export with state and settings summary.
-- [x] Define diagnostics redaction rules and privacy review.
-- [x] Add runtime diagnostics (duration, throughput, failures, queue peaks).
+- [x] Add structured logs and an in-app log viewer.
+- [x] Export diagnostics with state and settings summaries.
+- [x] Define redaction rules and privacy review boundaries.
+- [x] Add runtime metrics such as duration, throughput, failures, and queue peaks.
 
-## Data and storage
+## Data And Storage
 
-- [x] Data persistence via `loadData/saveData`.
-- [x] IndexedDB via Dexie for sync state (no migration needed pre-release).
-- [x] Replace localStorage sync state with IndexedDB via Dexie.
-- [x] Plan IndexedDB schema migrations for future changes.
+- [x] Persist plugin settings through `loadData()` and `saveData()`.
+- [x] Move sync state to Dexie-backed IndexedDB.
+- [x] Replace localStorage-based sync state.
+- [x] Plan schema migration rules for future changes.
 
-## Testing and compatibility
+## Testing And Compatibility
 
-- [ ] Validate mobile compatibility (runtime tests + UX polish).
-- [x] Add unit tests for reconciler, job queue, exclude rules.
-- [ ] Add unit tests for adapters.
+- [ ] Validate mobile compatibility with runtime checks and UX review.
+- [x] Add unit tests for the reconciler, queue, and exclude rules.
+- [ ] Add stronger adapter-level unit tests.
 
-## Runtime architecture refactor
+## Runtime Architecture Refactor
 
-### Phase A - behavior-preserving split
+### Phase A: Behavior-Preserving Split
 
-- [x] Move auto-sync/session/scheduler orchestration from `main.ts` into `runtime/plugin-runtime.ts`.
-- [x] Keep `main.ts` as plugin facade (load/save settings, UI registration, command registration).
-- [x] Preserve existing external plugin methods used by UI/commands (`runAutoSync`, `pauseAutoSync`, `resumeAutoSync`, `isSyncRunning`, auth pause status).
+- [x] Move auto-sync, session, and scheduler orchestration out of `main.ts` into `runtime/plugin-runtime.ts`.
+- [x] Keep `main.ts` as a thin plugin facade.
+- [x] Preserve plugin methods used by UI and commands.
 
-### Phase B - orchestration boundaries
+### Phase B: Orchestration Boundaries
 
-- [x] Introduce `runtime/session-manager.ts` for restore/refresh/persist auth session logic.
-- [x] Introduce `runtime/trigger-scheduler.ts` for interval/debounce/pending single-flight scheduling.
-- [x] Split sync execution into `runtime/sync-coordinator.ts` (runtime orchestration) and `sync/use-cases/sync-runner.ts` (provider-agnostic one-cycle pipeline).
+- [x] Add `runtime/session-manager.ts` for auth restore and refresh.
+- [x] Add `runtime/trigger-scheduler.ts` for interval, debounce, and single-flight behavior.
+- [x] Split execution between `runtime/sync-coordinator.ts` and `sync/use-cases/sync-runner.ts`.
 
-### Phase C - resilience extension points
+### Phase C: Resilience Extension Points
 
-- [x] Add optional `runtime/network-policy.ts` to centralize network gating decisions.
+- [x] Add optional `runtime/network-policy.ts`.
 
-### Phase D - sync module layout hygiene
+### Phase D: Sync Module Layout Hygiene
 
-- [x] Reorganize `sync/` by responsibility: `contracts/`, `planner/`, `engine/`, `state/`, `support/`, `use-cases/`.
-- [x] Move use-case orchestration (`manual-sync`, `diagnostics`) into `runtime/use-cases/`.
-- [x] Keep behavior unchanged while updating all import boundaries and tests/build.
-- [x] Add `oxlint` import boundary guards (`no-restricted-imports` overrides) for sync layering.
-
-### Verification
-
-- [x] `pnpm run test` passes after each phase.
-- [x] `pnpm run build` passes with no new type-unsafe bypasses.
-- [ ] Manual checks: login restore, token refresh, pause/resume, local rename sync, remote rename sync.
-
-## Remote provider abstraction
-
-### Phase A - provider foundation
-
-- [x] Add `RemoteProvider` contracts and registry.
-- [x] Add default remote provider (`proton-drive`) implementation over existing auth/service/remote-file-system.
-- [x] Add `LocalProvider` abstraction and Obsidian local provider implementation (`local-file-system` + watcher).
-- [x] Add `LocalProviderRegistry` and local provider bootstrap (`createLocalProviderRegistry`).
-- [x] Add provider-aware settings fields (`remoteProviderId`, `remoteScope*`, `remoteProviderCredentials`).
-
-### Phase B - runtime integration
-
-- [x] Refactor `SessionManager` to restore/refresh/connect via provider abstraction.
-- [x] Refactor `SyncRunner` to create remote file system via provider (`provider.createRemoteFileSystem(...)`).
-
-### Phase C - UI and command migration
-
-- [x] Migrate login/settings auth flows to provider interface (keep current provider UX).
-- [x] Migrate command handlers and conflict/remote-root modals off direct provider service usage.
+- [x] Reorganize `sync/` by responsibility.
+- [x] Move manual-sync and diagnostics orchestration into `runtime/use-cases/`.
+- [x] Update import boundaries and tests without changing behavior.
+- [x] Add `oxlint` guards for sync-layer dependency direction.
 
 ### Verification
 
-- [x] `pnpm run lint` passes with provider changes.
-- [x] `pnpm run test` and `pnpm run build` pass with provider changes.
-- [x] Remove legacy settings migration path; load and persist provider-only settings directly.
+- [x] `pnpm run test` passed after each phase.
+- [x] `pnpm run build` passed after each phase.
+- [ ] Manual checks still pending for session restore, token refresh, pause or resume, and local or remote rename flows.
 
-## Filesystem contract extraction
+## Remote Provider Abstraction
 
-- [x] Extract shared file-system contracts out of the old sync-local type bundle into `src/contracts/filesystem/*`.
-- [x] Migrate `provider/` imports from sync-local type definitions to `src/contracts/filesystem/*`.
-- [x] Migrate `sync/runtime/ui/tests` imports for file-system types to `src/contracts/filesystem/*`.
+### Phase A: Provider Foundation
+
+- [x] Add `RemoteProvider` contracts and registries.
+- [x] Add the default remote provider implementation for `proton-drive`.
+- [x] Add `LocalProvider` abstraction and the Obsidian local provider.
+- [x] Add `LocalProviderRegistry` bootstrap.
+- [x] Add provider-oriented settings fields.
+
+### Phase B: Runtime Integration
+
+- [x] Refactor `SessionManager` to restore, refresh, and connect through provider interfaces.
+- [x] Refactor `SyncRunner` to create the remote filesystem through the provider.
+
+### Phase C: UI And Command Migration
+
+- [x] Move login and settings auth flows onto the provider interface.
+- [x] Move command handlers and modal flows away from direct provider service usage.
+
+### Verification
+
+- [x] `pnpm run lint` passed after provider changes.
+- [x] `pnpm run test` passed after provider changes.
+- [x] `pnpm run build` passed after provider changes.
+- [x] Remove the legacy settings migration path and persist provider-only fields directly.
+
+## Filesystem Contract Extraction
+
+- [x] Extract shared filesystem contracts into `src/contracts/filesystem/*`.
+- [x] Migrate provider imports to the new filesystem contracts.
+- [x] Migrate sync, runtime, UI, and test imports that depended on the old location.
 - [x] Keep sync-run contracts under `src/contracts/sync/*`.
-- [x] Add lint boundaries to enforce `provider` cannot import `sync/**` and `filesystem` stays dependency-light.
-- [x] Verification: `pnpm run lint` + `pnpm run test` + `pnpm run build`.
+- [x] Add lint boundaries so `provider/` cannot import `sync/**` and foundational filesystem code stays dependency-light.
+- [x] Verify with `pnpm run lint`, `pnpm run test`, and `pnpm run build`.
 
-## Remote rate limiting evolution
+## Remote Rate Limiting Evolution
 
-- [x] Documented and prototyped provider-owned remote rate limiting.
-- [x] Re-evaluated the maintenance cost of the extra strategy/middleware layer.
-- [x] Removed the provider-side rate-limit strategy/middleware implementation and its related tests/contracts from the current codebase.
+- [x] Document and prototype provider-owned remote rate limiting.
+- [x] Re-evaluate the maintenance cost of an extra provider-side strategy layer.
+- [x] Remove the unused provider-side rate-limit strategy and related tests and contracts from the current codebase.

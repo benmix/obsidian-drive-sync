@@ -1,34 +1,34 @@
-# 错误系统
+# 错误系统设计
 
-最后更新：2026-03-10
+最近更新：2026-03-10
 
 ## 1. 目的
 
-项目使用一套共享的结构化错误系统，让运行时策略、UI 文案、同步状态、日志、诊断导出统一基于同一种错误语义工作。
+仓库使用结构化错误模型，让运行时策略、持久化状态、诊断信息和 UI 都能用同一种语言描述同一个失败。
 
-核心规则很简单：
+核心规则是：
 
-**内部代码路径统一操作结构化错误，用户界面只展示安全且可翻译的信息。**
+**内部代码处理结构化错误；用户可见界面只渲染安全且可翻译的消息。**
 
-这份文档描述的是当前实现，不是迁移提案。
+这份文档描述的是当前设计，不是未来迁移方案。
 
 ## 2. 目标
 
-- 在项目自有逻辑中用稳定错误码替代脆弱的 `Error.message` 匹配。
-- 分离内部诊断信息和用户可见文案。
-- 让重试、认证暂停、阻塞任务恢复等策略由错误码驱动。
-- 将结构化错误字段持久化到同步状态和日志中。
-- 导出具备排障价值、同时做过基础脱敏的诊断信息。
+- 在项目自有逻辑中使用稳定错误码，而不是脆弱的 `Error.message` 匹配
+- 分离诊断细节和用户可见文案
+- 让重试、认证暂停和任务阻塞决策基于代码字段，而不是字符串
+- 在同步状态和日志中持久化结构化错误摘要
+- 导出有用但不泄露秘密的诊断信息
 
 ## 3. 非目标
 
-- 重写第三方 Proton SDK 内部抛出的所有原生 `Error`。
-- 引入复杂的异常继承层级。
-- 继续兼容历史的 `lastError: string` 状态模型。
+- 重写第三方 SDK 内部抛出的每一个原生 `Error`
+- 引入很深的异常类继承层次
+- 在新状态路径里继续保留旧版 `lastError: string` 兼容逻辑
 
 ## 4. 核心模型
 
-共享错误类型是 `DriveSyncError`。
+共享错误类型为 `DriveSyncError`。
 
 ```ts
 export type ErrorCategory =
@@ -82,20 +82,21 @@ class DriveSyncError extends Error {
 }
 ```
 
-主要字段含义：
+字段含义：
 
-- `code`：稳定语义标识，供运行时策略判断。
-- `category`：粗粒度分类，例如 auth、network、sync。
-- `retryable`：是否允许自动重试。
-- `userMessage` / `userMessageKey`：安全的用户可见信息来源。
-- `debugMessage` / `details`：诊断用上下文。
-- `cause`：必要时保留原始底层错误。
+- `code`：供运行时决策使用的稳定语义标识
+- `category`：粗粒度错误分类
+- `severity`：日志和展示的重要性等级
+- `retryable`：是否允许进入重试调度
+- `userMessage`、`userMessageKey`、`userMessageParams`：安全的用户可见消息来源
+- `debugMessage` 与 `details`：诊断上下文
+- `cause`：必要时保留的底层原始错误
 
 ## 5. 主要工具函数
 
 共享辅助函数位于 `src/errors/`。
 
-核心入口：
+主要入口：
 
 - `createDriveSyncError(code, init)`
 - `normalizeUnknownDriveSyncError(error, options?)`
@@ -105,76 +106,77 @@ class DriveSyncError extends Error {
 - `shouldPauseAuthForError(error)`
 - `getRetryDelayForDriveSyncError(error, attempt)`
 
-关于归一化有一个重要规则：
+重要规范化规则：
 
-- `normalizeUnknownDriveSyncError()` 既接受原始错误，也接受已存在的 `DriveSyncError`。
-- 如果传入的是已有 `DriveSyncError`，同时又提供了覆写参数，函数会返回一个重新包装后的 `DriveSyncError`。
-- 这样高层工作流可以保留底层稳定错误码，同时替换成更适合当前场景的用户文案。
+- `normalizeUnknownDriveSyncError()` 同时接受原始值和已有的 `DriveSyncError`
+- 如果传入的是 `DriveSyncError` 且带了 override，该函数会返回一个包裹后的新错误，覆盖策略字段或用户文案字段
+- 这样上层流程可以保留底层错误码，同时替换某个命令或工作流专用的提示文案
 
-## 6. 分层职责
+## 6. 各层职责
 
-### 6.1 Provider / SDK 适配层
-
-职责：
-
-- 尽早把第三方异常映射成 `DriveSyncError`。
-- 在 `details` 中补充必要的 provider 上下文。
-- 仅在 Proton SDK 缺少机器可读字段时，保留少量基于 message 的 fallback 分类。
-
-当前实现示例：
-
-- Proton 认证 restore / refresh 失败会映射为 auth 或 network 错误码。
-- Proton 远端文件系统操作会把 not-found、already-exists、conflict、write-failed、transient-incomplete 等情况映射为结构化错误。
-
-### 6.2 同步引擎
+### 6.1 Provider 与 SDK 适配层
 
 职责：
 
-- 基于结构化字段做重试、阻塞、auth pause、not-found / conflict 判定。
-- 持久化任务级错误元数据。
-- 输出任务级结构化日志。
+- 尽早把第三方失败规范化为结构化错误
+- 通过 `details` 追加 provider 上下文
+- 只有在 SDK 只暴露原始字符串时，才保留有限的消息文本兜底分类
 
-当前行为：
+当前例子：
 
-- not-found、auth、冲突、重试耗尽、重试调度都已经由错误码驱动。
-- 任务状态保存 `lastErrorCode`、`lastErrorRetryable`、`lastErrorAt`。
-- 运行级状态保存 `lastErrorCode`、`lastErrorCategory`、`lastErrorRetryable`、`lastErrorAt`。
+- 认证恢复或刷新失败会映射成 auth 或 network 错误码
+- 远端文件系统操作会映射成 not-found、already-exists、conflict、write-failed 等结构化错误
+
+### 6.2 Sync 引擎
+
+职责：
+
+- 基于结构化字段决定重试、阻塞、认证暂停和 not-found 或 conflict 行为
+- 持久化每个任务的错误摘要
+- 输出结构化任务日志
+
+当前持久化字段示例：
+
+- `lastErrorCode`
+- `lastErrorCategory`
+- `lastErrorRetryable`
+- `lastErrorAt`
 
 ### 6.3 Runtime
 
 职责：
 
-- 在工作流入口统一归一化错误。
-- 把同步错误和认证错误写入持久化状态。
-- 展示翻译后的用户提示。
+- 在工作流入口统一规范化错误
+- 将同步和认证失败写入持久化状态
+- 对用户展示已翻译且安全的提示
 
 当前行为：
 
-- `PluginRuntime` 会记录结构化同步失败。
-- `SessionManager` 会记录结构化认证失败和 auth 日志，而不只是保留内存字符串。
-- Network policy 基于归一化后的网络错误工作，而不是依赖原始 message。
+- `PluginRuntime` 会记录结构化同步失败
+- `SessionManager` 会记录结构化认证失败和 auth 日志
+- 网络策略消费的是规范化后的 network 错误，而不是原始字符串
 
 ### 6.4 UI
 
 职责：
 
-- 使用翻译后的用户文案。
-- 在有诊断价值的地方显示错误码。
-- 避免在常规 UI 中直接暴露原始堆栈或底层 SDK 细节。
+- 渲染翻译后的用户消息
+- 在需要诊断价值时显示错误码
+- 不在常规 UI 中直接暴露堆栈和底层 SDK 细节
 
 当前行为：
 
-- 状态页根据错误码渲染翻译后的消息。
-- 命令、设置页、登录、预同步、远端根目录选择等流程都使用共享错误消息翻译辅助函数。
-- auth paused 场景展示统一的认证提示，而不是原始 SDK 文本。
+- 状态 UI 根据错误码渲染消息
+- 登录、设置、预同步和远端根目录流程复用统一翻译辅助函数
+- auth pause 界面不会直接显示 SDK 原始文本
 
 ## 7. 持久化模型
 
-结构化错误状态已经持久化到同步状态中，不再依赖自由文本字符串。
+结构化错误状态会写入同步状态，而不是依赖自由文本字符串。
 
-### 7.1 SyncState
+### 7.1 Sync State
 
-当前字段：
+当前字段包括：
 
 ```ts
 type SyncState = {
@@ -186,9 +188,9 @@ type SyncState = {
 };
 ```
 
-### 7.2 SyncJob
+### 7.2 Sync Job
 
-当前任务级字段：
+当前每个任务的字段包括：
 
 ```ts
 type SyncJob = {
@@ -198,11 +200,11 @@ type SyncJob = {
 };
 ```
 
-历史 `lastError: string` 数据没有兼容层。
+当前设计不再为历史 `lastError: string` 值保留兼容路径。
 
 ## 8. 日志与诊断
 
-### 8.1 日志
+### 8.1 结构化日志
 
 结构化同步日志可能包含：
 
@@ -217,54 +219,54 @@ type SyncJob = {
 - `provider`
 - `details`
 
-约束：
+约定：
 
-- `message` 保持简短、稳定。
-- 语义主要放在 `code` 和上下文字段里。
-- 需要额外排障信息时放进 `details`。
+- `message` 保持简短且稳定
+- 语义尽量放进 `code` 和结构化字段里
+- `details` 用于补充调试上下文
 
 ### 8.2 诊断导出
 
-诊断导出目前包含：
+诊断导出可能包含：
 
-- 顶层同步错误摘要字段
+- 顶层同步错误摘要
 - 最近的结构化错误日志
 - 每个任务的错误摘要
 - 运行时指标
 
-当前脱敏规则：
+当前脱敏规则包括：
 
-- 远端 scope ID 和 cursor 做部分脱敏
+- 远端 scope ID 和 cursor 部分脱敏
 - 账号邮箱脱敏
-- 导出的路径脱敏
-- 日志 message 和 job ID 中较长、像 token 的片段会被脱敏
+- 导出路径脱敏
+- 日志和任务 ID 中疑似 token 的长字符串脱敏
 
-诊断导出用于排障，但不会导出原始 secret 或完整远端标识。
+诊断信息应帮助排障，但不应导出原始密钥或完整远端标识。
 
-## 9. 用户消息策略
+## 9. 消息层级
 
-系统区分三层消息。
+系统刻意区分三种消息层级。
 
 ### 9.1 用户可见文案
 
-使用位置：
+使用场景：
 
-- Notice
-- 状态页
+- notice 提示
+- 状态 UI
 - 设置页和登录流程
 
 来源：
 
 - `userMessageKey`
 - `userMessageParams`
-- 安全 fallback `userMessage`
+- 安全兜底 `userMessage`
 
 ### 9.2 诊断文案
 
-使用位置：
+使用场景：
 
 - 结构化日志
-- diagnostics 导出
+- 诊断导出
 
 来源：
 
@@ -274,33 +276,33 @@ type SyncJob = {
 
 ### 9.3 原始 cause
 
-使用位置：
+使用场景：
 
-- 控制台 warning
-- 开发调试
+- 控制台调试
+- 开发者调查问题
 
-原始底层错误不应直接出现在普通用户 UI 中。
+底层原始错误不应直接出现在普通用户 UI 中。
 
 ## 10. 当前边界
 
-对于项目自有核心路径，这套系统已经建立完成；但仍有几个有意保留的边界：
+当前仍保留少量有意为之的边界：
 
-- Proton SDK 底层内部仍然会抛原生 `Error`。
-- Provider 适配层在 SDK 只能给原始字符串时，仍保留少量基于 message 的 fallback 分类。
-- `severity` 字段已经存在，但目前还不是运行时分支判断的主要输入。
+- 第三方 SDK 内部仍会抛原生 `Error`
+- 当 SDK 只暴露原始文本时，provider 适配层仍保留有限的消息文本兜底分类
+- 共享类型上虽然有 `severity` 字段，但它还不是运行时策略的主要分支条件
 
-只要项目自有运行时决策继续统一消费归一化后的 `DriveSyncError`，这些边界就是可接受的。
+只要项目自有路径上的决策继续消费规范化后的 `DriveSyncError`，这些边界就是可以接受的。
 
 ## 11. 验证
 
-这套错误系统已经有单元测试和行为测试覆盖，包括：
+这个系统必须保留完整链路：
 
-- 归一化与消息翻译
-- `SessionManager` 的认证错误持久化
-- 同步引擎的结构化重试和 auth block 行为
-- Proton auth 与远端文件系统映射
-- diagnostics 导出结构与脱敏
+**raw failure -> normalized `DriveSyncError` -> runtime policy -> persisted summary and logs -> translated UI message**
 
-后续修改这套系统时，应保持这条链路不被破坏：
+修改该系统时，至少验证：
 
-**原始失败 -> 归一化 `DriveSyncError` -> 运行时策略 -> 持久化摘要/日志 -> 翻译后的 UI 消息**
+- 规范化与翻译辅助函数
+- `SessionManager` 中的 auth 错误持久化
+- sync engine 的重试和 auth block 行为
+- provider 侧对认证和远端文件系统失败的映射
+- 诊断导出结构与脱敏效果

@@ -1,122 +1,135 @@
 # Runtime Sync Strategy Specification
 
 > Effective date: 2026-03-07
-> This document defines runtime behavior after initialization completes.
-> For first-time initialization strategy, see `SYNC_INITIALIZATION_STRATEGY.md`.
+> This document governs sync behavior after initialization has finished. For first-sync rules, see [`SYNC_INITIALIZATION_STRATEGY.md`](./SYNC_INITIALIZATION_STRATEGY.md).
 
-## 1. Goals and Scope
+## 1. Purpose
 
-1. Define three unified strategies: `local_win` / `remote_win` / `bidirectional`.
-2. Define runtime decision rules for files, folders, conflicts, and missing confirmations.
-3. Constrain implementation boundaries to avoid strategy forks and hidden high-risk behavior.
-4. Provide executable acceptance criteria to ensure implementation follows documentation.
+This document defines the runtime decision rules for ongoing sync. It exists to keep three things explicit:
 
-## 2. Terminology
+- what each sync strategy means
+- which special-case protections take priority over the normal matrix
+- where implementation branching is allowed
 
-- `local`: local filesystem view of the Obsidian vault.
-- `remote`: remote storage filesystem view.
-- `tracked`: a path that already has sync state mapping (`SyncEntry`).
-- `tombstone`: local deletion marker waiting for remote convergence.
-- `conflict_pending`: path is in pending conflict state awaiting manual merge.
+## 2. Terms
 
-## 3. Global Rules (Highest to Lowest Priority)
+- `local`: the Obsidian vault view
+- `remote`: the remote filesystem view
+- `tracked`: a path with an existing sync-state mapping
+- `tombstone`: a local deletion marker waiting for remote convergence
+- `conflict_pending`: a path blocked on manual conflict resolution
 
-1. Conflict protection first: paths in `conflict_pending` must not auto-run canonical upload/download.
-2. Tombstone convergence first: when `tombstone` exists, prioritize delete convergence over regular incremental updates.
-3. Double-confirm remote missing: remote missing must be confirmed in two consecutive rounds before destructive convergence.
-4. Normal strategy decision: execute by the `local_win` / `remote_win` / `bidirectional` matrix.
+## 3. Global Rules
+
+These rules apply from highest to lowest priority:
+
+1. Conflict protection comes first. A path in `conflict_pending` must not auto-run the normal upload or download path.
+2. Tombstone convergence comes before ordinary incremental updates.
+3. Remote missing must be confirmed twice before destructive convergence is allowed.
+4. If no special-case rule applies, the configured `syncStrategy` decides the action.
 
 ## 4. Strategy Definitions
 
 ### 4.1 `local_win`
 
-- Local is the source of authority; remote mirrors local.
-- Principle: except for conflict copies, remote content must not overwrite the local canonical file.
+Local is the source of truth. Remote mirrors local.
+
+Constraint:
+
+- apart from conflict copies, remote content must not overwrite the canonical local file
 
 ### 4.2 `remote_win`
 
-- Remote is the source of authority; local mirrors remote.
-- Principle: except for local conflict backups, local content must not overwrite the remote canonical file.
+Remote is the source of truth. Local mirrors remote.
+
+Constraint:
+
+- apart from local conflict backups, local content must not overwrite the canonical remote file
 
 ### 4.3 `bidirectional`
 
-- Bi-directional sync; no automatic side selection on conflict.
-- Principle: on conflict, produce conflict copy and enter `conflict_pending`, then resume after manual merge.
+Both sides are authoritative until a conflict is detected.
+
+Constraint:
+
+- if both sides changed, the system creates a conflict copy and enters `conflict_pending` instead of auto-picking a winner
 
 ## 5. Decision Matrix
 
-| Scenario             | `local_win`                                            | `remote_win`                                           | `bidirectional`                                        |
-| -------------------- | ------------------------------------------------------ | ------------------------------------------------------ | ------------------------------------------------------ |
-| local-only (file)    | `upload`                                               | `delete-local`                                         | `upload`                                               |
-| remote-only (file)   | `delete-remote`                                        | `download`                                             | `download`                                             |
-| both changed (file)  | `download remote copy` + `upload local`                | `backup local copy` + `download remote`                | `create conflict copy` + `mark conflict_pending`       |
-| local-only (folder)  | `create-remote-folder`                                 | `delete-local`                                         | `create-remote-folder`                                 |
-| remote-only (folder) | `delete-remote`                                        | `create-local-folder`                                  | `create-local-folder`                                  |
-| tracked both missing | cleanup mapping (and perform required cleanup deletes) | cleanup mapping (and perform required cleanup deletes) | cleanup mapping (and perform required cleanup deletes) |
+| Scenario             | `local_win`                                     | `remote_win`                                    | `bidirectional`                                  |
+| -------------------- | ----------------------------------------------- | ----------------------------------------------- | ------------------------------------------------ |
+| local-only file      | `upload`                                        | `delete-local`                                  | `upload`                                         |
+| remote-only file     | `delete-remote`                                 | `download`                                      | `download`                                       |
+| both changed file    | `download remote copy` + `upload local`         | `backup local copy` + `download remote`         | `create conflict copy` + `mark conflict_pending` |
+| local-only folder    | `create-remote-folder`                          | `delete-local`                                  | `create-remote-folder`                           |
+| remote-only folder   | `delete-remote`                                 | `create-local-folder`                           | `create-local-folder`                            |
+| tracked both missing | cleanup mapping and any required residual state | cleanup mapping and any required residual state | cleanup mapping and any required residual state  |
 
 ## 6. Special-Case Rules
 
 ### 6.1 Double-Confirm Remote Missing
 
-1. For tracked remote-missing paths, first round only increments `remoteMissingCount`; no destructive action.
-2. Strategy-driven convergence (delete local or recreate remote) is allowed only after two consecutive confirmations.
+- On the first observed remote-missing round for a tracked path, only increment `remoteMissingCount`.
+- Destructive follow-up such as delete-local or recreate-remote is allowed only after a second consecutive confirmation.
 
 ### 6.2 Tombstone Convergence
 
-1. `tombstone` means "deleted locally, pending remote delete".
-2. Under non-`remote_win`, if remote object still exists, prioritize planning `delete-remote` convergence.
+- A tombstone means the path was deleted locally and the remote side still needs to converge.
+- Under any strategy other than `remote_win`, planner logic should prefer `delete-remote` convergence before normal incremental work.
 
 ### 6.3 `conflict_pending` Suppression
 
-1. Do not generate repeated conflict jobs for the same path while `conflict_pending` is active.
-2. After user clears conflict marker and finishes manual merge, path returns to normal incremental sync.
+- Do not generate repeated conflict jobs for the same path while `conflict_pending` is active.
+- After the user resolves the conflict and clears the marker, the path returns to normal incremental sync.
 
-## 7. Conflict Handling Specification (Unified Copy Model)
+## 7. Conflict Copy Model
 
-1. Conflict handling no longer exposes a direct "overwrite by side" strategy path.
-2. Always keep one editable canonical file.
-3. Write the opposite-side version into a conflict copy with naming format:
+Conflict handling uses one unified model:
+
+1. keep one canonical editable file in place
+2. write the opposite-side version into a conflict copy
+3. mark the path as `conflict_pending`
+4. resume normal sync only after manual resolution
+
+Conflict copy naming:
 
 ```text
 <filename> (conflicted <source> YYYY-MM-DD HHmm).<ext>
 ```
 
-4. `<source>` may only be:
-    - `remote`
-    - `local`
+Allowed `<source>` values:
 
-## 8. Implementation Constraints (Code-Level)
+- `local`
+- `remote`
 
-1. Use unified config field `syncStrategy` with enum values only:
-    - `local_win`
-    - `remote_win`
-    - `bidirectional`
-2. Do not add any `manual` conflict strategy code path.
-3. Centralize strategy branching in planner layer (`presence-policy` / `reconciler` / `remote-poller`); execution layer consumes jobs only and must not fork by strategy.
-4. Any action that could cause bulk deletion must be visible and abortable in preflight.
+## 8. Implementation Constraints
 
-## 9. Testing and Acceptance Criteria
+- Use `syncStrategy` with only these values: `local_win`, `remote_win`, `bidirectional`.
+- Do not reintroduce a separate `manual` conflict strategy path.
+- Keep strategy branching in planner-level logic such as presence policy, reconcile decisions, or remote polling.
+- The execution layer should consume jobs; it should not re-decide strategy.
+- Any operation that could produce large-scale deletion must be visible in preflight and cancelable.
 
-### 9.1 Minimum Unit Test Coverage
+## 9. Verification Requirements
 
-1. `local-only` / `remote-only` behavior under all three strategies (file + folder).
-2. Correct conflict copy generation and job types for `both changed`.
-3. Double-confirm behavior for remote missing.
-4. Tombstone convergence behavior.
-5. `conflict_pending` suppression and release.
-6. Local-clear behavior after initialization:
-    - no initialization hard-rule shortcut;
-    - behavior strictly follows current `syncStrategy`.
+### 9.1 Minimum Unit Coverage
 
-### 9.2 Integration Acceptance
+- local-only and remote-only behavior under all three strategies
+- correct job and conflict-copy behavior for both-changed files
+- double-confirm remote-missing behavior
+- tombstone convergence behavior
+- `conflict_pending` suppression and release
+- post-initialization local-clear behavior with no initialization shortcut
 
-1. `planSync -> runPlannedSync` behavior matches the decision matrix.
-2. `runAutoSync` and `pollRemoteSync` do not show reversed strategy behavior.
-3. In the "local cleared after initialization" scenario, behavior must strictly follow the matrix.
+### 9.2 Integration Coverage
+
+- `planSync` followed by `runPlannedSync` matches the decision matrix
+- `runAutoSync` and `pollRemoteSync` do not reverse strategy semantics
+- local-clear after initialization follows runtime strategy, not initialization hard rules
 
 ### 9.3 Release Gate
 
-1. `pnpm run lint` passes.
-2. `pnpm run test` passes.
-3. `pnpm run build` passes.
-4. Manual verification includes at least one "local cleared after initialization" scenario.
+- `pnpm run lint` passes
+- `pnpm run test` passes
+- `pnpm run build` passes
+- manual verification includes at least one local-cleared-after-initialization scenario

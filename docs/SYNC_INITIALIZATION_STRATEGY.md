@@ -1,147 +1,153 @@
-# Sync Initialization Strategy (First Baseline Establishment)
+# Sync Initialization Strategy
 
 > Effective date: 2026-03-09
-> This document constrains behavior only during the initialization phase.
-> After initialization completes, switch to `SYNC_STRATEGY.md`.
+> This document applies only while the plugin is establishing the first trusted baseline. After initialization completes, switch to [`SYNC_STRATEGY.md`](./SYNC_STRATEGY.md).
 
-## 1. Goals and Scope
+## 1. Purpose
 
-1. Define decision rules for first sync when no stable baseline exists.
-2. Clarify risk controls, preflight confirmation, exit conditions, and recovery behavior in initialization.
-3. Ensure initialization does not cause accidental large-scale destructive actions due to strategy ambiguity.
+Initialization is a separate phase because the system does not yet have a trusted baseline. The goals are:
 
-## 2. Entry and Exit Conditions
+- establish a reliable first baseline
+- avoid accidental destructive behavior when local and remote state disagree
+- make high-risk decisions visible before execution
 
-### 2.1 Enter Initialization Phase
+## 2. Entry And Exit Conditions
 
-Enter initialization when any of the following is true:
+### 2.1 Enter Initialization
 
-1. No stable sync baseline is detected (no valid `entries` / `synced*` baseline).
-2. No trusted `lastSyncAt` exists (first install or state reset).
-3. User explicitly triggers a re-initialization flow.
+Initialization starts when any of the following is true:
 
-### 2.2 Exit Initialization Phase
+1. no trusted sync baseline exists
+2. no reliable `lastSyncAt` exists because this is a first install or state reset
+3. the user explicitly starts a re-initialization flow
 
-Exit initialization only when all of the following are true:
+### 2.2 Exit Initialization
 
-1. Planned initialization jobs are completed (queue empty and no blocking failures).
-2. Sync baseline has been written (`syncedLocalHash` / `syncedRemoteRev` available for future incremental decisions).
-3. `initializationCompleted = true` (or equivalent state marker) is set.
+Initialization ends only when all of the following are true:
 
-## 3. Global Initialization Rules (Highest to Lowest Priority)
+1. planned initialization work is finished with no blocking failures
+2. a trusted baseline has been written for future incremental decisions
+3. an `initializationCompleted` marker or equivalent state is set
 
-1. Safety first: initialization must run with preflight and show upload/download/delete counts.
-2. Empty-local restore first: when local is empty and remote is non-empty, force remote-to-local restore.
-3. Prefer lower risk: when alternatives exist, prefer non-destructive actions.
-4. Strategy fallback: if no hard rule matches, decide by `syncStrategy`.
+## 3. Global Rules
 
-## 4. Initialization Decision Matrix
+From highest to lowest priority:
 
-| Initialization Scenario           | `local_win`                                                                                          | `remote_win`                                                                                          | `bidirectional`                                                                                                                                                 |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local empty, remote non-empty     | `download/create-local-folder` (forced)                                                              | `download/create-local-folder` (forced)                                                               | `download/create-local-folder` (forced)                                                                                                                         |
-| Local non-empty, remote empty     | `upload/create-remote-folder`                                                                        | `delete-local` (high risk, requires second confirmation)                                              | `upload/create-remote-folder`                                                                                                                                   |
-| Local empty, remote empty         | no-op (write empty baseline)                                                                         | no-op (write empty baseline)                                                                          | no-op (write empty baseline)                                                                                                                                    |
-| Local non-empty, remote non-empty | same-path unchanged files write baseline only; otherwise follow `local_win` and keep conflict copies | same-path unchanged files write baseline only; otherwise follow `remote_win` and keep conflict copies | same-path files first check `mtime+size`; unchanged files write baseline only; otherwise newer side wins by `mtime`; undecidable cases enter `conflict_pending` |
+1. initialization must run with preflight and visible upload, download, and delete counts
+2. if local is empty and remote is non-empty, remote restore wins regardless of strategy
+3. when two valid choices exist, choose the lower-risk path
+4. if no hard rule applies, fall back to `syncStrategy`
 
-## 5. Initialization Same-Path Baseline Shortcut
+## 4. Decision Matrix
 
-This rule applies only during initialization and only to file paths that exist on both sides.
+| Scenario                      | `local_win`                                                                         | `remote_win`                                                                         | `bidirectional`                                                                                                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| local empty, remote non-empty | forced `download` and `create-local-folder`                                         | forced `download` and `create-local-folder`                                          | forced `download` and `create-local-folder`                                                                                                               |
+| local non-empty, remote empty | `upload` and `create-remote-folder`                                                 | `delete-local` after a second high-risk confirmation                                 | `upload` and `create-remote-folder`                                                                                                                       |
+| local empty, remote empty     | write an empty baseline and do nothing else                                         | write an empty baseline and do nothing else                                          | write an empty baseline and do nothing else                                                                                                               |
+| both sides non-empty          | write baseline for unchanged same-path files; otherwise follow `local_win` behavior | write baseline for unchanged same-path files; otherwise follow `remote_win` behavior | write baseline for unchanged same-path files; otherwise use `mtime` as an initialization-only tie-break and fall back to conflict when still inconclusive |
+
+## 5. Same-Path Baseline Shortcut
+
+This shortcut applies only during initialization and only to files that exist at the same relative path on both sides.
+
+Decision order:
+
+1. compare normalized `mtime` and `size` when both are available
+2. if metadata is inconclusive, compare file content as an initialization-only fallback
+3. if the content is identical, treat the file as unchanged
+4. unchanged files write baseline only and schedule no upload, download, or conflict-copy job
+
+This shortcut applies to all three strategies.
+
+## 6. Bidirectional Time-Based Tie-Break
+
+If the same-path shortcut does not prove equality, `bidirectional` gets one extra initialization-only rule for files that exist on both sides.
 
 Decision rules:
 
-1. If both local and remote file metadata expose valid `mtime` and `size`, and `size` matches while `mtime` matches after provider-precision normalization, treat the file as unchanged.
-2. If metadata does not prove equality but both sides still expose a same-path file, compare file content as an initialization-only fallback.
-3. If content is identical, treat the file as unchanged.
-4. For unchanged files, write sync baseline only; do not schedule `upload`, `download`, or conflict-copy jobs.
-5. This shortcut applies to `local_win`, `remote_win`, and `bidirectional`.
-
-## 6. Bidirectional Initialization Time-Based Resolution
-
-If the same-path baseline shortcut above does not match, `bidirectional` applies an extra initialization-only tie-break for files that exist on both sides.
-
-Decision rules:
-
-1. If both sides expose valid `mtime`, compare them.
-2. If local `mtime` is newer, schedule `upload` and let the remote write create the next remote revision.
-3. If remote `mtime` is newer, schedule `download` and overwrite the local file.
-4. If the metadata needed for the checks above is missing or inconclusive, do not auto-pick a side; fall back to the normal bidirectional conflict flow.
+1. if both sides expose valid `mtime`, compare them
+2. if local is newer, schedule `upload`
+3. if remote is newer, schedule `download`
+4. if metadata is missing or still inconclusive, do not auto-pick a side; fall back to conflict behavior
 
 Constraints:
 
-1. This rule does not apply to folders.
-2. This rule does not apply after initialization completes.
-3. The same-path baseline shortcut first uses normalized metadata and may fall back to direct content comparison; it still does not persist content hashes for baseline establishment.
-4. The `bidirectional` time-based rule is a tie-break only for initialization; runtime `bidirectional` behavior remains conflict-based.
+- this rule does not apply to folders
+- this rule does not apply after initialization ends
+- the rule exists only to avoid unnecessary conflicts while no baseline exists yet
 
-## 7. Empty-Local Remote Restore (Hard Rule)
+## 7. Empty-Local Remote Restore Hard Rule
 
-Trigger conditions (all must hold):
+Trigger conditions:
 
-1. Current phase is initialization.
-2. Local is empty.
-3. Remote is non-empty.
+1. initialization phase is active
+2. local vault is empty
+3. remote root is not empty
 
-Execution requirements:
+Required behavior:
 
-1. Only `download` and `create-local-folder` are allowed.
-2. `upload` and `delete-remote` are explicitly forbidden.
-3. After restore completes, write sync baseline immediately and switch to runtime strategy.
+- allow only `download` and `create-local-folder`
+- explicitly forbid `upload` and `delete-remote`
+- write the baseline immediately after restore finishes
+- switch to runtime strategy after initialization completes
 
-Constraints:
+This hard rule must never reactivate later just because the local side was cleared after initialization.
 
-1. This rule applies only during initialization.
-2. If local is cleared after initialization completes, this rule must not be re-triggered.
+## 8. Preflight And Confirmation
 
-## 8. Preflight and Confirmation
+Before initialization runs, preflight must show:
 
-1. Before initialization execution, preflight must show:
-    - upload count
-    - download count
-    - delete count (local and remote separated)
-2. If any delete count is greater than zero, second confirmation is mandatory.
-3. Under `remote_win`, "local non-empty + remote empty" is a high-risk scenario. It is blocked by default and may continue only after explicit user confirmation.
+- upload count
+- download count
+- local delete count
+- remote delete count
 
-## 9. Failure Recovery and Retry
+Additional rules:
 
-1. Initialization must be re-entrant after interruption; continue unfinished work using already written baseline/state.
-2. Do not switch to runtime incremental path before initialization finishes.
-3. If consecutive failures reach threshold, enter blocking state and require user intervention (auth, network, permissions, etc.).
+- any delete count requires a second confirmation
+- `remote_win` with local non-empty and remote empty is high-risk and should be blocked by default until explicitly confirmed
 
-## 10. Boundary with Runtime Strategy
+## 9. Failure Recovery
 
-1. This document governs first baseline establishment.
-2. Runtime document (`SYNC_STRATEGY.md`) governs continuous sync after baseline exists.
-3. Both phases must not be active in the same decision cycle; each cycle belongs to one phase only.
+- initialization must be re-entrant after interruption
+- partially written baseline and queue state should be reused where safe
+- runtime incremental sync must not start before initialization completes
+- repeated failures should eventually enter a blocking state that requires user action
 
-## 11. Testing and Acceptance Criteria
+## 10. Boundary With Runtime Sync
 
-### 11.1 Minimum Unit Test Coverage
+- this document governs first baseline establishment and explicit re-initialization
+- [`SYNC_STRATEGY.md`](./SYNC_STRATEGY.md) governs ongoing sync after baseline exists
+- a single decision cycle belongs to one phase only
 
-1. Initialization phase detection (enter/exit).
-2. Empty-local restore outputs only `download/create-local-folder`.
-3. Initialization writes baseline only for same-path files proven unchanged by normalized metadata or content comparison, under all strategies.
-4. Bidirectional initialization prefers `upload` when local file `mtime` is newer.
-5. Bidirectional initialization prefers `download` when remote file `mtime` is newer.
-6. Inconclusive metadata, including equal `mtime` with different `size`, falls back to strategy-specific handling.
-7. After initialization completes, local clear must not trigger initialization hard rule.
-8. `remote_win` high-risk scenario requires second-confirmation gate.
+## 11. Verification Requirements
 
-### 11.2 Integration Acceptance
+### 11.1 Minimum Unit Coverage
 
-1. First install + existing remote data -> local restored correctly.
-2. First install + both sides non-empty -> strategy respected.
-3. First install + both sides contain same-path file with equivalent normalized `mtime` and equal `size` -> baseline is written without upload/download/conflict copy.
-4. First install + both sides contain same-path file with inconclusive metadata but identical content -> baseline is written without upload/download/conflict copy.
-5. First install + both sides contain same-path file -> newer `mtime` side wins under `bidirectional`.
-6. First install + both sides contain same-path file but metadata and content are inconclusive -> strategy-specific path is retained.
-7. Initialization interrupted then restarted -> can continue and complete baseline write.
+- initialization phase detection and exit logic
+- empty-local restore allows only download and local-folder creation
+- same-path unchanged files write baseline only under every strategy
+- `bidirectional` chooses upload when local `mtime` is newer
+- `bidirectional` chooses download when remote `mtime` is newer
+- inconclusive metadata falls back to strategy-specific handling
+- post-initialization local clear does not retrigger the hard rule
+- `remote_win` high-risk flow requires second confirmation
+
+### 11.2 Integration Coverage
+
+- first install with existing remote data restores local correctly
+- first install with both sides non-empty respects strategy rules
+- same-path files with equivalent normalized metadata write baseline only
+- same-path files with inconclusive metadata but equal content write baseline only
+- same-path files with different `mtime` values choose the newer side under `bidirectional`
+- interrupted initialization can resume and complete
 
 ### 11.3 Release Gate
 
-1. `pnpm run lint` passes.
-2. `pnpm run test` passes.
-3. `pnpm run build` passes.
-4. Manual verification includes at least one full empty-local remote-restore initialization flow.
-5. Manual verification includes at least one same-path initialization flow with normalized-equal `mtime` and equal `size`.
-6. Manual verification includes at least one same-path bidirectional initialization flow with different local/remote `mtime`.
+- `pnpm run lint` passes
+- `pnpm run test` passes
+- `pnpm run build` passes
+- manual verification includes a full empty-local remote-restore flow
+- manual verification includes a same-path unchanged flow
+- manual verification includes a same-path bidirectional flow with different local and remote `mtime`

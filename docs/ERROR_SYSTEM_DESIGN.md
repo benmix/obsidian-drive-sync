@@ -1,30 +1,30 @@
-# Error System
+# Error System Design
 
 Last updated: 2026-03-10
 
 ## 1. Purpose
 
-The project uses a shared structured error system so that runtime policy, UI copy, sync state, logs, and diagnostics all speak the same error language.
+The repository uses a structured error model so runtime policy, persisted state, diagnostics, and UI all talk about the same failure in the same language.
 
-The core rule is simple:
+The core rule is:
 
-**internal code paths operate on structured errors, while user-facing surfaces only render safe and translatable messages.**
+**internal code works with structured errors; user-facing surfaces render only safe and translatable messages.**
 
-This document describes the current implementation, not a migration proposal.
+This document describes the current design, not a future migration plan.
 
 ## 2. Goals
 
-- Use stable error codes instead of brittle `Error.message` matching in project-owned logic.
-- Separate internal diagnostics from user-visible copy.
-- Keep retry, auth-pause, and blocked-job decisions code-driven.
-- Persist structured error fields in sync state and logs.
-- Export diagnostics with useful structure and basic redaction.
+- use stable error codes instead of fragile `Error.message` matching in project-owned logic
+- separate diagnostic detail from user-facing copy
+- make retry, auth-pause, and blocked-job decisions code-driven
+- persist structured error summaries in sync state and logs
+- export diagnostics that are useful without exposing secrets
 
 ## 3. Non-Goals
 
-- Rewriting every native `Error` thrown inside third-party Proton SDK internals.
-- Introducing a deep exception class hierarchy.
-- Preserving legacy `lastError: string` state compatibility.
+- rewriting every native `Error` thrown inside third-party SDK internals
+- introducing a deep exception-class hierarchy
+- preserving legacy `lastError: string` compatibility in new state paths
 
 ## 4. Core Model
 
@@ -82,18 +82,19 @@ class DriveSyncError extends Error {
 }
 ```
 
-Meaning of the main fields:
+Field meaning:
 
-- `code`: stable semantic identity used by runtime policy.
-- `category`: coarse-grained grouping such as auth, network, or sync.
-- `retryable`: whether retry scheduling is allowed.
-- `userMessage` and `userMessageKey`: safe user-facing message source.
-- `debugMessage` and `details`: diagnostic-only context.
-- `cause`: original lower-level error when useful.
+- `code`: stable semantic identity for runtime decisions
+- `category`: coarse-grained failure grouping
+- `severity`: importance level for logging and surfacing
+- `retryable`: whether retry scheduling is allowed
+- `userMessage`, `userMessageKey`, `userMessageParams`: safe user-facing message source
+- `debugMessage` and `details`: diagnostic context
+- `cause`: original lower-level failure when useful
 
 ## 5. Main Utilities
 
-The shared helpers live under `src/errors/`.
+Shared helpers live in `src/errors/`.
 
 Primary entry points:
 
@@ -107,74 +108,75 @@ Primary entry points:
 
 Important normalization rule:
 
-- `normalizeUnknownDriveSyncError()` accepts both raw values and existing `DriveSyncError` instances.
-- When an existing `DriveSyncError` is passed together with override options, the function returns a wrapped `DriveSyncError` with the overridden user-facing or policy fields.
-- This allows higher layers to keep a stable low-level code while replacing UI copy for a specific command or workflow.
+- `normalizeUnknownDriveSyncError()` accepts raw values and existing `DriveSyncError` instances
+- if a `DriveSyncError` is passed with overrides, the function returns a wrapped error with updated policy or user-facing fields
+- higher layers can preserve the low-level code while changing workflow-specific UI copy
 
-## 6. Layer Responsibilities
+## 6. Ownership By Layer
 
-### 6.1 Provider and SDK adapters
+### 6.1 Provider And SDK Adapters
 
 Responsibilities:
 
-- Convert third-party failures into `DriveSyncError` as early as practical.
-- Attach provider context in `details` when useful.
-- Keep limited message-based fallback classification only at the Proton SDK boundary where machine-readable fields are missing.
+- normalize third-party failures as early as practical
+- attach provider context through structured `details`
+- keep message-based fallback classification only where the SDK exposes raw strings and nothing else
 
 Current examples:
 
-- Proton auth restore and refresh failures map to auth or network codes.
-- Proton remote filesystem operations map not-found, already-exists, conflict, write-failed, and transient-incomplete cases into structured errors.
+- auth restore and refresh failures become auth or network codes
+- remote filesystem operations become not-found, already-exists, conflict, write-failed, or transient-incomplete errors
 
-### 6.2 Sync engine
+### 6.2 Sync Engine
 
 Responsibilities:
 
-- Make retry, block, auth-pause, and not-found/conflict decisions from structured fields.
-- Persist per-job error metadata.
-- Emit structured logs for task-level events.
+- decide retry, block, auth-pause, and not-found or conflict behavior from structured fields
+- persist per-job error summaries
+- emit structured task-level logs
 
-Current behavior:
+Current persisted job and run state includes fields such as:
 
-- Not-found, auth, conflict, retry exhaustion, and retry scheduling are all code-driven.
-- Job state stores `lastErrorCode`, `lastErrorRetryable`, and `lastErrorAt`.
-- Run-level state stores `lastErrorCode`, `lastErrorCategory`, `lastErrorRetryable`, and `lastErrorAt`.
+- `lastErrorCode`
+- `lastErrorCategory`
+- `lastErrorRetryable`
+- `lastErrorAt`
 
 ### 6.3 Runtime
 
 Responsibilities:
 
-- Normalize errors at workflow entry points.
-- Record sync and auth failures into persisted state.
-- Show translated user-facing notices.
+- normalize errors at workflow entrypoints
+- record sync and auth failures into persisted state
+- show translated, user-safe notices
 
 Current behavior:
 
-- `PluginRuntime` records structured sync failures.
-- `SessionManager` records structured auth failures and auth logs, not only in-memory strings.
-- Network policy uses normalized network failures instead of raw messages.
+- `PluginRuntime` records structured sync failures
+- `SessionManager` records structured auth failures and auth logs
+- network policy consumes normalized network errors instead of raw strings
 
 ### 6.4 UI
 
 Responsibilities:
 
-- Use translated user-facing messages.
-- Show error codes where diagnostics value exists.
-- Avoid surfacing raw stacks or low-level SDK details in normal UI.
+- render translated user-facing messages
+- show error codes where diagnostics value exists
+- avoid exposing raw stacks or low-level SDK detail in normal UI
 
 Current behavior:
 
-- Status UI renders translated messages from error codes.
-- Command, settings, login, pre-sync, and remote-root flows use shared error message translation helpers.
-- Auth-paused UI shows a unified user-facing auth message, not raw SDK text.
+- status UI renders messages derived from error codes
+- login, settings, pre-sync, and remote-root flows use shared translation helpers
+- auth-paused UI does not show raw SDK text
 
 ## 7. Persistence Model
 
-Structured error state is persisted in sync state rather than relying on free-form strings.
+Structured error state is persisted in sync state instead of free-form strings.
 
-### 7.1 SyncState
+### 7.1 Sync State
 
-Current fields:
+Current fields include:
 
 ```ts
 type SyncState = {
@@ -186,9 +188,9 @@ type SyncState = {
 };
 ```
 
-### 7.2 SyncJob
+### 7.2 Sync Job
 
-Current per-job fields:
+Current per-job fields include:
 
 ```ts
 type SyncJob = {
@@ -198,13 +200,13 @@ type SyncJob = {
 };
 ```
 
-No compatibility layer is maintained for historical `lastError: string` data.
+The current design does not preserve a compatibility path for historical `lastError: string` values.
 
 ## 8. Logging And Diagnostics
 
-### 8.1 Logs
+### 8.1 Structured Logs
 
-Structured sync logs may contain:
+Structured sync logs may include:
 
 - `message`
 - `context`
@@ -219,38 +221,38 @@ Structured sync logs may contain:
 
 Guidelines:
 
-- Keep `message` short and stable.
-- Put semantics in `code` and context fields.
-- Use `details` for extra debugging context when needed.
+- keep `message` short and stable
+- put semantics into `code` and structured fields
+- use `details` for extra debugging context
 
-### 8.2 Diagnostics export
+### 8.2 Diagnostics Export
 
-Diagnostics export includes:
+Diagnostics export may include:
 
-- top-level sync error summary fields
+- top-level sync error summaries
 - recent structured error logs
 - per-job error summaries
 - runtime metrics
 
-Redaction rules currently applied:
+Current redaction rules include:
 
-- remote scope IDs and cursors are partially redacted
-- account email is redacted
-- exported paths are redacted
-- long token-like substrings in log messages and job IDs are redacted
+- partial redaction of remote scope IDs and cursors
+- redaction of account email
+- redaction of exported paths
+- redaction of long token-like substrings in logs and job IDs
 
-Diagnostics are intended for troubleshooting, but still avoid exporting raw secrets or full remote identifiers.
+Diagnostics should help debugging without exporting raw secrets or full remote identifiers.
 
-## 9. User Message Strategy
+## 9. Message Levels
 
-The system uses three message levels.
+The system intentionally separates three message levels.
 
-### 9.1 User-facing copy
+### 9.1 User-Facing Copy
 
 Used by:
 
 - notices
-- status surfaces
+- status UI
 - settings and login flows
 
 Source:
@@ -259,7 +261,7 @@ Source:
 - `userMessageParams`
 - safe fallback `userMessage`
 
-### 9.2 Diagnostic copy
+### 9.2 Diagnostic Copy
 
 Used by:
 
@@ -272,35 +274,35 @@ Source:
 - `debugMessage`
 - `details`
 
-### 9.3 Raw cause
+### 9.3 Raw Cause
 
 Used by:
 
-- console warnings
-- developer debugging
+- console debugging
+- developer investigation
 
-Raw low-level errors should not be shown directly in normal user UI.
+Raw low-level failures should not appear directly in normal UI.
 
 ## 10. Current Boundaries
 
-The system is fully established for project-owned core paths, but a few boundaries remain intentional:
+A few boundaries remain intentional:
 
-- Low-level Proton SDK internals still throw native `Error` values.
-- Provider adapters still keep limited message-based fallback classification when SDKs expose only raw strings.
-- Error severity exists on the shared type but is not yet a major runtime branching input.
+- third-party SDK internals still throw native `Error` values
+- provider adapters still rely on limited message-based fallback classification where the SDK exposes only raw text
+- `severity` exists on the shared type but is not yet a major branching input for runtime policy
 
-These boundaries are acceptable as long as project-owned runtime decisions continue to consume normalized `DriveSyncError` values.
+These limits are acceptable as long as project-owned decisions operate on normalized `DriveSyncError` values.
 
 ## 11. Verification
 
-The error system is covered by unit and behavior tests, including:
+Coverage should preserve the full chain:
 
-- normalization and message translation
+**raw failure -> normalized `DriveSyncError` -> runtime policy -> persisted summary and logs -> translated UI message**
+
+When changing this system, verify at least:
+
+- normalization and translation helpers
 - auth error persistence in `SessionManager`
-- sync engine structured retry and auth-block behavior
-- Proton auth and remote filesystem mapping
+- sync-engine retry and auth-block behavior
+- provider-side mapping of auth and remote filesystem failures
 - diagnostics export structure and redaction
-
-When updating this system, preserve the end-to-end chain:
-
-**raw failure -> normalized `DriveSyncError` -> runtime policy -> persisted summary/logs -> translated UI message**

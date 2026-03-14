@@ -1,17 +1,17 @@
-# Obsidian Drive Sync Architecture Design
+# Obsidian Drive Sync Architecture
 
-## 1. Document Objectives
+## 1. Purpose
 
-This document describes the architecture that corresponds to the current codebase implementation, focusing on the following questions:
+This document describes the architecture of the current codebase. It answers four questions:
 
-- How modules are layered and where boundaries are defined.
-- How the sync flow enters from UI/commands and is eventually executed.
-- How Provider and Sync Kernel are decoupled.
-- Where future extensions (new providers / provider-specific behavior) should be implemented.
+- how the repository is layered
+- how sync work enters the runtime and reaches the sync kernel
+- how provider-specific code is kept separate from provider-agnostic logic
+- where new integrations or extensions should be added
 
-This is an implementation-oriented engineering document and does not repeat product requirement details. For product scope and functional specification, see `docs/SPECS.md`.
+For product scope and required behavior, read [`SPECS.md`](./SPECS.md). This file is about implementation ownership.
 
-## 2. Architecture Overview
+## 2. System Overview
 
 ```text
 UI / Commands
@@ -20,192 +20,246 @@ UI / Commands
 Plugin Facade (main.ts)
       |
       v
-Runtime Orchestration (runtime/*)
-      |                        \
-      |                         \-- Session / Policy / Scheduling
+Runtime (runtime/*)
+      |                \
+      |                 \-- session / policy / scheduling
       v
-Sync Kernel (sync/*)  <---->  Filesystem Contracts (contracts/filesystem/*)
+Sync Kernel (sync/*) <----> Filesystem Contracts (contracts/filesystem/*)
       ^
       |
-Provider Abstraction (contracts/provider/* + provider/registry)
+Provider Layer (contracts/provider/* + provider/*)
       |
-      +-- Local Provider impl (provider/providers/obsidian/*)
-      +-- Remote Provider impl (provider/providers/proton-drive/*)
+      +-- Local provider: provider/providers/obsidian/*
+      +-- Remote provider: provider/providers/proton-drive/*
 
-Data Layer
-  - Plugin settings: Obsidian plugin data (data/plugin-data.ts)
-  - Sync state/index/jobs/logs: IndexedDB Dexie (data/sync-db.ts + sync/state/*)
+Persistence
+  - plugin settings: Obsidian plugin data
+  - sync state, jobs, logs: IndexedDB via Dexie
 ```
 
-## 3. Layers and Responsibilities
+## 3. Layer Responsibilities
 
-### 3.1 Filesystem Contracts (Shared Foundational Contracts)
+### 3.1 Filesystem Contracts
 
-- Directories:
-    - `src/contracts/filesystem/*`
-    - `src/filesystem/path.ts`
-- Responsibilities:
-    - Define shared IO contracts such as `LocalFileSystem`, `RemoteFileSystem`, and `LocalChange`.
-    - Provide path utilities (`path.ts`) as reusable cross-layer primitives.
-- Constraints:
-    - Types and foundational utilities only; no business workflow logic.
+Owned paths:
 
-### 3.2 Provider Layer (External System Integration)
+- `src/contracts/filesystem/*`
+- `src/filesystem/path.ts`
 
-- Directory: `src/provider/*`
-- Responsibilities:
-    - Provide unified local/remote abstractions (`LocalProvider` / `RemoteProvider`).
-    - Manage active providers via registry.
-    - Isolate SDK and platform API differences.
-- Key points:
-    - `default-registry.ts` registers only the providers needed for the active ID.
-    - Remote providers return concrete `RemoteFileSystem` adapters directly.
-    - No shared provider-side strategy or middleware layer is currently enabled.
+Responsibilities:
+
+- define shared IO contracts such as `LocalFileSystem`, `RemoteFileSystem`, and `LocalChange`
+- define path utilities used across layers
+
+Constraints:
+
+- no runtime orchestration
+- no provider-specific behavior
+- no sync policy
+
+### 3.2 Provider Layer
+
+Owned path:
+
+- `src/provider/*`
+
+Responsibilities:
+
+- expose provider-level abstractions such as `LocalProvider` and `RemoteProvider`
+- isolate SDK and platform-specific behavior
+- own concrete filesystem adapters
+- own provider registry and provider selection
+
+Current design notes:
+
+- `default-registry.ts` builds the active provider registries
+- remote providers return concrete `RemoteFileSystem` adapters directly
+- there is no shared provider-side strategy or middleware layer in the current design
 
 ### 3.3 Sync Kernel
 
-- Directory: `src/sync/*`
-- Responsibilities:
-    - `planner/*`: change detection and reconciliation planning (local/remote/reconcile).
-    - `engine/*`: queue execution, retry, and state progression.
-    - `state/*`: sync state persistence abstraction.
-    - `use-cases/sync-runner.ts`: entry point for one sync cycle.
-- Design principle:
-    - Provider-agnostic; depends only on shared contracts under `src/contracts/*`.
+Owned path:
 
-### 3.4 Runtime Layer (Orchestration)
+- `src/sync/*`
 
-- Directory: `src/runtime/*`
-- Responsibilities:
-    - `plugin-state.ts`: plugin settings/provider state facade (load/migrate/save settings, active provider registries, auth/session fields).
-    - `plugin-runtime.ts`: lifecycle orchestration hub.
-    - `session-manager.ts`: session restore/refresh and auth-pause control.
-    - `trigger-scheduler.ts`: interval + local change debounce + single-flight.
-    - `sync-coordinator.ts`: compose local/remote file systems and call `SyncRunner`.
-    - `network-policy.ts`: network gate and failure cooldown (feature-toggleable).
+Responsibilities:
 
-### 3.5 Plugin Facade / UI / Commands (Outer Interaction Layer)
+- `planner/*`: compare local and remote state and decide what work should happen
+- `engine/*`: execute queued jobs, apply retries, and advance state
+- `state/*`: persist sync state and queue data
+- `use-cases/sync-runner.ts`: run one provider-agnostic sync cycle
 
-- `main.ts`
-    - Plugin entry facade responsible for lifecycle wiring and delegating state/runtime operations.
-- `ui/*`
-    - Depend only on plugin API and provider abstractions; do not depend on concrete provider implementations.
-- `commands/*`
-    - One command per file under `src/commands/command-*.ts`; `commands/index.ts` composes context, registers settings tab, and registers each command.
+Design rule:
+
+- the sync kernel depends on shared contracts, not on provider SDKs or concrete providers
+
+### 3.4 Runtime Layer
+
+Owned path:
+
+- `src/runtime/*`
+
+Responsibilities:
+
+- `plugin-state.ts`: load, normalize, persist, and expose provider-related settings and state
+- `plugin-runtime.ts`: runtime composition root and plugin-facing orchestration API
+- `session-manager.ts`: restore, refresh, and pause auth sessions
+- `trigger-scheduler.ts`: own interval triggers, local debounce, and single-flight scheduling
+- `sync-coordinator.ts`: build active filesystems and hand control to the sync runner
+- `network-policy.ts`: optionally gate sync activity after network failures
+
+Runtime is the only layer that should coordinate providers, sessions, policies, and the sync kernel in one place.
+
+### 3.5 Plugin Facade, UI, And Commands
+
+Owned paths:
+
+- `src/main.ts`
+- `src/ui/*`
+- `src/commands/*`
+
+Responsibilities:
+
+- `main.ts`: plugin lifecycle entrypoint and thin facade over runtime and state
+- `ui/*`: settings, modals, and user-facing views built on plugin-facing contracts
+- `commands/*`: user-triggered command entrypoints
+
+Rules:
+
+- UI should not depend on concrete provider implementations
+- commands should not reproduce sync or provider logic inline
+- `main.ts` should wire components together, not own sync algorithms
 
 ## 4. Core Abstractions
 
 ### 4.1 `ObsidianDriveSyncPluginApi`
 
-- Location: `src/contracts/plugin/plugin-api.ts`
-- Purpose:
-    - A shared interface for Runtime/UI/Commands, preventing reverse dependency on `main.ts` implementation details.
+Location:
 
-### 4.2 `RemoteProvider` / `LocalProvider`
+- `src/contracts/plugin/plugin-api.ts`
 
-- Location: `src/contracts/provider/`
-- Purpose:
-    - Consolidate auth, connectivity, scope handling, and file system creation into providers.
-    - Keep Sync Kernel focused on `RemoteFileSystem` / `LocalFileSystem` without SDK awareness.
+Purpose:
 
-### 4.3 `RemoteFileSystem` Adapter Ownership
+- give runtime, UI, and commands a stable shared interface
+- prevent reverse dependencies on `main.ts` implementation detail
 
-- Location:
-    - `src/provider/providers/<provider>/remote-file-system.ts`
-- Purpose:
-    - Keep provider-specific remote IO behavior inside the provider adapter itself.
-    - Avoid keeping an extra abstraction layer unless at least two providers need the same cross-provider behavior.
+### 4.2 `RemoteProvider` And `LocalProvider`
 
-## 5. Key Sequences
+Location:
 
-### 5.1 Plugin Startup Sequence
+- `src/contracts/provider/*`
 
-1. `main.ts` initializes `PluginState` and calls `initializeFromStorage()`.
-2. Settings migration runs and normalized settings are persisted if needed.
-3. Local/remote registries are built by active provider ID inside `PluginState`.
-4. `PluginRuntime` is initialized and `restoreSession()` is executed.
-5. `commands/index.ts` registers the settings tab and all commands.
-6. Scheduler refresh is performed according to `autoSyncEnabled`.
+Purpose:
 
-### 5.2 Auto-Sync Sequence
+- group auth, connectivity, scope handling, and filesystem creation under provider ownership
+- keep the sync kernel focused on filesystem contracts instead of SDK-specific operations
 
-1. `TriggerScheduler` emits a run request (`interval` / `local` / `manual`).
-2. `PluginRuntime` evaluates `NetworkPolicy` first.
-3. `SyncCoordinator`:
-    - Builds active remote client via `SessionManager`.
-    - Creates local file system from `LocalProvider`.
-    - Creates remote file system from `RemoteProvider`.
-4. `SyncRunner` executes:
-    - Apply local change plan.
-    - Poll remote changes and generate jobs.
-    - Run full reconcile when needed.
-    - Drive `SyncEngine.runOnce()` to consume queue and persist state.
+### 4.3 Remote Filesystem Adapter Ownership
 
-### 5.3 Auth Recovery Sequence
+Location:
 
-1. At startup or manual trigger, `SessionManager` checks stored credentials.
-2. It calls provider `restore/refresh`; on success it writes reusable credentials and clears auth pause.
-3. On failure, it enters auth pause, blocks auto-sync, and records error context.
+- `src/provider/providers/<provider>/remote-file-system.ts`
 
-## 6. Data and State
+Purpose:
 
-### 6.1 Settings (Plugin Settings)
+- keep remote IO behavior inside the provider adapter that owns it
+- avoid extracting a shared provider-side abstraction until at least two providers need the same behavior
 
-- Storage: Obsidian `loadData/saveData` (`data/plugin-data.ts`).
-- Main fields:
-    - provider ID, scope ID/path, credentials, account info, conflict strategy, auto-sync switch, network policy switch.
+## 5. Main Runtime Sequences
+
+### 5.1 Plugin Startup
+
+1. `main.ts` creates plugin state and loads persisted settings.
+2. State normalization or migration runs if required.
+3. Provider registries are built from the active provider IDs.
+4. `PluginRuntime` is created and attempts session restore.
+5. Commands and settings UI are registered.
+6. Scheduler state is refreshed according to the current settings.
+
+### 5.2 Sync Execution
+
+1. A command, UI action, interval, or local change requests a sync run.
+2. `TriggerScheduler` ensures single-flight behavior.
+3. `PluginRuntime` applies network policy and session checks.
+4. `SyncCoordinator` creates the active local and remote filesystems.
+5. `SyncRunner` applies local changes, polls remote changes, reconciles state, and runs the queue.
+6. Sync state, jobs, logs, and metrics are persisted.
+
+### 5.3 Auth Recovery
+
+1. `SessionManager` reads stored credentials.
+2. It asks the active provider to restore or refresh the session.
+3. On success, reusable credentials are persisted and auth pause is cleared.
+4. On failure, auth pause is entered and runtime-visible error state is updated.
+
+## 6. Data And State
+
+### 6.1 Settings
+
+Storage:
+
+- Obsidian plugin data via `loadData()` and `saveData()`
+
+Examples of persisted settings:
+
+- provider ID
+- remote scope ID and path
+- provider credentials and account summary
+- sync strategy and auto-sync configuration
+- network policy toggle
 
 ### 6.2 Sync State
 
-- Storage: IndexedDB Dexie (`data/sync-db.ts`).
-- Main tables:
-    - `entries`: path state, remote mapping, baseline fingerprint, conflict markers.
-    - `jobs`: queued operations, priority, retry, next run time, status.
-    - `meta`: `lastSyncAt`, `lastError`, `remoteEventCursor`, runtime metrics.
-    - `logs`: diagnostic logs.
+Storage:
 
-## 7. Dependency Direction and Constraints
+- IndexedDB via Dexie
 
-The repository enforces module boundaries with `oxlint no-restricted-imports` (see `.oxlintrc.json`).
+Main tables:
 
-Key constraints:
+- `entries`: path mapping, fingerprints, conflict flags, tombstones
+- `jobs`: queued work, priority, retry state, and next run time
+- `meta`: sync summary, cursor state, and runtime metrics
+- `logs`: structured diagnostics
 
-- `runtime` must not depend on UI, commands, concrete provider implementations, `main`, or settings UI.
-- `provider` must not depend on sync/runtime/UI/commands/main/settings.
-- `sync` internal import directions are constrained by sub-layer to keep kernel stable.
-- `filesystem` as a foundational module must not depend on upper business layers.
+## 7. Dependency Direction
 
-## 8. Extension Design
+The repository enforces layer boundaries with `oxlint` and a custom layer check.
 
-### 8.1 Add a New Remote Provider
+Key rules:
 
-Recommended steps:
+- `runtime/` must not depend on UI internals, command modules, `main.ts`, or concrete providers
+- `provider/` must not depend on `runtime/` or `sync/`
+- `sync/` must preserve its internal layering so planner, engine, and state concerns do not collapse together
+- foundational filesystem contracts must not depend on upper business layers
 
-1. Implement auth and remote file system adapter in `provider/providers/<new-provider>/`.
+## 8. Extension Guidance
+
+### 8.1 Adding A New Remote Provider
+
+1. Implement auth and remote filesystem logic under `provider/providers/<new-provider>/`.
 2. Implement the `RemoteProvider` contract.
-3. Add a provider factory mapping in `default-registry.ts`.
-4. Keep provider-specific remote behavior inside the provider adapter unless there is a proven shared need.
-5. Keep `sync/*` unchanged; if needed, only add provider-specific UX text in UI.
+3. Register the provider in `default-registry.ts`.
+4. Keep provider-specific behavior inside that provider unless another provider proves the same need.
+5. Leave `sync/*` unchanged unless a shared contract must evolve.
 
-### 8.2 Add Shared Provider-Side Behavior
+### 8.2 Extracting Shared Provider Behavior
 
-Recommended steps:
+1. Start by implementing the behavior inside the provider that needs it.
+2. Extract a shared abstraction only after at least two providers need the same thing.
+3. Keep runtime and sync unaware of provider-specific mechanics.
+4. Add tests around the extracted behavior before reusing it.
 
-1. First implement behavior directly in the target provider adapter and confirm it is genuinely cross-provider.
-2. Only introduce a shared provider-side abstraction after at least two providers need the same behavior.
-3. Keep the sync kernel and runtime unaware of provider-specific mechanics.
-4. Add standalone unit tests around the extracted provider behavior before reusing it elsewhere.
+## 9. Architecture Decisions To Preserve
 
-## 9. Architecture Decision Summary
+- Provider abstraction exists to keep SDK coupling out of the sync kernel.
+- `main.ts` remains a facade, not the orchestration layer.
+- Shared contracts live under `src/contracts/*`.
+- Remote provider behavior stays in concrete provider adapters by default.
+- Runtime coordinates sessions, policies, and sync; sync does not reach upward.
 
-- Uses layered "Provider Abstraction + Sync Kernel" to reduce SDK coupling.
-- Uses `main.ts` as facade with runtime orchestration to avoid entrypoint bloat.
-- Centralizes contracts under `src/contracts/*` and keeps path utilities separate in `src/filesystem/path.ts`.
-- Keeps remote provider behavior in concrete provider adapters instead of maintaining an extra strategy layer by default.
+## 10. Future Evolution
 
-## 10. Future Evolution Suggestions
-
-- `DriveSyncSettings` has been renamed to be provider-neutral; keep this neutral semantic direction.
-- Evolve provider registry to support multiple providers visible in parallel (current model is active-ID scoped registration).
-- If shared provider-side behavior returns in the future, require a concrete second provider use case before extracting a new abstraction.
-- Add architecture regression checks (for example, automatic import-graph boundary validation).
+- Keep settings naming provider-neutral.
+- Allow the provider registry to grow beyond a single visible remote provider if the product needs it.
+- Require a concrete second use case before introducing shared provider-side middleware.
+- Add stronger architecture regression checks if layering starts drifting.

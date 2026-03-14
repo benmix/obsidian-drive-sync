@@ -1,132 +1,119 @@
----
-
-# Obsidian 云盘同步
-
-**技术规格说明（Specs v1.0）**
-
----
+# Obsidian Drive Sync
 
 ## 1. 概述
 
 ### 1.1 产品名称
 
-**Obsidian 云盘同步插件**
+Obsidian Drive Sync Plugin
 
 ### 1.2 目标
 
-提供一个 Obsidian 插件，在本地 vault 与远端 provider 指定目录之间实现**可靠的双向同步**，并具备冲突检测、失败恢复与可观测性。
+为一个本地 Obsidian vault 与一个选定远端目录之间提供可靠的双向同步，并具备冲突检测、失败恢复以及足够的可观测性，方便排查真实同步问题。
 
 ### 1.3 非目标
 
-- 不替换 Obsidian 原生 vault adapter。
-- 不实现实时多人协作。
-- 不实现超出远端 provider API 之外的自定义后端。
-- 不保证与 Obsidian Sync 的状态一致性。
-
----
+- 不替换 Obsidian 原生 vault adapter
+- 不做实时多人协作
+- 不自建超出所选远端 provider API 之外的后端
+- 不承诺与 Obsidian Sync 绝对一致
 
 ## 2. 范围
 
 ### 2.1 范围内
 
-- 本地 vault 与远端 provider 目录的双向同步。
-- 文件 / 文件夹的创建、修改、删除、重命名。
-- 冲突检测与自动处理（默认策略）。
-- 会话恢复、重试与可续跑执行。
-- 桌面平台（macOS / Windows / Linux）。
+- 本地 vault 与单个远端根目录之间的双向同步
+- 文件和文件夹的创建、修改、删除、重命名
+- 冲突检测和可配置的处理策略
+- 会话恢复、重试与可续跑执行
+- 桌面平台：macOS、Windows、Linux
 
 ### 2.2 范围外
 
-- 完整的移动端自动同步行为（后续可能提供降级支持）。
-- 富文本级别合并（仅支持文件级别）。
-
----
+- 完整验证过的移动端自动同步行为
+- 富文本或行级合并；冲突处理仍停留在文件级别
 
 ## 3. 术语
 
-| 术语            | 定义                                |
-| --------------- | ----------------------------------- |
-| Vault           | 由 Obsidian 管理的本地文件目录      |
-| Remote Root     | 作为同步根的远端 provider 目录      |
-| relPath         | 相对于 vault 根目录的规范化路径     |
-| node uid        | 远端节点的稳定标识                  |
-| Index           | 本地同步状态数据库                  |
-| Job             | 一个幂等的同步任务                  |
-| Synced Baseline | 最近一次成功同步时的本地 / 远端指纹 |
-
----
+| 术语            | 含义                                 |
+| --------------- | ------------------------------------ |
+| Vault           | 由 Obsidian 管理的本地目录           |
+| Remote Root     | 选定的远端同步范围目录               |
+| relPath         | 相对 vault 根目录的规范化路径        |
+| node uid        | 远端节点稳定标识                     |
+| Index           | 持久化同步状态数据库                 |
+| Job             | 幂等同步任务                         |
+| Synced Baseline | 最近一次成功同步时的本地与远端指纹对 |
 
 ## 4. 高层架构
 
 ### 4.1 组件模型
 
-- **UI 层**
+- UI 层
     - 设置页
     - 同步状态视图
     - 命令面板命令
-
-- **同步编排层**
-    - Reconciler（对齐本地与远端状态）
-    - Scheduler（调度任务队列）
-    - State Machine（路径级状态）
-
-- **文件系统契约层**
-    - 提供 `LocalFileSystem` / `RemoteFileSystem` / `LocalChange` 等共享类型契约。
-    - 作为 `sync/` 与 `provider/` 的共同基础依赖；不包含业务流程逻辑。
-
-- **LocalFS Adapter**
-    - 基于 Obsidian Vault API。
-    - 提供事件流与文件操作能力。
-
-- **RemoteFS Adapter**
-    - 是远端 provider SDK 的唯一依赖层。
-    - 暴露统一的远端文件系统抽象。
-
-- **持久化层**
-    - Index DB（基于 Dexie 的 IndexedDB）
-    - Job Queue
-    - Remote Cursor / Snapshot Metadata
-
----
+- Runtime 编排层
+    - 会话恢复与刷新
+    - 调度与触发协调
+    - 同步协调
+- Sync kernel
+    - 对账本地与远端状态
+    - 决定并执行队列任务
+    - 持久化同步状态
+- Filesystem contracts 层
+    - 为 `LocalFileSystem`、`RemoteFileSystem`、`LocalChange` 提供共享契约
+- 本地文件系统适配器
+    - 基于 Obsidian vault API
+    - 负责本地事件流和文件操作
+- 远端文件系统适配器
+    - 负责远端 provider SDK 交互
+    - 暴露稳定的远端文件系统抽象
+- 持久化层
+    - 插件设置保存在 Obsidian 插件数据中
+    - 同步状态保存在 Dexie 支撑的 IndexedDB 中
 
 ## 5. 认证与会话
 
 ### 5.1 认证模型
 
-- 使用远端 provider 基于账号的 **SDK session 机制**（通过注入的 `httpClient` 实现）。
-- 登录形态：用户名 + 密码 + 可选 2FA。
-- 插件**不**持久化明文密码。
-
-### 5.4 SDK 客户端引导要求
-
-- `httpClient`：插件提供的 fetch adapter，负责附加认证头、超时控制、401 refresh + retry。
-- `account`：基于远端 provider API 的 account 接口，用于地址 / key / 私钥解密等能力。
-- `crypto`：OpenPGP + crypto proxy 包装层，用于满足 SDK 的密码学接口要求。
-- `srp`：用于登录 / 会话计算的 SRP 模块。
-- `cache`：`entitiesCache` + `cryptoCache`（MemoryCache），供 SDK 维护内部状态。
-- `telemetry`：映射到插件日志的 SDK telemetry adapter（不得携带敏感字段）。
+- 认证依赖远端 provider 账户与 SDK 会话机制
+- 登录形态为用户名、密码，以及可选的 2FA 或 mailbox password
+- 插件不持久化明文密码
 
 ### 5.2 会话持久化
 
-- 持久化载荷：由 SDK 集成层（`httpClient`）管理的不透明 session 凭据。
-- 生命周期：
-    1. 插件启动 -> 恢复会话
-    2. 如果过期 / 失效 -> 通过登录流程重新认证
-    3. 如果失败 -> 提示用户登录
+持久化内容：
+
+- 由 provider 集成层管理的 opaque session 凭据
+
+生命周期：
+
+1. 插件启动后尝试恢复会话
+2. 如果会话过期或失效，则进入重新认证流程
+3. 若无法恢复，则暂停同步并提示用户处理
 
 ### 5.3 安全要求
 
-- 不记录敏感字段。
-- 支持用户动作：“Sign out & Clear Session”。
-- 当会话失效时必须显式中断同步。
+- 不记录认证敏感字段
+- 支持显式登出并清空会话
+- 会话校验失败时必须中止同步
 
----
+### 5.4 SDK 客户端引导要求
 
-## 6. 本地文件系统规范
+当前 provider 集成需要：
+
+- `httpClient`：带认证头、超时、刷新和重试逻辑的 fetch 适配器
+- `account`：供解密相关能力使用的 provider 账户接口
+- `crypto`：SDK 所需的 OpenPGP 与加密包装层
+- `srp`：登录和会话处理所需的 SRP 支持
+- `cache`：SDK 使用的内存缓存
+- `telemetry`：把 SDK telemetry 路由进插件日志的适配器，且不得带敏感字段
+
+## 6. 本地文件系统要求
 
 ### 6.1 事件来源
 
-来自 Obsidian Vault API 的事件：
+本地适配器必须处理以下 Obsidian vault 事件：
 
 - `create`
 - `modify`
@@ -135,101 +122,92 @@
 
 ### 6.2 事件规范化
 
-- 将路径分隔符统一为 `/`。
-- 移除 `.` / `..`。
-- 应用统一的大小写策略（可配置）。
+适配器必须：
+
+- 把路径分隔符统一为 `/`
+- 去掉 `.` 和 `..`
+- 应用一致的大小写策略
 
 ### 6.3 事件防抖
 
-- 同一路径合并窗口：**300–800ms**。
-- `rename` 的优先级高于 `create/delete`。
+- 同一路径的合并窗口应保持在 300 ms 到 800 ms 左右
+- `rename` 的优先级应高于 create/delete 抖动
 
----
-
-## 7. 远端文件系统规范
+## 7. 远端文件系统要求
 
 ### 7.1 Remote Root
 
-- 同步范围限定在一个由用户选择的远端根目录。
-- 插件不得访问该目录之外的资源。
+- 同步范围仅限一个用户选定的远端根目录
+- 插件不得越过该范围操作远端资源
 
 ### 7.2 所需远端能力
 
-RemoteFS adapter 必须提供：
+远端适配器必须支持：
 
-- 列出树结构（可分页）
-- 上传（创建 / 更新）
+- 带分页的树形遍历
+- 创建和更新上传
 - 下载
 - 删除
-- 移动 / 重命名
-- 稳定标识（`node uid`）
-- revision / etag / mtime（至少一种）
+- 移动或重命名
+- 稳定远端标识
+- 至少一种 revision 指纹，例如 revision ID、etag 或 `mtime`
 
 ### 7.3 远端变更检测
 
-- **优先**：cursor / changes feed（SDK tree events）
-- **回退**：周期性快照 diff
+- 优先：cursor 或 changes feed
+- 回退：周期性 snapshot diff
 
----
+## 8. 持久化要求
 
-## 8. 索引数据库规范
+### 8.1 `entries` 表
 
-### 8.1 表：`entries`
+| 字段              | 类型    | 说明               |
+| ----------------- | ------- | ------------------ |
+| `relPath`         | TEXT PK | 规范化路径         |
+| `type`            | ENUM    | `file` 或 `folder` |
+| `localMtimeMs`    | INTEGER | 本地时间戳         |
+| `localSize`       | INTEGER | 本地大小           |
+| `localHash`       | TEXT    | 懒计算 sha256      |
+| `remoteId`        | TEXT    | node uid           |
+| `remoteRev`       | TEXT    | 远端 revision 指纹 |
+| `syncedLocalHash` | TEXT    | 基线               |
+| `syncedRemoteRev` | TEXT    | 基线               |
+| `tombstone`       | BOOLEAN | 删除标记           |
+| `lastSyncAt`      | INTEGER | 最近成功同步时间   |
 
-| 字段            | 类型    | 说明             |
-| --------------- | ------- | ---------------- |
-| relPath         | TEXT PK | 规范化路径       |
-| type            | ENUM    | file / folder    |
-| localMtimeMs    | INTEGER |                  |
-| localSize       | INTEGER |                  |
-| localHash       | TEXT    | sha256，惰性计算 |
-| remoteId        | TEXT    | node uid         |
-| remoteRev       | TEXT    | revision uid     |
-| syncedLocalHash | TEXT    | 同步基线         |
-| syncedRemoteRev | TEXT    | 同步基线         |
-| tombstone       | BOOLEAN | 删除标记         |
-| lastSyncAt      | INTEGER |                  |
+### 8.2 `jobs` 表
 
-### 8.2 表：`jobs`
-
-| 字段      | 类型    |
-| --------- | ------- |
-| id        | TEXT PK |
-| op        | ENUM    |
-| path      | TEXT    |
-| fromPath  | TEXT    |
-| toPath    | TEXT    |
-| priority  | INTEGER |
-| attempt   | INTEGER |
-| nextRunAt | INTEGER |
-| reason    | ENUM    |
+| 字段        | 类型    |
+| ----------- | ------- |
+| `id`        | TEXT PK |
+| `op`        | ENUM    |
+| `path`      | TEXT    |
+| `fromPath`  | TEXT    |
+| `toPath`    | TEXT    |
+| `priority`  | INTEGER |
+| `attempt`   | INTEGER |
+| `nextRunAt` | INTEGER |
+| `reason`    | ENUM    |
 
 ### 8.3 存储后端
 
-- 使用 Dexie 的 IndexedDB（浏览器安全，兼容 Obsidian）。
-- 设置仍保存在 Obsidian 插件数据中；同步状态位于 IndexedDB。
-- Schema 迁移通过 Dexie versioning 管理（见 8.4）。
+- 插件设置保存在 Obsidian 插件数据中
+- 同步状态保存在 Dexie 支撑的 IndexedDB 中
+- schema 变更通过 Dexie versioning 管理
 
-### 8.4 IndexedDB schema migration
+### 8.4 迁移规则
 
-迁移规则：
+- 每次 schema 变化都要递增 `SYNC_STATE_DB_VERSION`
+- 需要数据转换时，使用 Dexie 的迁移钩子
+- 在可行情况下，为旧版本保留一个版本周期的兼容读取路径
+- 对于破坏性变更，要提供带用户提示的重建路径
+- 不要在迁移中静默丢数据
 
-- 每次 schema 变更都提升 `SYNC_STATE_DB_VERSION`，并新增一个 Dexie `.version(n).stores(...)`。
-- 在需要数据转换时，使用 Dexie 的 `modify` / `add` / `delete`。
-- 至少保留一个向后兼容读取版本（N-1）。
-- 对破坏性变更，必须提供 reindex 路径（清空 + 重建），并向用户显式告警。
-- 避免静默丢表；应尽量保留关键记录。
-
-已规划变更（占位，用于保持版本设计一致）：
-
-- v3：为 jobs 增加 `status` 索引（schema 中已存在），并为缺失字段补齐 migration guard。
-- v4：在不改变 entry/job key 的前提下，扩展 `runtimeMetrics` 字段（如有需要）。
-
----
-
-## 9. 同步状态机
+## 9. 同步状态模型
 
 ### 9.1 路径级状态
+
+典型路径级状态包括：
 
 - `Clean`
 - `LocalDirty`
@@ -238,18 +216,16 @@ RemoteFS adapter 必须提供：
 - `Syncing`
 - `Error`
 
-### 9.2 状态迁移（简化）
+### 9.2 简化状态迁移
 
-| From        | Event             | To          |
-| ----------- | ----------------- | ----------- |
-| Clean       | Local modify      | LocalDirty  |
-| Clean       | Remote change     | RemoteDirty |
-| LocalDirty  | Upload success    | Clean       |
-| RemoteDirty | Download success  | Clean       |
-| \*          | Conflict detected | Conflict    |
-| \*          | Fatal error       | Error       |
-
----
+| From          | Event      | To            |
+| ------------- | ---------- | ------------- |
+| `Clean`       | 本地修改   | `LocalDirty`  |
+| `Clean`       | 远端变更   | `RemoteDirty` |
+| `LocalDirty`  | 上传成功   | `Clean`       |
+| `RemoteDirty` | 下载成功   | `Clean`       |
+| 任意          | 检测到冲突 | `Conflict`    |
+| 任意          | 致命错误   | `Error`       |
 
 ## 10. 冲突检测与处理
 
@@ -259,28 +235,31 @@ RemoteFS adapter 必须提供：
 localChanged  = localHash  != syncedLocalHash
 remoteChanged = remoteRev != syncedRemoteRev
 
-if localChanged && remoteChanged -> Conflict
+if localChanged && remoteChanged -> conflict
 ```
 
-### 10.2 默认处理策略
+### 10.2 默认处理模型
 
-- 保留一个规范的可编辑文件。
-- 将对侧版本保存为一个冲突副本：
+- 保留一个 canonical 可编辑文件
+- 将另一侧版本保存为冲突副本
+- 在索引里把路径标记为冲突状态
+
+冲突副本命名：
 
 ```text
 <filename> (conflicted <source> YYYY-MM-DD HHmm).<ext>
 ```
 
-- `<source>` 取值：`local` / `remote`
-- 将结果持久化到索引中，并标记为冲突状态。
+允许的 source 值：
 
-### 10.3 可配置策略
+- `local`
+- `remote`
 
-- `bidirectional`（默认）
+### 10.3 支持的策略值
+
+- `bidirectional`
 - `local_win`
 - `remote_win`
-
----
 
 ## 11. 作业队列与执行
 
@@ -297,266 +276,211 @@ if localChanged && remoteChanged -> Conflict
 
 ### 11.2 执行规则
 
-- 同一路径上的执行必须串行化。
-- 优先执行 move/delete，再执行内容类作业。
-- 按优先级调度（高优先级先执行）。
-- 并发上限：2（内建，不可配置）。
-- 所有作业都必须**幂等**。
-- 队列状态机：pending / processing / blocked。
-- 重试调度（`retryAt`）必须对用户可见。
+- 同一路径上的任务串行执行
+- 当顺序相关时，move 和 delete 优先于普通内容任务
+- 使用基于优先级的调度
+- 当前内建并发上限为 2
+- 所有任务都必须幂等
+- 队列状态支持 `pending`、`processing`、`blocked`
+- 重试时间必须能在持久化状态或 UI 中看到
 
 ### 11.3 重试策略
 
-- 网络 / 5xx：指数退避。
-- 认证错误：暂停并要求重新登录。
-- 按错误类型区分退避（rate / network / 404 等）。
-- 超过最大重试次数（内建为 5） -> 进入 `Error` 状态。
-
----
+- 网络错误和瞬时服务端失败采用指数退避
+- 认证失败会暂停同步并要求用户介入
+- 重试行为可以按错误类型细分
+- 超过内建重试上限后，任务进入失败状态
 
 ## 12. 启动与恢复
 
 ### 12.1 插件启动流程
 
-1. 加载 Index DB
-2. 恢复会话
-3. 快速扫描本地（mtime / size）
+1. 加载同步状态
+2. 恢复认证会话
+3. 执行快速本地扫描
 4. 拉取远端变更
-5. Reconcile -> 入队作业
-6. 启动 worker
+5. 对账并生成任务
+6. 启动队列执行
 
 ### 12.2 崩溃恢复
 
-- 继续未完成作业。
-- 保留 tombstone，避免重复 create/delete 抖动。
-- 提供 “Rebuild Index” 命令。
-- 启动时清理陈旧 processing jobs 与孤儿状态。
-
----
+- 恢复未完成任务
+- 保留 tombstone，避免反复 create/delete 抖动
+- 支持显式的重建索引恢复操作
+- 启动时清理陈旧 processing 任务和孤儿状态
 
 ## 13. UI 与 UX 要求
 
-### 13.1 设置
+### 13.1 设置页
 
-- 账号登录 / 登出
-- Remote Root 选择器
-- 排除规则（支持 `*` / `**`，含校验与预览）
-- 冲突策略
+设置页至少应暴露：
+
+- 账号登录与登出
+- 远端根目录选择
+- 带校验和预览的 exclude rules
+- 同步策略
 - 自动同步开关
 
 ### 13.2 状态视图
 
-- 当前状态
-- 队列长度
-- 当前进行中的作业 + 下次重试时间
-- 最近错误
-- 手动同步 / 暂停 / 恢复
+状态视图至少应展示：
+
+- 当前同步状态
+- 队列长度与任务计数
+- 如有必要，展示正在执行的任务和下一次重试时间
+- 最近一次错误摘要
+- 手动同步与暂停/恢复操作
 - 冲突摘要
 - 最近日志
 
 ### 13.3 命令
 
-- 立即同步
-- 暂停 / 恢复
-- 重建索引
-- 导出诊断信息
-- 审查冲突
+命令集至少应支持：
 
----
+- 立即同步
+- 暂停/恢复自动同步
+- 重建索引
+- 导出诊断
+- 处理冲突
 
 ## 14. 性能要求
 
-- 支持最多约 50k 文件的 vault 启动。
-- 不得阻塞 Obsidian 主线程。
-- 惰性 hash 计算。
-- 采用分页远端遍历，并根据 provider / SDK 特性控制节奏。
-- 预同步检查（作业数量、体积估算、确认 / 取消）。
-- 后台 reconcile + 限流扫描。
+- 大 vault 启动应保持可接受，包括约 50k 文件量级
+- 插件不得阻塞 Obsidian 主线程
+- 哈希计算应尽量懒执行
+- 远端遍历应带分页，并按 provider 能力节制速度
+- pre-sync 检查应在高成本或高风险执行前给出估算
+- 后台对账必须做节流
 
----
+## 15. 可观测性要求
 
-## 15. 可观测性
-
-- 结构化日志（不得包含敏感字段）
-- job 级错误跟踪
-- 可导出的诊断包（脱敏）
-- 日志查看器（状态视图）
-- 运行时指标（耗时、吞吐、失败率、队列峰值）
-
----
+- 无敏感字段的结构化日志
+- 任务级错误跟踪
+- 带脱敏的诊断包导出
+- 应用内日志查看器
+- 运行时指标，如耗时、吞吐、失败率和队列峰值
 
 ## 16. 风险与缓解
 
-| 风险                     | 缓解方式                  |
-| ------------------------ | ------------------------- |
-| 远端 provider SDK 不稳定 | 通过 RemoteFS 门面隔离    |
-| 没有远端 cursor          | 使用快照 diff + 优化      |
-| 大 vault 性能压力        | 分层扫描 + 限流           |
-| 外部 rename 复杂         | 未来引入 rename 推断窗口  |
-| Cursor 抖动              | 持久化 cursor + 快照回退  |
-| 移动端差异               | 提供降级路径 + 运行时检测 |
-
----
+| 风险                 | 缓解方式                                     |
+| -------------------- | -------------------------------------------- |
+| provider SDK 不稳定  | 通过远端适配器隔离                           |
+| 没有远端 cursor 支持 | 使用 snapshot diff 和优化                    |
+| 大 vault 性能问题    | 使用懒哈希、批处理和节流                     |
+| rename 复杂度高      | 明确处理 rename 逻辑并覆盖边界测试           |
+| cursor 抖动          | 持久化 cursor 并在必要时回退到 snapshot diff |
+| 移动端差异           | 在验证前将移动端视为降级支持                 |
 
 ## 17. 里程碑
 
-### Phase 0 - 可行性
+### Phase 0：可行性
 
-- 验证 SDK 登录 + list / upload / download。
+- 通过 provider SDK 验证登录、列目录、上传和下载
 
-### Phase 1 - MVP
+### Phase 1：MVP
 
-- 双向同步（手动触发）。
-- Index + job queue。
-- 基础冲突处理。
+- 手动双向同步
+- 索引和任务队列
+- 基础冲突处理
 
-### Phase 2 - GA
+### Phase 2：GA
 
-- 自动同步。
-- 远端增量处理。
-- 完整恢复与诊断。
-
----
+- 自动同步
+- 远端增量处理
+- 更完整的恢复与诊断
 
 ## 18. 开放问题
 
-- 是否存在官方 change feed / cursor？
-- 是否能通过 SDK 公开 API 组合出更强的远端变更指纹（例如 etag / mtime / size 组合）？
-
----
+- provider 是否在所有目标环境里都暴露了正式的 change feed 或 cursor
+- 是否可以只用公开 SDK 数据推导出更强的远端指纹
 
 ## 19. 运行时重构计划（2026-03）
 
 ### 19.1 目标
 
-- 将插件入口与同步编排解耦：让 `main.ts` 保持为薄门面，把运行时逻辑迁到 `runtime/*`。
-- 保持 sync-kernel 语义稳定：`reconciler + queue + executor` 保持稳定，此次重构不改算法。
-- 提升可测试性：scheduler、session 与单周期执行都应能独立测试。
+- 保持 `main.ts` 轻量，把编排逻辑移动到 `runtime/*`
+- 在改善职责清晰度的同时保持 sync-kernel 语义不变
+- 让 scheduler、session 和单次同步流程更容易测试
 
 ### 19.2 目标分层
 
-- **Plugin Facade（`main.ts`）**
-    - 设置加载 / 保存
-    - UI 标签页 / 命令注册
-    - 生命周期委派
+- 插件门面仍位于 `main.ts`
+- 运行时编排位于 `runtime/*`
+- provider 无关的 sync kernel 位于 `sync/*`
+- provider 自有文件系统适配器位于 `provider/providers/*`
+- 共享契约统一位于 `src/contracts/*`
 
-- **Runtime Layer（`runtime/*`）**
-    - `plugin-runtime.ts`：高层编排与对插件暴露的 API
-    - `session-manager.ts`：恢复 / 刷新 / 持久化认证会话
-    - `trigger-scheduler.ts`：interval + 本地 debounce + single-flight
-    - `sync-coordinator.ts`：围绕 provider / session / scope 的运行时编排
-    - `use-cases/*`：手动同步与诊断编排
+### 19.3 非目标
 
-- **Sync Kernel（`sync/*`）**
-    - `planner/*`：本地 / 远端规划与对账策略
-    - `engine/*`：执行引擎与队列
-    - `state/*`：状态存储与内存索引模型
-    - `support/*`：共享辅助工具
-    - `use-cases/*`：provider 无关的单周期同步执行
-    - 共享契约位于 `src/contracts/sync/*` 与 `src/contracts/filesystem/*`
-    - 保持冲突 / 重试 / 状态语义不变
-
-- **Provider 远端文件系统 adapter 边界（`provider/providers/*`）**
-    - provider 自持有的 `RemoteFileSystem` adapter
-    - 默认不引入共享的 provider 侧 decorator / strategy 层
-    - 只有在明确的跨 provider 需求出现后，才新增共享抽象
-
-### 19.3 此次重构的非目标
-
-- 不新增新的冲突策略。
-- 不调整作业优先级与重试语义。
-- 不更换存储后端（继续使用 Dexie IndexedDB + 插件数据设置）。
+- 不新增冲突策略
+- 不重写重试语义
+- 不替换 Dexie 与插件数据这一存储方案
 
 ### 19.4 推进阶段
 
-1. **Phase A（保持行为不变的拆分）**
-    - 将编排逻辑从 `main.ts` 抽到 `runtime/plugin-runtime.ts`
-    - 保持对 UI / commands 暴露的插件方法稳定
-
-2. **Phase B（编排边界）**
-    - 将 session / scheduler / runner 拆分为独立运行时模块
-
-3. **Phase C（弹性扩展）**
-    - 增加 `NetworkPolicy` 运行时模块（feature-flagged）
-    - provider 专用 IO 行为仍保留在 provider adapter 中，除非已经证明共享抽象合理
+1. 从 `main.ts` 拆出编排逻辑
+2. 进一步拆分 session、scheduler 和 coordinator 职责
+3. 增加可选网络策略
 
 ### 19.5 验收标准
 
-- 每个阶段后 `pnpm run test` 与 `pnpm run build` 都通过。
-- 不得回归以下手动场景：
-    - 会话恢复
-    - token 刷新
-    - 自动同步暂停 / 恢复
-    - 本地 / 远端 rename 同步
+- 每个阶段后 `pnpm run test` 和 `pnpm run build` 都通过
+- session restore、token refresh、pause/resume 与 rename 场景无行为回归
 
 ## 20. 远端 Provider 抽象计划（2026-03）
 
 ### 20.1 目标
 
-- 将远端文件操作与认证 / 连接 / scope 校验统一收口到 provider 层。
-- 在不改 sync-kernel 算法的前提下支持未来新增远端 provider。
-- 保持默认行为不变（默认 provider 仍为 `proton-drive`）。
+- 把认证、连接、scope 校验和远端文件系统创建统一归到 provider 层
+- 在不修改 sync-kernel 算法的前提下支持未来更多 provider
+- 保持当前 `proton-drive` 的默认行为不变
 
-### 20.2 新抽象
+### 20.2 主要抽象
 
-- **RemoteProvider**
-    - `login/restore/refresh/logout`
-    - `connect/disconnect`
-    - `createRemoteFileSystem(client, scopeId)`
-    - `validateScope(client, scopeId)`
-
-- **LocalProvider**
-    - `createLocalFileSystem(app)`
-    - `createLocalWatcher(app, onChange, registerEvent, debounceMs)`
-
-- **LocalProviderRegistry**
-    - 按 `localProviderId` 发现本地 provider
-    - 默认回退到 `obsidian-local`
-
-- **RemoteProviderRegistry**
-    - 按 `remoteProviderId` 发现远端 provider
-    - 默认回退到 `proton-drive`
+- `RemoteProvider`
+    - login、restore、refresh、logout
+    - connect、disconnect
+    - create remote filesystem
+    - validate scope
+- `LocalProvider`
+    - create local filesystem
+    - create local watcher
+- 本地与远端 provider registry
 
 ### 20.3 设置模型演进
 
-- 新增面向 provider 的字段：
-    - `remoteProviderId`
-    - `remoteScopeId` / `remoteScopePath`
-    - `remoteProviderCredentials`
-    - `remoteAccountEmail`
-    - `remoteHasAuthSession`
+provider 导向的设置字段包括：
 
-- 兼容策略：
-    - 直接持久化 provider-only 设置
-    - 运行时代码只读写 provider-only 字段
-    - 不再保留旧品牌专用设置字段的迁移路径
+- `remoteProviderId`
+- `remoteScopeId`
+- `remoteScopePath`
+- `remoteProviderCredentials`
+- `remoteAccountEmail`
+- `remoteHasAuthSession`
+
+兼容方向：
+
+- 直接持久化 provider 导向字段
+- runtime 仅读写 provider 字段
+- 不要长期保留旧品牌专用兼容路径
 
 ### 20.4 推进阶段
 
-1. **Phase A**
-    - 增加 provider 契约 / 注册表与默认远端 provider 实现
-
-2. **Phase B**
-    - 将运行时 session / sync runner 迁移到 provider 接口
-
-3. **Phase C**
-    - 将设置 / 登录 / 命令 / 弹窗从直接依赖 provider service 迁移到 provider API
-
-4. **Phase D**
-    - 删除未使用的 provider 专用辅助代码，并让 provider use-cases 成为唯一同步入口
+1. 增加 provider 契约和注册表
+2. 让 runtime session 和 sync 入口迁移到 provider 接口
+3. 让设置、登录、命令和弹窗迁移到 provider API
+4. 删除陈旧的直连 provider helper 路径
 
 ### 20.5 验收标准
 
-- 基于 provider 的运行时能够使用现有 provider 数据 / 状态正常工作。
-- 登录恢复、token 刷新、自动同步与手动同步不得出现行为回归。
-- 每阶段结束后 lint / test / build 都保持绿色。
+- provider 化后的 runtime 仍能与现有状态和设置协同工作
+- login restore、token refresh、auto-sync 和 manual sync 无回归
+- lint、test 和 build 均保持绿色
 
 ### 20.6 实现状态（2026-03-06）
 
-- Phase A / B / C 已完成（provider 契约 / 注册表、运行时、设置 / 登录 / 命令 / 弹窗）。
-- 已增加 provider session helper，以统一 restore / refresh / connect 的会话路径。
-- 已在 provider 中增加 `getRootScope(...)`，因此远端文件夹选择器不再依赖具体 SDK 细节。
-- 已移除旧版设置兼容路径；当前运行时直接使用 provider-only 持久化，不再保留迁移胶水。
-- 当时的验证结果：`pnpm run lint`、`pnpm run test` 与 `pnpm run build` 均已通过。
-
----
+- Phase A、B、C 已完成
+- 已增加 provider session helper 统一 restore、refresh 与 connect 路径
+- 已增加 provider root-scope API，使远端目录选择 UI 不再依赖 SDK 细节
+- 已移除旧设置兼容路径
+- 当时里程碑验证结果为：`pnpm run lint`、`pnpm run test`、`pnpm run build` 全部通过

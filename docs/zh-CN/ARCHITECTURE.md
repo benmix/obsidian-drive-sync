@@ -1,17 +1,17 @@
-# Obsidian 云盘同步 架构设计
+# Obsidian Drive Sync 架构设计
 
-## 1. 文档目标
+## 1. 目的
 
-本文档描述与当前代码实现相对应的架构，重点回答以下问题：
+这份文档描述当前代码库的架构，主要回答四个问题：
 
-- 模块如何分层，以及边界如何定义。
-- 同步流程如何从 UI / 命令进入并最终执行。
-- Provider 与 Sync Kernel 如何解耦。
-- 未来扩展（新 provider / provider 专用行为）应当在何处实现。
+- 仓库如何分层
+- 同步工作如何进入 runtime 并最终到达 sync kernel
+- provider 专属代码如何与 provider 无关逻辑分离
+- 新集成或新扩展应当落在哪一层
 
-这是一份面向实现的工程文档，不重复产品需求细节。产品范围与功能规格请参见 `docs/SPECS.md`。
+如果想看产品范围和行为要求，请读 [`SPECS.md`](./SPECS.md)。这份文档只讨论实现边界与职责归属。
 
-## 2. 架构总览
+## 2. 系统总览
 
 ```text
 UI / Commands
@@ -20,192 +20,246 @@ UI / Commands
 Plugin Facade (main.ts)
       |
       v
-Runtime Orchestration (runtime/*)
-      |                        \
-      |                         \-- Session / Policy / Scheduling
+Runtime (runtime/*)
+      |                \
+      |                 \-- session / policy / scheduling
       v
-Sync Kernel (sync/*)  <---->  Filesystem Contracts (contracts/filesystem/*)
+Sync Kernel (sync/*) <----> Filesystem Contracts (contracts/filesystem/*)
       ^
       |
-Provider Abstraction (contracts/provider/* + provider/registry)
+Provider Layer (contracts/provider/* + provider/*)
       |
-      +-- Local Provider impl (provider/providers/obsidian/*)
-      +-- Remote Provider impl (provider/providers/proton-drive/*)
+      +-- Local provider: provider/providers/obsidian/*
+      +-- Remote provider: provider/providers/proton-drive/*
 
-Data Layer
-  - Plugin settings: Obsidian plugin data (data/plugin-data.ts)
-  - Sync state/index/jobs/logs: IndexedDB Dexie (data/sync-db.ts + sync/state/*)
+Persistence
+  - plugin settings: Obsidian plugin data
+  - sync state, jobs, logs: IndexedDB via Dexie
 ```
 
-## 3. 分层与职责
+## 3. 分层职责
 
-### 3.1 Filesystem Contracts（共享基础契约）
+### 3.1 Filesystem Contracts
 
-- 目录：
-    - `src/contracts/filesystem/*`
-    - `src/filesystem/path.ts`
-- 职责：
-    - 定义 `LocalFileSystem`、`RemoteFileSystem`、`LocalChange` 等共享 IO 契约。
-    - 提供路径工具（`path.ts`）作为跨层可复用的基础原语。
-- 约束：
-    - 只包含类型与基础工具，不包含业务流程逻辑。
+所属路径：
 
-### 3.2 Provider 层（外部系统集成）
+- `src/contracts/filesystem/*`
+- `src/filesystem/path.ts`
 
-- 目录：`src/provider/*`
-- 职责：
-    - 提供统一的本地/远端抽象（`LocalProvider` / `RemoteProvider`）。
-    - 通过注册表管理当前启用的 provider。
-    - 隔离 SDK 与平台 API 差异。
-- 关键点：
-    - `default-registry.ts` 只注册当前活动 ID 所需的 provider。
-    - 远端 provider 直接返回具体的 `RemoteFileSystem` adapter。
-    - 当前没有启用共享的 provider 侧策略或中间件层。
+职责：
+
+- 定义 `LocalFileSystem`、`RemoteFileSystem`、`LocalChange` 等共享 IO 契约
+- 定义跨层复用的路径工具
+
+约束：
+
+- 不包含 runtime 编排
+- 不包含 provider 专属行为
+- 不包含同步策略
+
+### 3.2 Provider 层
+
+所属路径：
+
+- `src/provider/*`
+
+职责：
+
+- 暴露 `LocalProvider`、`RemoteProvider` 等 provider 级抽象
+- 隔离 SDK 和平台差异
+- 持有具体文件系统适配器
+- 持有 provider 注册与选择逻辑
+
+当前设计说明：
+
+- `default-registry.ts` 构建当前激活的 provider 注册表
+- 远端 provider 直接返回具体的 `RemoteFileSystem` 适配器
+- 当前设计中没有启用共享的 provider 侧策略层或中间件层
 
 ### 3.3 Sync Kernel
 
-- 目录：`src/sync/*`
-- 职责：
-    - `planner/*`：变更检测与对账规划（local / remote / reconcile）。
-    - `engine/*`：队列执行、重试与状态推进。
-    - `state/*`：同步状态持久化抽象。
-    - `use-cases/sync-runner.ts`：单次同步周期入口。
-- 设计原则：
-    - 保持 provider 无关；仅依赖 `src/contracts/*` 下的共享契约。
+所属路径：
 
-### 3.4 Runtime 层（编排）
+- `src/sync/*`
 
-- 目录：`src/runtime/*`
-- 职责：
-    - `plugin-state.ts`：插件设置 / provider 状态门面（加载 / 迁移 / 保存设置，维护活动 provider 注册表与认证 / 会话字段）。
-    - `plugin-runtime.ts`：生命周期编排中心。
-    - `session-manager.ts`：会话恢复 / 刷新与 auth-pause 控制。
-    - `trigger-scheduler.ts`：定时轮询 + 本地变更防抖 + single-flight。
-    - `sync-coordinator.ts`：组合本地 / 远端文件系统并调用 `SyncRunner`。
-    - `network-policy.ts`：网络门禁与失败冷却（可通过开关启用）。
+职责：
 
-### 3.5 Plugin Facade / UI / Commands（外层交互层）
+- `planner/*`：比较本地与远端状态，并决定要做什么工作
+- `engine/*`：执行任务队列、应用重试，并推进状态
+- `state/*`：持久化同步状态和任务数据
+- `use-cases/sync-runner.ts`：执行一次 provider 无关的同步周期
 
-- `main.ts`
-    - 插件入口门面，负责生命周期接线，并把状态 / 运行时操作委托出去。
-- `ui/*`
-    - 仅依赖插件 API 与 provider 抽象；不得依赖具体 provider 实现。
-- `commands/*`
-    - 每条命令一个文件，位于 `src/commands/command-*.ts`；`commands/index.ts` 负责组合上下文、注册设置页，并注册每条命令。
+设计原则：
+
+- sync kernel 只依赖共享契约，不依赖具体 provider 或 SDK
+
+### 3.4 Runtime 层
+
+所属路径：
+
+- `src/runtime/*`
+
+职责：
+
+- `plugin-state.ts`：加载、规范化、持久化并暴露 provider 相关设置与状态
+- `plugin-runtime.ts`：运行时组合入口和面向插件的编排 API
+- `session-manager.ts`：恢复、刷新和暂停认证会话
+- `trigger-scheduler.ts`：负责 interval 触发、本地防抖和 single-flight 调度
+- `sync-coordinator.ts`：构造当前本地与远端文件系统，并把执行权交给 sync runner
+- `network-policy.ts`：在网络失败后可选地阻断同步行为
+
+runtime 是唯一允许同时编排 provider、会话、策略和 sync kernel 的层。
+
+### 3.5 Plugin Facade、UI 与 Commands
+
+所属路径：
+
+- `src/main.ts`
+- `src/ui/*`
+- `src/commands/*`
+
+职责：
+
+- `main.ts`：插件生命周期入口，以及对 runtime 和 state 的轻量门面
+- `ui/*`：基于插件对外契约构建设置页、弹窗和视图
+- `commands/*`：用户触发的命令入口
+
+规则：
+
+- UI 不应依赖具体 provider 实现
+- 命令层不应内联重复同步或 provider 逻辑
+- `main.ts` 负责接线，不负责同步算法
 
 ## 4. 核心抽象
 
 ### 4.1 `ObsidianDriveSyncPluginApi`
 
-- 位置：`src/contracts/plugin/plugin-api.ts`
-- 目的：
-    - 作为 Runtime / UI / Commands 共享接口，避免这些层反向依赖 `main.ts` 的具体实现。
+位置：
 
-### 4.2 `RemoteProvider` / `LocalProvider`
+- `src/contracts/plugin/plugin-api.ts`
 
-- 位置：`src/contracts/provider/`
-- 目的：
-    - 将认证、连接、scope 处理与文件系统创建统一收口到 provider 中。
-    - 让 Sync Kernel 专注于 `RemoteFileSystem` / `LocalFileSystem`，而不感知底层 SDK。
+目的：
 
-### 4.3 `RemoteFileSystem` Adapter 所属边界
+- 为 runtime、UI 和 commands 提供稳定共享接口
+- 防止反向依赖 `main.ts` 的实现细节
 
-- 位置：
-    - `src/provider/providers/<provider>/remote-file-system.ts`
-- 目的：
-    - 将 provider 专用的远端 IO 行为留在 provider adapter 内部。
-    - 只有在至少两个 provider 需要同一种跨 provider 行为时，才考虑再抽一层共享抽象。
+### 4.2 `RemoteProvider` 与 `LocalProvider`
 
-## 5. 关键流程
+位置：
 
-### 5.1 插件启动流程
+- `src/contracts/provider/*`
 
-1. `main.ts` 初始化 `PluginState` 并调用 `initializeFromStorage()`。
-2. 执行设置迁移，并在需要时持久化规范化后的设置。
-3. `PluginState` 根据当前活动 provider ID 构建本地 / 远端注册表。
-4. 初始化 `PluginRuntime`，并执行 `restoreSession()`。
-5. `commands/index.ts` 注册设置页与全部命令。
-6. 根据 `autoSyncEnabled` 刷新调度器状态。
+目的：
 
-### 5.2 自动同步流程
+- 把认证、连接、scope 处理和文件系统创建归到 provider 自己的职责之下
+- 让 sync kernel 只关注文件系统契约，而不是 SDK 操作细节
 
-1. `TriggerScheduler` 发出运行请求（`interval` / `local` / `manual`）。
-2. `PluginRuntime` 先评估 `NetworkPolicy`。
-3. `SyncCoordinator`：
-    - 通过 `SessionManager` 构建当前远端 client。
-    - 从 `LocalProvider` 创建本地文件系统。
-    - 从 `RemoteProvider` 创建远端文件系统。
-4. `SyncRunner` 执行：
-    - 应用本地变更计划。
-    - 拉取远端变更并生成作业。
-    - 在需要时执行完整 reconcile。
-    - 调用 `SyncEngine.runOnce()` 消费队列并持久化状态。
+### 4.3 远端文件系统适配器归属
 
-### 5.3 认证恢复流程
+位置：
 
-1. 启动时或手动触发时，`SessionManager` 会检查已存储的凭据。
-2. 它调用 provider 的 `restore/refresh`；成功时写回可复用凭据并清除 auth pause。
-3. 失败时进入 auth pause，阻止自动同步，并记录错误上下文。
+- `src/provider/providers/<provider>/remote-file-system.ts`
+
+目的：
+
+- 把远端 IO 行为留在真正拥有它的 provider 适配器内部
+- 在至少两个 provider 证明有同类需求之前，不要提前抽共享层
+
+## 5. 主要运行流程
+
+### 5.1 插件启动
+
+1. `main.ts` 创建 plugin state 并加载持久化设置。
+2. 如有需要，执行设置规范化或迁移。
+3. 根据当前 provider ID 构建注册表。
+4. 创建 `PluginRuntime` 并尝试恢复会话。
+5. 注册命令和设置 UI。
+6. 按当前设置刷新调度器状态。
+
+### 5.2 同步执行
+
+1. 命令、UI、定时器或本地变更触发一次同步请求。
+2. `TriggerScheduler` 保证 single-flight。
+3. `PluginRuntime` 先应用网络策略和会话检查。
+4. `SyncCoordinator` 构建当前本地和远端文件系统。
+5. `SyncRunner` 处理本地变更、轮询远端变更、对账并运行队列。
+6. 同步状态、任务、日志和指标被持久化。
+
+### 5.3 认证恢复
+
+1. `SessionManager` 读取存储的凭据。
+2. 它请求当前 provider 恢复或刷新会话。
+3. 成功时持久化可复用凭据，并清除 auth pause。
+4. 失败时进入 auth pause，并更新运行时可见错误状态。
 
 ## 6. 数据与状态
 
-### 6.1 设置（插件设置）
+### 6.1 设置
 
-- 存储：Obsidian `loadData/saveData`（`data/plugin-data.ts`）。
-- 主要字段：
-    - provider ID、scope ID / path、凭据、账号信息、冲突策略、自动同步开关、网络策略开关。
+存储位置：
+
+- Obsidian 插件数据，通过 `loadData()` 和 `saveData()` 读写
+
+典型字段包括：
+
+- provider ID
+- 远端 scope ID 和路径
+- provider 凭据与账号摘要
+- 同步策略与自动同步配置
+- 网络策略开关
 
 ### 6.2 同步状态
 
-- 存储：IndexedDB Dexie（`data/sync-db.ts`）。
-- 主要表：
-    - `entries`：路径状态、远端映射、基线指纹、冲突标记。
-    - `jobs`：排队中的操作、优先级、重试、下次运行时间、状态。
-    - `meta`：`lastSyncAt`、`lastError`、`remoteEventCursor`、运行时指标。
-    - `logs`：诊断日志。
+存储位置：
 
-## 7. 依赖方向与约束
+- IndexedDB via Dexie
 
-仓库通过 `oxlint no-restricted-imports`（见 `.oxlintrc.json`）强制模块边界。
+主要表：
 
-关键约束：
+- `entries`：路径映射、指纹、冲突标记、墓碑
+- `jobs`：排队任务、优先级、重试状态和下一次执行时间
+- `meta`：同步摘要、cursor 状态和运行时指标
+- `logs`：结构化诊断日志
 
-- `runtime` 不得依赖 UI、commands、具体 provider 实现、`main` 或设置 UI。
-- `provider` 不得依赖 sync / runtime / UI / commands / main / settings。
-- `sync` 内部的导入方向按子层级受约束，以保持内核稳定。
-- 作为基础模块的 `filesystem` 不得依赖上层业务逻辑。
+## 7. 依赖方向
 
-## 8. 扩展设计
+仓库使用 `oxlint` 和自定义 layer check 强制分层。
 
-### 8.1 新增一个远端 Provider
+关键规则：
 
-推荐步骤：
+- `runtime/` 不能依赖 UI 内部实现、命令模块、`main.ts` 或具体 provider
+- `provider/` 不能依赖 `runtime/` 或 `sync/`
+- `sync/` 内部必须保持 planner、engine、state 的分层，不要塌缩成一层
+- 基础 filesystem contracts 不能反向依赖上层业务模块
 
-1. 在 `provider/providers/<new-provider>/` 中实现认证与远端文件系统 adapter。
+## 8. 扩展指南
+
+### 8.1 新增远端 Provider
+
+1. 在 `provider/providers/<new-provider>/` 下实现认证与远端文件系统逻辑。
 2. 实现 `RemoteProvider` 契约。
-3. 在 `default-registry.ts` 中补充 provider 工厂映射。
-4. 将 provider 专用的远端行为留在 provider adapter 内部，除非已经证明确有共享需求。
-5. 保持 `sync/*` 不变；如有需要，仅在 UI 中补 provider 专用文案。
+3. 在 `default-registry.ts` 中注册该 provider。
+4. 如果需求只属于该 provider，就把行为留在它自己的实现里。
+5. 除非共享契约必须演进，否则不要改 `sync/*`。
 
-### 8.2 添加共享的 Provider 侧行为
+### 8.2 抽取共享 Provider 行为
 
-推荐步骤：
+1. 先在真正需要它的 provider 内实现。
+2. 只有在至少两个 provider 都有相同需求时才抽共享抽象。
+3. 保持 runtime 和 sync 对 provider 特性无感知。
+4. 在复用之前，为抽出的行为补独立测试。
 
-1. 先直接在目标 provider adapter 内实现，并确认该行为确实跨 provider 通用。
-2. 只有当至少两个 provider 需要同一行为时，才抽取共享的 provider 侧抽象。
-3. 让 sync kernel 与 runtime 对 provider 专用机制保持无感。
-4. 在复用前，先为抽出的 provider 行为补齐独立单元测试。
+## 9. 需要保留的架构决策
 
-## 9. 架构决策摘要
+- 之所以引入 provider abstraction，是为了把 SDK 耦合隔离在 sync kernel 之外。
+- `main.ts` 必须继续是门面，而不是编排层。
+- 共享契约统一放在 `src/contracts/*`。
+- 默认情况下，远端 provider 行为留在具体 provider 适配器中。
+- runtime 负责编排会话、策略和同步；sync 不得反向越层。
 
-- 使用“Provider Abstraction + Sync Kernel”分层以降低 SDK 耦合。
-- 使用 `main.ts` 作为门面，并把运行时编排外提，以避免入口文件膨胀。
-- 将共享契约集中在 `src/contracts/*`，并把路径工具独立保存在 `src/filesystem/path.ts`。
-- 默认将远端 provider 行为保留在具体 adapter 中，而不额外维护一层策略层。
+## 10. 后续演进
 
-## 10. 后续演进建议
-
-- `DriveSyncSettings` 已被重命名为 provider 无关语义；后续应继续保持这种中性命名方向。
-- 将 provider registry 演进为支持并行可见的多个 provider（当前模型是按活动 ID 限定注册）。
-- 如果未来再次出现共享的 provider 侧行为，必须先有明确的第二个 provider 用例，再抽取新抽象。
-- 增加架构回归检查（例如自动化导入图边界校验）。
+- 设置命名继续保持 provider 中立。
+- 如果产品需要，provider registry 可以演进为支持多个可见 provider。
+- 在引入共享 provider 侧中间件之前，必须先出现明确的第二个用例。
+- 如果分层开始漂移，应增加更强的架构回归检查。
