@@ -1,11 +1,11 @@
+import type { LocalProvider } from "../provider/local-provider";
+import type { AnyRemoteProvider, RemoteProviderClient } from "../provider/remote-provider";
+
 import type { ObsidianDriveSyncPluginApi } from "./plugin-api";
 
-type RemoteProvider = ReturnType<ObsidianDriveSyncPluginApi["getRemoteProvider"]>;
-type LocalProvider = ReturnType<ObsidianDriveSyncPluginApi["getLocalProvider"]>;
-
-export type ConnectedRemoteClient = {
-	provider: RemoteProvider;
-	client: unknown;
+export type ConnectedRemoteClient<TProvider extends AnyRemoteProvider = AnyRemoteProvider> = {
+	provider: TProvider;
+	client: RemoteProviderClient<TProvider>;
 	scopeId: string;
 };
 
@@ -20,13 +20,13 @@ export type CommandErrorOptions = {
 	userMessageKey?: string;
 };
 
-export type CommandContext = {
-	plugin: ObsidianDriveSyncPluginApi;
+export type CommandContext<TProvider extends AnyRemoteProvider = AnyRemoteProvider> = {
+	plugin: ObsidianDriveSyncPluginApi<TProvider>;
 	localProvider: LocalProvider;
 	requireScopeId: () => string | null;
-	requireConnectedRemoteClient: () => Promise<ConnectedRemoteClient | null>;
+	requireConnectedRemoteClient: () => Promise<ConnectedRemoteClient<TProvider> | null>;
 	runRemoteCommand: (
-		onConnected: (connection: ConnectedRemoteClient) => Promise<void>,
+		onConnected: (connection: ConnectedRemoteClient<TProvider>) => Promise<void>,
 	) => Promise<void>;
 	showCommandError: (error: unknown, options: CommandErrorOptions) => void;
 };

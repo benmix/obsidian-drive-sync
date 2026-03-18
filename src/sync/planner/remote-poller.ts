@@ -186,14 +186,16 @@ async function pollRemoteCursor(
 		return null;
 	}
 
-	if (!state.remoteEventCursor) {
-		return null;
-	}
-
 	const root = await remoteFileSystem.getRootEntry();
 	const scope = root?.eventScopeId;
 	if (!scope) {
 		return null;
+	}
+
+	if (!state.remoteEventCursor) {
+		remoteFileSystem.setLatestEventCursor?.(scope, undefined);
+	} else {
+		remoteFileSystem.setLatestEventCursor?.(scope, state.remoteEventCursor);
 	}
 
 	const events: RemoteEntryChangeEvent[] = [];
@@ -201,7 +203,7 @@ async function pollRemoteCursor(
 		events.push(event);
 	});
 
-	await new Promise((resolve) => window.setTimeout(resolve, 750));
+	await new Promise((resolve) => setTimeout(resolve, 750));
 	subscription.dispose();
 
 	if (events.length === 0) {
@@ -241,6 +243,7 @@ async function pollRemoteCursor(
 	}
 
 	if (requiresFullRefresh || remoteIds.size === 0) {
+		remoteFileSystem.setLatestEventCursor?.(scope, latestEventId);
 		return null;
 	}
 

@@ -1,18 +1,20 @@
 import { MemoryCache, ProtonDriveClient } from "@protontech/drive-sdk";
 import { Notice } from "obsidian";
 
+import type { ProtonDriveConnectedClient } from "../../../../contracts/provider/proton/drive-provider";
 import type { ProtonSession } from "../../../../contracts/provider/proton/sdk-session";
 
 import { buildSdkSessionClient } from "./sdk-session";
 
 export class ProtonDriveService {
-	private client: ProtonDriveClient | null = null;
-	private connecting: Promise<ProtonDriveClient | null> | null = null;
+	private client: ProtonDriveConnectedClient | null = null;
+	private connecting: Promise<ProtonDriveConnectedClient | null> | null = null;
+	private latestEventIds = new Map<string, string>();
 
 	async connect(
 		session: ProtonSession,
 		onTokenRefresh?: () => Promise<void>,
-	): Promise<ProtonDriveClient | null> {
+	): Promise<ProtonDriveConnectedClient | null> {
 		if (this.client) {
 			return this.client;
 		}
@@ -36,22 +38,23 @@ export class ProtonDriveService {
 		}
 	}
 
-	getClient(): ProtonDriveClient | null {
+	getClient(): ProtonDriveConnectedClient | null {
 		return this.client;
 	}
 
 	disconnect() {
 		this.client = null;
+		this.latestEventIds.clear();
 	}
 
 	private async createClient(
 		session: ProtonSession,
 		onTokenRefresh?: () => Promise<void>,
-	): Promise<ProtonDriveClient | null> {
+	): Promise<ProtonDriveConnectedClient | null> {
 		const { httpClient, account, openPGPCryptoModule, srpModule, telemetry } =
 			await buildSdkSessionClient(session, onTokenRefresh);
 
-		return new ProtonDriveClient({
+		const sdk = new ProtonDriveClient({
 			httpClient,
 			entitiesCache: new MemoryCache(),
 			cryptoCache: new MemoryCache(),
@@ -59,6 +62,21 @@ export class ProtonDriveService {
 			openPGPCryptoModule,
 			srpModule,
 			telemetry,
+			latestEventIdProvider: {
+				getLatestEventId: (eventScopeId) => this.latestEventIds.get(eventScopeId) ?? null,
+			},
 		});
+		return {
+			sdk,
+			getLatestEventId: (eventScopeId: string) =>
+				this.latestEventIds.get(eventScopeId) ?? null,
+			setLatestEventId: (eventScopeId: string, eventId?: string) => {
+				if (!eventId) {
+					this.latestEventIds.delete(eventScopeId);
+					return;
+				}
+				this.latestEventIds.set(eventScopeId, eventId);
+			},
+		};
 	}
 }

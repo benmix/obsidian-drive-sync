@@ -1,7 +1,11 @@
 import { Notice } from "obsidian";
 
 import { type ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import type { RemoteProviderSession } from "../contracts/provider/remote-provider";
+import type {
+	AnyRemoteProvider,
+	RemoteProviderClient,
+	RemoteProviderSessionOf,
+} from "../contracts/provider/remote-provider";
 import { type SyncRunRequest } from "../contracts/sync/run-request";
 import {
 	createDriveSyncError,
@@ -24,14 +28,14 @@ import {
 	loadSyncState as loadSyncStateUseCase,
 } from "./use-cases/sync-state";
 
-export class PluginRuntime {
+export class PluginRuntime<TProvider extends AnyRemoteProvider> {
 	private autoSyncPaused = false;
-	private readonly sessionManager: SessionManager;
-	private readonly syncCoordinator: SyncCoordinator;
+	private readonly sessionManager: SessionManager<TProvider>;
+	private readonly syncCoordinator: SyncCoordinator<TProvider>;
 	private readonly triggerScheduler: TriggerScheduler;
 	private readonly networkPolicy: NetworkPolicy;
 
-	constructor(private readonly plugin: ObsidianDriveSyncPluginApi) {
+	constructor(private readonly plugin: ObsidianDriveSyncPluginApi<TProvider>) {
 		this.sessionManager = new SessionManager(plugin);
 		this.syncCoordinator = new SyncCoordinator(plugin, this.sessionManager);
 		this.networkPolicy = new NetworkPolicy(() => ({
@@ -63,11 +67,11 @@ export class PluginRuntime {
 		await this.sessionManager.restoreSession();
 	}
 
-	async buildActiveRemoteSession(): Promise<RemoteProviderSession | null> {
+	async buildActiveRemoteSession(): Promise<RemoteProviderSessionOf<TProvider> | null> {
 		return await this.sessionManager.buildActiveRemoteSession();
 	}
 
-	async connectRemoteClient(): Promise<unknown> {
+	async connectRemoteClient(): Promise<RemoteProviderClient<TProvider>> {
 		return await this.sessionManager.connectClient();
 	}
 

@@ -1,8 +1,22 @@
-import type { RemoteProviderLoginInput } from "../remote-provider";
+import type { ProtonDriveClient } from "@protontech/drive-sdk";
+
+import type { RemoteProvider, RemoteProviderLoginInput } from "../remote-provider";
 
 import type { AuthSession } from "./auth-session";
 import type { ReusableCredentials, Session } from "./auth-types";
 import type { ProtonSession } from "./sdk-session";
+
+export type ProtonDriveConnectedClient = {
+	sdk: ProtonDriveClient;
+	getLatestEventId(eventScopeId: string): string | null;
+	setLatestEventId(eventScopeId: string, eventId?: string): void;
+};
+
+export type ProtonDriveProvider = RemoteProvider<
+	ProtonDriveConnectedClient,
+	ProtonSession,
+	ReusableCredentials
+>;
 
 export interface ProtonDriveAuthServiceContract {
 	login(credentials: RemoteProviderLoginInput): Promise<AuthSession>;
@@ -15,7 +29,10 @@ export interface ProtonDriveAuthServiceContract {
 }
 
 export interface ProtonDriveServiceContract {
-	connect(session: ProtonSession, onTokenRefresh?: () => Promise<void>): Promise<unknown | null>;
+	connect(
+		session: ProtonSession,
+		onTokenRefresh?: () => Promise<void>,
+	): Promise<ProtonDriveConnectedClient | null>;
 	disconnect(): void;
 }
 

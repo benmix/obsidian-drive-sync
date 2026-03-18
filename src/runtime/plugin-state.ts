@@ -6,10 +6,7 @@ import {
 	DEFAULT_LOCAL_PROVIDER_ID,
 	DEFAULT_REMOTE_PROVIDER_ID,
 } from "../contracts/provider/provider-ids";
-import type {
-	RemoteProvider,
-	RemoteProviderCredentials,
-} from "../contracts/provider/remote-provider";
+import type { RemoteProviderCredentialsOf } from "../contracts/provider/remote-provider";
 import {
 	loadPluginData,
 	mergePluginData,
@@ -19,15 +16,17 @@ import {
 import {
 	createLocalProviderRegistry,
 	createRemoteProviderRegistry,
+	type RegisteredRemoteProvider,
 } from "../provider/default-registry";
 import { LocalProviderRegistry, RemoteProviderRegistry } from "../provider/registry";
 
 export class PluginState {
 	private mutableSettings: DriveSyncSettings = { ...DEFAULT_SETTINGS };
 	private localProviderRegistry: LocalProviderRegistry = new LocalProviderRegistry();
-	private remoteProviderRegistry: RemoteProviderRegistry = new RemoteProviderRegistry();
+	private remoteProviderRegistry: RemoteProviderRegistry<RegisteredRemoteProvider> =
+		new RemoteProviderRegistry<RegisteredRemoteProvider>();
 
-	constructor(private readonly plugin: ObsidianDriveSyncPluginApi) {}
+	constructor(private readonly plugin: ObsidianDriveSyncPluginApi<RegisteredRemoteProvider>) {}
 
 	async initializeFromStorage(): Promise<void> {
 		const data = await loadPluginData(this.plugin);
@@ -53,11 +52,11 @@ export class PluginState {
 		return providerId || DEFAULT_REMOTE_PROVIDER_ID;
 	}
 
-	listRemoteProviders(): RemoteProvider[] {
+	listRemoteProviders(): RegisteredRemoteProvider[] {
 		return this.remoteProviderRegistry.list();
 	}
 
-	getRemoteProvider(): RemoteProvider {
+	getRemoteProvider(): RegisteredRemoteProvider {
 		return this.remoteProviderRegistry.get(this.getRemoteProviderId());
 	}
 
@@ -103,11 +102,17 @@ export class PluginState {
 		});
 	}
 
-	getStoredProviderCredentials(): RemoteProviderCredentials | undefined {
-		return this.mutableSettings.remoteProviderCredentials;
+	getStoredProviderCredentials():
+		| RemoteProviderCredentialsOf<RegisteredRemoteProvider>
+		| undefined {
+		return this.mutableSettings.remoteProviderCredentials as
+			| RemoteProviderCredentialsOf<RegisteredRemoteProvider>
+			| undefined;
 	}
 
-	setStoredProviderCredentials(credentials: RemoteProviderCredentials | undefined): void {
+	setStoredProviderCredentials(
+		credentials: RemoteProviderCredentialsOf<RegisteredRemoteProvider> | undefined,
+	): void {
 		this.updateSettings({
 			remoteProviderCredentials: credentials,
 		});

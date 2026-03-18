@@ -1,25 +1,28 @@
 import type { LocalProvider } from "../contracts/provider/local-provider";
 import { type LocalProviderId, type RemoteProviderId } from "../contracts/provider/provider-ids";
-import type { RemoteProvider } from "../contracts/provider/remote-provider";
+import type { AnyRemoteProvider } from "../contracts/provider/remote-provider";
 import { createDriveSyncError } from "../errors";
 
 import { createObsidianLocalProvider } from "./providers/obsidian/provider";
 import { createProtonDriveRemoteProvider } from "./providers/proton-drive/provider";
 import { LocalProviderRegistry, RemoteProviderRegistry } from "./registry";
 
-type RemoteProviderFactory = () => RemoteProvider;
 type LocalProviderFactory = () => LocalProvider;
 
-const REMOTE_PROVIDER_FACTORIES: Record<RemoteProviderId, RemoteProviderFactory> = {
+const REMOTE_PROVIDER_FACTORIES = {
 	["proton-drive"]: () => createProtonDriveRemoteProvider(),
-};
+} satisfies Record<RemoteProviderId, () => AnyRemoteProvider>;
+
+export type RegisteredRemoteProvider = ReturnType<
+	(typeof REMOTE_PROVIDER_FACTORIES)[keyof typeof REMOTE_PROVIDER_FACTORIES]
+>;
 
 const LOCAL_PROVIDER_FACTORIES: Record<LocalProviderId, LocalProviderFactory> = {
 	["obsidian-local"]: () => createObsidianLocalProvider(),
 };
 
-export function createRemoteProviderRegistry(): RemoteProviderRegistry {
-	const registry = new RemoteProviderRegistry();
+export function createRemoteProviderRegistry(): RemoteProviderRegistry<RegisteredRemoteProvider> {
+	const registry = new RemoteProviderRegistry<RegisteredRemoteProvider>();
 	for (const providerFactory of Object.values(REMOTE_PROVIDER_FACTORIES)) {
 		registry.register(providerFactory());
 	}

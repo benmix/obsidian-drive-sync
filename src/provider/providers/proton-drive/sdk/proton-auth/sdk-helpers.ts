@@ -1,5 +1,10 @@
-import type { ProtonDriveAccount, ProtonDriveAccountAddress } from "@protontech/drive-sdk";
-import type { PublicKey as DrivePublicKey } from "@protontech/drive-sdk/dist/crypto/interface";
+import type {
+	ProtonDriveAccount,
+	ProtonDriveAccountAddress,
+	ProtonDriveHTTPClient,
+	ProtonDriveHTTPClientBlobRequest,
+	ProtonDriveHTTPClientJsonRequest,
+} from "@protontech/drive-sdk";
 import * as openpgp from "openpgp";
 
 import type {
@@ -20,6 +25,7 @@ import type {
 	SRPModuleInterface,
 	SRPVerifier,
 } from "../../../../../contracts/provider/proton/srp-module";
+import { wrapPrivateKey, wrapPublicKey } from "../openpgp-proxy";
 
 import { apiRequest } from "./api";
 import {
@@ -38,28 +44,9 @@ import { getSrp, verifyAndGetModulus } from "./srp";
 // SDK Integration Helpers
 // ============================================================================
 
-interface HttpClientRequest {
-	url: string;
-	method: string;
-	headers: Headers;
-	json?: Record<string, unknown>;
-	body?: BodyInit;
-	timeoutMs: number;
-	signal?: AbortSignal;
-	onProgress?: (progress: number) => void;
-}
-
-interface ProtonHttpClient {
-	fetchJson(request: HttpClientRequest): Promise<Response>;
-	fetchBlob(request: HttpClientRequest): Promise<Response>;
-}
-
-type DrivePrivateKey = {
-	readonly _idx: openpgp.PrivateKey;
-	readonly _dummyType: "private";
-};
-
 type OwnAddress = ProtonDriveAccountAddress;
+type DrivePrivateKey = OwnAddress["keys"][number]["key"];
+type DrivePublicKey = Awaited<ReturnType<ProtonDriveAccount["getPublicKeys"]>>[number];
 
 /**
  * Create an HTTP client for the Proton Drive SDK
@@ -67,7 +54,7 @@ type OwnAddress = ProtonDriveAccountAddress;
 export function createProtonHttpClient(
 	session: Session,
 	onTokenRefresh?: () => Promise<void>,
-): ProtonHttpClient {
+): ProtonDriveHTTPClient {
 	// Helper to build the full URL - handles both relative and absolute URLs
 	const buildUrl = (url: string): string => {
 		// If URL is already absolute, use it as-is
@@ -94,7 +81,7 @@ export function createProtonHttpClient(
 	};
 
 	return {
-		async fetchJson(request: HttpClientRequest): Promise<Response> {
+		async fetchJson(request: ProtonDriveHTTPClientJsonRequest): Promise<Response> {
 			const { url, method, headers, json, timeoutMs, signal } = request;
 
 			// Add auth headers
@@ -136,14 +123,13 @@ export function createProtonHttpClient(
 						// Refresh failed, return original 401 response
 					}
 				}
-
 				return response;
 			} finally {
 				clearTimeout(timeout);
 			}
 		},
 
-		async fetchBlob(request: HttpClientRequest): Promise<Response> {
+		async fetchBlob(request: ProtonDriveHTTPClientBlobRequest): Promise<Response> {
 			const { url, method, headers, body, timeoutMs, signal } = request;
 
 			// Add auth headers
@@ -203,14 +189,6 @@ export function createProtonAccount(
 ): ProtonDriveAccount {
 	// Cache for decrypted keys to avoid re-decrypting on each call
 	const decryptedKeysCache = new Map<string, openpgp.PrivateKey>();
-
-	const wrapPrivateKey = (key: openpgp.PrivateKey): DrivePrivateKey => ({
-		_idx: key,
-		_dummyType: "private",
-	});
-	const wrapPublicKey = (key: openpgp.PublicKey): DrivePublicKey => ({
-		_idx: key,
-	});
 
 	async function decryptAddressKeys(
 		keys: AddressKeyInfo[],

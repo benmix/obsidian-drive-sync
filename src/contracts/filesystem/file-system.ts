@@ -62,6 +62,8 @@ export interface RemoteFileSystem {
 		eventScopeId: string,
 		onEvent: (event: RemoteEntryChangeEvent) => Promise<void>,
 	): Promise<{ dispose: () => void }>;
+	setLatestEventCursor?(eventScopeId: string, eventId?: string): void;
+	getLatestEventCursor?(eventScopeId: string): string | null;
 	getRootEntry?(): Promise<RemoteFileEntry | null>;
 }
 

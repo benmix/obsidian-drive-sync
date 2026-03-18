@@ -29,6 +29,8 @@ function formatMetric(event: MetricEvent): string {
 			return `blockVerificationError retryHelped=${event.retryHelped}`;
 		case "volumeEventsSubscriptionsChanged":
 			return `volumeEventsSubscriptionsChanged count=${event.numberOfVolumeSubscriptions}`;
+		case "performance":
+			return `performance type=${event.type} model=${event.cryptoModel} bytes=${event.bytesProcessed} ms=${event.milliseconds}`;
 		default: {
 			const exhaustive: never = event;
 			return `metric ${JSON.stringify(exhaustive)}`;

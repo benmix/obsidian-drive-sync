@@ -188,8 +188,7 @@ export const PLATFORM_MAP: Record<string, string> = {
 	win32: "windows",
 };
 export const PLATFORM = PLATFORM_MAP[process.platform] ?? "macos";
-export const APP_VERSION =
-	PLATFORM === "windows" ? `${PLATFORM}-drive@1.12.4` : `${PLATFORM}-drive@2.10.1`;
+export const APP_VERSION = "external-drive-obsidian-drive-sync@0.1.0";
 export const CHILD_CLIENT_ID = PLATFORM === "macos" ? "macOSDrive" : "windowsDrive";
 
 // SRP Modulus verification key

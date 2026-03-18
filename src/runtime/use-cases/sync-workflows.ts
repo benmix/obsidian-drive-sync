@@ -1,7 +1,10 @@
 import { type App } from "obsidian";
 
 import type { LocalProvider } from "../../contracts/provider/local-provider";
-import type { RemoteProvider } from "../../contracts/provider/remote-provider";
+import type {
+	AnyRemoteProvider,
+	RemoteProviderClient,
+} from "../../contracts/provider/remote-provider";
 import { type SyncStrategy } from "../../contracts/sync/strategy";
 import { SyncEngine } from "../../sync/engine/sync-engine";
 import { isInitializationPhase } from "../../sync/planner/initialization";
@@ -10,11 +13,11 @@ import { PluginDataStateStore } from "../../sync/state/state-store";
 
 import { syncLocalToRemote, syncRemoteToLocal } from "./manual-sync";
 
-export async function syncVaultToRemote(
+export async function syncVaultToRemote<TProvider extends AnyRemoteProvider>(
 	app: App,
 	localProvider: LocalProvider,
-	remoteProvider: RemoteProvider,
-	client: unknown,
+	remoteProvider: TProvider,
+	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
 ): Promise<{ uploaded: number }> {
 	const localFileSystem = localProvider.createLocalFileSystem(app);
@@ -22,11 +25,11 @@ export async function syncVaultToRemote(
 	return await syncLocalToRemote(localFileSystem, remoteFileSystem);
 }
 
-export async function restoreVaultFromRemote(
+export async function restoreVaultFromRemote<TProvider extends AnyRemoteProvider>(
 	app: App,
 	localProvider: LocalProvider,
-	remoteProvider: RemoteProvider,
-	client: unknown,
+	remoteProvider: TProvider,
+	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
 ): Promise<{ downloaded: number }> {
 	const localFileSystem = localProvider.createLocalFileSystem(app);
@@ -34,11 +37,11 @@ export async function restoreVaultFromRemote(
 	return await syncRemoteToLocal(localFileSystem, remoteFileSystem);
 }
 
-export async function planSync(
+export async function planSync<TProvider extends AnyRemoteProvider>(
 	app: App,
 	localProvider: LocalProvider,
-	remoteProvider: RemoteProvider,
-	client: unknown,
+	remoteProvider: TProvider,
+	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
 	settings?: {
 		syncStrategy?: SyncStrategy;
@@ -57,11 +60,11 @@ export async function planSync(
 	return await engine.plan({ preferRemoteSeed });
 }
 
-export async function runPlannedSync(
+export async function runPlannedSync<TProvider extends AnyRemoteProvider>(
 	app: App,
 	localProvider: LocalProvider,
-	remoteProvider: RemoteProvider,
-	client: unknown,
+	remoteProvider: TProvider,
+	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
 	settings?: {
 		syncStrategy?: SyncStrategy;
@@ -77,11 +80,11 @@ export async function runPlannedSync(
 	return await engine.runOnce();
 }
 
-export async function rebuildSyncIndex(
+export async function rebuildSyncIndex<TProvider extends AnyRemoteProvider>(
 	app: App,
 	localProvider: LocalProvider,
-	remoteProvider: RemoteProvider,
-	client: unknown,
+	remoteProvider: TProvider,
+	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
 	settings?: {
 		syncStrategy?: SyncStrategy;
@@ -97,11 +100,11 @@ export async function rebuildSyncIndex(
 	await engine.rebuildIndex();
 }
 
-export async function pollRemoteSync(
+export async function pollRemoteSync<TProvider extends AnyRemoteProvider>(
 	app: App,
 	localProvider: LocalProvider,
-	remoteProvider: RemoteProvider,
-	client: unknown,
+	remoteProvider: TProvider,
+	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
 	settings?: {
 		syncStrategy?: SyncStrategy;
@@ -130,11 +133,11 @@ export async function pollRemoteSync(
 	return { jobsPlanned: result.jobs.length, entries: result.snapshot.length };
 }
 
-export async function estimateSyncPlan(
+export async function estimateSyncPlan<TProvider extends AnyRemoteProvider>(
 	app: App,
 	localProvider: LocalProvider,
-	remoteProvider: RemoteProvider,
-	client: unknown,
+	remoteProvider: TProvider,
+	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
 	settings?: {
 		syncStrategy?: SyncStrategy;

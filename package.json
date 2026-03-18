@@ -24,7 +24,7 @@
 		"version": "node scripts/version-bump.mjs && git add manifest.json versions.json"
 	},
 	"dependencies": {
-		"@protontech/drive-sdk": "latest",
+		"@protontech/drive-sdk": "0.13.0",
 		"bcryptjs": "^3.0.3",
 		"dexie": "^4.2.1",
 		"mime-types": "^3.0.2",

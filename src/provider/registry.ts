@@ -1,22 +1,22 @@
 import type { LocalProvider } from "../contracts/provider/local-provider";
 import type { LocalProviderId, RemoteProviderId } from "../contracts/provider/provider-ids";
-import type { RemoteProvider } from "../contracts/provider/remote-provider";
+import type { AnyRemoteProvider } from "../contracts/provider/remote-provider";
 import { createDriveSyncError } from "../errors";
 
-export class RemoteProviderRegistry {
-	private readonly providers = new Map<RemoteProviderId, RemoteProvider>();
+export class RemoteProviderRegistry<TProvider extends AnyRemoteProvider = AnyRemoteProvider> {
+	private readonly providers = new Map<RemoteProviderId, TProvider>();
 
-	constructor(initialProviders: RemoteProvider[] = []) {
+	constructor(initialProviders: TProvider[] = []) {
 		for (const provider of initialProviders) {
 			this.register(provider);
 		}
 	}
 
-	register(provider: RemoteProvider): void {
+	register(provider: TProvider): void {
 		this.providers.set(provider.id, provider);
 	}
 
-	get(providerId: RemoteProviderId): RemoteProvider {
+	get(providerId: RemoteProviderId): TProvider {
 		const provider = this.providers.get(providerId);
 		if (provider) {
 			return provider;
@@ -30,7 +30,7 @@ export class RemoteProviderRegistry {
 		});
 	}
 
-	list(): RemoteProvider[] {
+	list(): TProvider[] {
 		return [...this.providers.values()];
 	}
 }

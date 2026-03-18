@@ -1,20 +1,16 @@
-import type { ProtonDriveClient } from "@protontech/drive-sdk";
-
 import type { RemoteFileSystem } from "../../../contracts/filesystem/file-system";
 import type { ReusableCredentials } from "../../../contracts/provider/proton/auth-types";
 import type {
 	ProtonDriveAuthServiceContract,
+	ProtonDriveConnectedClient,
+	ProtonDriveProvider,
 	ProtonDriveProviderInitOptions,
 	ProtonDriveServiceContract,
 } from "../../../contracts/provider/proton/drive-provider";
 import type { ProtonSession } from "../../../contracts/provider/proton/sdk-session";
 import type {
-	RemoteProvider,
 	RemoteProviderConnectOptions,
-	RemoteProviderCredentials,
 	RemoteProviderLoginInput,
-	RemoteProviderLoginResult,
-	RemoteProviderSession,
 	RemoteScopeRoot,
 } from "../../../contracts/provider/remote-provider";
 import { createDriveSyncError } from "../../../errors";
@@ -23,7 +19,11 @@ import { ProtonDriveRemoteFileSystem } from "./remote-file-system";
 import { ProtonDriveAuthService } from "./sdk/auth";
 import { ProtonDriveService } from "./sdk/service";
 
-export class ProtonDriveRemoteProvider implements RemoteProvider {
+type ProtonRootNodeResult =
+	| { ok: true; value: { uid: string; name: string } }
+	| { ok: false; error?: unknown };
+
+export class ProtonDriveRemoteProvider implements ProtonDriveProvider {
 	readonly id = "proton-drive";
 	readonly label = "Proton Drive";
 
@@ -32,30 +32,28 @@ export class ProtonDriveRemoteProvider implements RemoteProvider {
 		private readonly driveService: ProtonDriveServiceContract,
 	) {}
 
-	async login(input: RemoteProviderLoginInput): Promise<RemoteProviderLoginResult> {
+	async login(input: RemoteProviderLoginInput) {
 		const result = await this.authService.login(input);
 		return {
-			session: result.session as unknown as RemoteProviderSession,
+			session: result.session,
 			credentials: result.credentials,
 			userEmail: result.userEmail,
 		};
 	}
 
-	async restore(credentials: RemoteProviderCredentials): Promise<RemoteProviderSession> {
-		const session = await this.authService.restore(credentials as ReusableCredentials);
-		return session as unknown as RemoteProviderSession;
+	async restore(credentials: ReusableCredentials): Promise<ProtonSession> {
+		return await this.authService.restore(credentials);
 	}
 
-	getSession(): RemoteProviderSession | null {
-		return this.authService.getSession() as unknown as RemoteProviderSession | null;
+	getSession(): ProtonSession | null {
+		return this.authService.getSession();
 	}
 
-	async refreshToken(): Promise<RemoteProviderSession> {
-		const session = await this.authService.refreshToken();
-		return session as unknown as RemoteProviderSession;
+	async refreshToken(): Promise<ProtonSession> {
+		return await this.authService.refreshToken();
 	}
 
-	getReusableCredentials(): RemoteProviderCredentials {
+	getReusableCredentials(): ReusableCredentials {
 		return this.authService.getReusableCredentials();
 	}
 
@@ -68,48 +66,37 @@ export class ProtonDriveRemoteProvider implements RemoteProvider {
 	}
 
 	async connect(
-		session: RemoteProviderSession,
+		session: ProtonSession,
 		options?: RemoteProviderConnectOptions,
-	): Promise<unknown | null> {
-		return await this.driveService.connect(
-			session as unknown as ProtonSession,
-			options?.onTokenRefresh,
-		);
+	): Promise<ProtonDriveConnectedClient | null> {
+		return await this.driveService.connect(session, options?.onTokenRefresh);
 	}
 
 	disconnect(): void {
 		this.driveService.disconnect();
 	}
 
-	async getRootScope(client: unknown): Promise<RemoteScopeRoot> {
-		const rootResult =
-			typeof (client as { getMyFilesRootFolder?: () => Promise<unknown> })
-				.getMyFilesRootFolder === "function"
-				? await (
-						client as {
-							getMyFilesRootFolder: () => Promise<unknown>;
-						}
-					).getMyFilesRootFolder()
-				: null;
-		if (!rootResult || !(rootResult as { ok?: boolean }).ok) {
+	async getRootScope(client: ProtonDriveConnectedClient): Promise<RemoteScopeRoot> {
+		const rootResult = (await client.sdk.getMyFilesRootFolder()) as ProtonRootNodeResult;
+		if (!rootResult.ok) {
 			throw createDriveSyncError("REMOTE_NOT_FOUND", {
 				category: "remote_fs",
 				debugMessage: "Unable to load root folder.",
 			});
 		}
-		const rootNode = (rootResult as { value: { uid: string; name: string } }).value;
+		const rootNode = rootResult.value;
 		return {
 			id: rootNode.uid,
 			label: rootNode.name || "My files",
 		};
 	}
 
-	createRemoteFileSystem(client: unknown, scopeId: string): RemoteFileSystem {
-		return new ProtonDriveRemoteFileSystem(client as ProtonDriveClient, scopeId);
+	createRemoteFileSystem(client: ProtonDriveConnectedClient, scopeId: string): RemoteFileSystem {
+		return new ProtonDriveRemoteFileSystem(client, scopeId);
 	}
 
 	async validateScope(
-		client: unknown,
+		client: ProtonDriveConnectedClient,
 		scopeId: string,
 	): Promise<{ ok: boolean; message: string }> {
 		const remoteFileSystem = this.createRemoteFileSystem(client, scopeId);

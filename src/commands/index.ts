@@ -1,4 +1,5 @@
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import type { AnyRemoteProvider } from "../contracts/provider/remote-provider";
 
 import { registerDriveSyncAutoSyncNowCommand } from "./command-drive-sync-auto-sync-now";
 import { registerDriveSyncConnectCommand } from "./command-drive-sync-connect";
@@ -21,7 +22,9 @@ import { registerDriveSyncSyncVaultCommand } from "./command-drive-sync-sync-vau
 import { registerDriveSyncValidateRemoteOpsCommand } from "./command-drive-sync-validate-remote-ops";
 import { createCommandContext } from "./context";
 
-export function registerCommands(plugin: ObsidianDriveSyncPluginApi) {
+export function registerCommands<TProvider extends AnyRemoteProvider>(
+	plugin: ObsidianDriveSyncPluginApi<TProvider>,
+) {
 	const context = createCommandContext(plugin);
 
 	registerDriveSyncConnectCommand(context);

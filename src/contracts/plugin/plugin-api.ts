@@ -2,22 +2,26 @@ import type { App, Plugin } from "obsidian";
 
 import type { LocalProvider } from "../provider/local-provider";
 import type {
+	AnyRemoteProvider,
 	RemoteProvider,
-	RemoteProviderCredentials,
-	RemoteProviderSession,
+	RemoteProviderClient,
+	RemoteProviderCredentialsOf,
+	RemoteProviderSessionOf,
 } from "../provider/remote-provider";
 import type { SyncState } from "../sync/state";
 
 import type { DriveSyncSettings } from "./settings";
 
-export interface ObsidianDriveSyncPluginApi extends Plugin {
+export interface ObsidianDriveSyncPluginApi<
+	TProvider extends AnyRemoteProvider = RemoteProvider,
+> extends Plugin {
 	readonly app: App;
 	readonly settings: Readonly<DriveSyncSettings>;
 	updateSettings(patch: Partial<DriveSyncSettings>): void;
 
 	getRemoteProviderId(): string;
-	listRemoteProviders(): RemoteProvider[];
-	getRemoteProvider(): RemoteProvider;
+	listRemoteProviders(): TProvider[];
+	getRemoteProvider(): TProvider;
 	setRemoteProviderId(providerId: string): void;
 	getLocalProviderId(): string;
 	getLocalProvider(): LocalProvider;
@@ -25,8 +29,10 @@ export interface ObsidianDriveSyncPluginApi extends Plugin {
 	getRemoteScopePath(): string;
 	setRemoteScope(scopeId: string, scopePath: string): void;
 
-	getStoredProviderCredentials(): RemoteProviderCredentials | undefined;
-	setStoredProviderCredentials(credentials: RemoteProviderCredentials | undefined): void;
+	getStoredProviderCredentials(): RemoteProviderCredentialsOf<TProvider> | undefined;
+	setStoredProviderCredentials(
+		credentials: RemoteProviderCredentialsOf<TProvider> | undefined,
+	): void;
 
 	getRemoteAccountEmail(): string;
 	setRemoteAccountEmail(email: string): void;
@@ -44,8 +50,8 @@ export interface ObsidianDriveSyncPluginApi extends Plugin {
 
 	isAuthPaused(): boolean;
 	getLastAuthError(): string | undefined;
-	buildActiveRemoteSession(): Promise<RemoteProviderSession | null>;
-	connectRemoteClient(): Promise<unknown>;
+	buildActiveRemoteSession(): Promise<RemoteProviderSessionOf<TProvider> | null>;
+	connectRemoteClient(): Promise<RemoteProviderClient<TProvider>>;
 	runAutoSync(force?: boolean): Promise<void>;
 	isSyncRunning(): boolean;
 	handleAuthRecovered(scheduleSync?: boolean): void;

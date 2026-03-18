@@ -1,12 +1,14 @@
 import type { OpenPGPCryptoProxy } from "@protontech/drive-sdk";
-import type {
-	PrivateKey as DrivePrivateKey,
-	PublicKey as DrivePublicKey,
-	SessionKey as DriveSessionKey,
-	VERIFICATION_STATUS as VerificationStatus,
-} from "@protontech/drive-sdk/dist/crypto/interface";
-import { VERIFICATION_STATUS } from "@protontech/drive-sdk/dist/crypto/interface";
 import * as openpgp from "openpgp";
+
+type DrivePrivateKey = Awaited<ReturnType<OpenPGPCryptoProxy["generateKey"]>>;
+type DrivePublicKey = Parameters<
+	OpenPGPCryptoProxy["generateSessionKey"]
+>[0]["recipientKeys"][number];
+type DriveSessionKey = Awaited<ReturnType<OpenPGPCryptoProxy["generateSessionKey"]>>;
+type VerificationStatus = Awaited<
+	ReturnType<OpenPGPCryptoProxy["verifyMessage"]>
+>["verificationStatus"];
 
 type EncryptMessageOptions = {
 	format?: "armored" | "binary";
@@ -36,14 +38,48 @@ type SessionKeyWithMetadata = DriveSessionKey & {
 	[SESSION_KEY_ALGORITHM_FIELD]?: openpgp.enums.symmetricNames;
 };
 
+const VERIFICATION_NOT_SIGNED = 0 as VerificationStatus;
+const VERIFICATION_SIGNED_AND_VALID = 1 as VerificationStatus;
+const VERIFICATION_SIGNED_AND_INVALID = 2 as VerificationStatus;
+
+function toStrictUint8Array(data: Uint8Array | ArrayBufferLike): Uint8Array<ArrayBuffer> {
+	return new Uint8Array(
+		data instanceof Uint8Array ? data : new Uint8Array(data),
+	) as Uint8Array<ArrayBuffer>;
+}
+
 export function wrapPublicKey(key: openpgp.PublicKey): DrivePublicKey {
-	const wrapped: DrivePublicKey = { _idx: key };
-	return wrapped;
+	const wrapped = key as openpgp.PublicKey & {
+		_idx?: openpgp.PublicKey;
+		_keyContentHash?: [string, string];
+	};
+	if (!wrapped._idx) {
+		Object.defineProperty(wrapped, "_idx", {
+			value: key,
+			configurable: true,
+		});
+	}
+	if (!wrapped._keyContentHash) {
+		const fingerprint = key.getFingerprint();
+		Object.defineProperty(wrapped, "_keyContentHash", {
+			value: [fingerprint, fingerprint] as const,
+			configurable: true,
+		});
+	}
+	return wrapped as unknown as DrivePublicKey;
 }
 
 export function wrapPrivateKey(key: openpgp.PrivateKey): DrivePrivateKey {
-	const wrapped: DrivePrivateKey = { _idx: key, _dummyType: "private" };
-	return wrapped;
+	const wrapped = wrapPublicKey(key) as unknown as openpgp.PrivateKey & {
+		_dummyType?: "private";
+	};
+	if (!wrapped._dummyType) {
+		Object.defineProperty(wrapped, "_dummyType", {
+			value: "private",
+			configurable: true,
+		});
+	}
+	return wrapped as unknown as DrivePrivateKey;
 }
 
 function unwrapPublicKey(key: DrivePublicKey): openpgp.PublicKey {
@@ -72,8 +108,11 @@ function unwrapPublicKeys(keys: DrivePublicKey | DrivePublicKey[]): openpgp.Publ
 
 function wrapSessionKey(key: openpgp.SessionKey): DriveSessionKey {
 	const sessionKey: SessionKeyWithMetadata = {
-		data: key.data,
-		[SESSION_KEY_ALGORITHM_FIELD]: key.algorithm,
+		data: toStrictUint8Array(key.data),
+		algorithm: key.algorithm,
+		aeadAlgorithm: key.aeadAlgorithm ?? null,
+		[SESSION_KEY_ALGORITHM_FIELD]:
+			(key.algorithm as openpgp.enums.symmetricNames | null) ?? undefined,
 	};
 	sessionKeyStore.set(sessionKey, key);
 	return sessionKey;
@@ -88,8 +127,11 @@ function unwrapSessionKey(key: DriveSessionKey): openpgp.SessionKey {
 			inferSessionKeyAlgorithm(withMetadata.data);
 		if (withMetadata.data && algorithm) {
 			return {
-				data: withMetadata.data,
+				data: toStrictUint8Array(withMetadata.data),
 				algorithm,
+				aeadAlgorithm:
+					(withMetadata.aeadAlgorithm as openpgp.enums.aeadNames | null | undefined) ??
+					undefined,
 			};
 		}
 		throw new Error("Session key is missing OpenPGP metadata.");
@@ -114,7 +156,7 @@ function inferSessionKeyAlgorithm(data?: Uint8Array): openpgp.enums.symmetricNam
 }
 
 function toVerificationStatus(verified: boolean | undefined): VerificationStatus {
-	return verified ? VERIFICATION_STATUS.SIGNED_AND_VALID : VERIFICATION_STATUS.SIGNED_AND_INVALID;
+	return verified ? VERIFICATION_SIGNED_AND_VALID : VERIFICATION_SIGNED_AND_INVALID;
 }
 
 function requireSigningKeys(signingKeys: DrivePrivateKey | undefined): DrivePrivateKey {
@@ -286,7 +328,7 @@ export function createOpenPGPCryptoProxy(): OpenPGPCryptoProxy {
 				passwords: options.passwords,
 				format: "binary",
 			});
-			return keyPacket;
+			return toStrictUint8Array(keyPacket);
 		},
 
 		async decryptSessionKey(options) {
@@ -356,7 +398,7 @@ export function createOpenPGPCryptoProxy(): OpenPGPCryptoProxy {
 				data: result.data,
 				verificationStatus:
 					verified === undefined
-						? VERIFICATION_STATUS.NOT_SIGNED
+						? VERIFICATION_NOT_SIGNED
 						: toVerificationStatus(verified),
 				verificationErrors: undefined,
 			};

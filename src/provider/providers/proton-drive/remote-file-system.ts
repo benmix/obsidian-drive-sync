@@ -14,7 +14,9 @@ import {
 } from "../../../errors";
 import { basename, dirname, normalizePath, splitPath } from "../../../filesystem/path";
 
-type ProtonDriveClient = {
+type ProtonDriveSdkApi = {
+	getLatestEventId?: (eventScopeId: string) => string | null;
+	setLatestEventId?: (eventScopeId: string, eventId?: string) => void;
 	iterateFolderChildren?: (parentNodeUid: string) => AsyncIterable<unknown>;
 	getFileDownloader?: (
 		nodeUid: string,
@@ -114,6 +116,10 @@ type ProtonDriveClient = {
 	) => Promise<{ dispose: () => void }>;
 };
 
+type ProtonDriveClient = ProtonDriveSdkApi & {
+	sdk?: ProtonDriveSdkApi;
+};
+
 type NodeEntity = {
 	uid: string;
 	parentUid?: string;
@@ -147,6 +153,10 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	constructor(client: ProtonDriveClient, scopeRootId: string) {
 		this.client = client;
 		this.scopeRootId = scopeRootId;
+	}
+
+	private get sdkClient(): ProtonDriveSdkApi {
+		return this.client.sdk ?? this.client;
 	}
 
 	async listEntries(): Promise<RemoteFileEntry[]> {
@@ -228,10 +238,10 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	}
 
 	async getEntry(id: string): Promise<RemoteFileEntry | null> {
-		if (!this.client.getNode) {
+		if (!this.sdkClient.getNode) {
 			return null;
 		}
-		const result = (await this.client.getNode(id)) as MaybeNode;
+		const result = (await this.sdkClient.getNode(id)) as MaybeNode;
 		if (!result.ok) {
 			return null;
 		}
@@ -239,10 +249,10 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	}
 
 	async getRootEntry(): Promise<RemoteFileEntry | null> {
-		if (!this.client.getMyFilesRootFolder) {
+		if (!this.sdkClient.getMyFilesRootFolder) {
 			return null;
 		}
-		const result = (await this.client.getMyFilesRootFolder()) as MaybeNode;
+		const result = (await this.sdkClient.getMyFilesRootFolder()) as MaybeNode;
 		if (!result.ok) {
 			return null;
 		}
@@ -253,17 +263,28 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		eventScopeId: string,
 		onEvent: (event: RemoteEntryChangeEvent) => Promise<void>,
 	): Promise<{ dispose: () => void }> {
-		if (!this.client.subscribeToTreeEvents) {
+		if (!this.sdkClient.subscribeToTreeEvents) {
 			throw unsupportedRemoteOperationError("tree events");
 		}
-		const subscription = await this.client.subscribeToTreeEvents(
+		const subscription = await this.sdkClient.subscribeToTreeEvents(
 			eventScopeId,
 			async (event: unknown) => {
 				const normalized = this.normalizeRemoteEvent(event);
+				if (normalized.eventId) {
+					this.setLatestEventCursor(eventScopeId, normalized.eventId);
+				}
 				await onEvent(normalized);
 			},
 		);
 		return subscription;
+	}
+
+	setLatestEventCursor(eventScopeId: string, eventId?: string): void {
+		this.client.setLatestEventId?.(eventScopeId, eventId);
+	}
+
+	getLatestEventCursor(eventScopeId: string): string | null {
+		return this.client.getLatestEventId?.(eventScopeId) ?? null;
 	}
 
 	async writeFile(
@@ -271,8 +292,10 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		data: Uint8Array,
 		metadata?: { mtimeMs?: number; size?: number },
 	): Promise<{ id?: string; revisionId?: string }> {
-		const getFileUploader = this.client.getFileUploader?.bind(this.client);
-		const getFileRevisionUploader = this.client.getFileRevisionUploader?.bind(this.client);
+		const getFileUploader = this.sdkClient.getFileUploader?.bind(this.sdkClient);
+		const getFileRevisionUploader = this.sdkClient.getFileRevisionUploader?.bind(
+			this.sdkClient,
+		);
 		if (!getFileUploader || !getFileRevisionUploader) {
 			throw unsupportedRemoteOperationError("file write");
 		}
@@ -395,10 +418,10 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	}
 
 	async readFile(id: string): Promise<Uint8Array> {
-		if (!this.client.getFileDownloader) {
+		if (!this.sdkClient.getFileDownloader) {
 			throw unsupportedRemoteOperationError("file read");
 		}
-		const downloader = await this.client.getFileDownloader(id);
+		const downloader = await this.sdkClient.getFileDownloader(id);
 		const chunks: Uint8Array[] = [];
 		const stream = new WritableStream<Uint8Array>({
 			write(chunk) {
@@ -418,10 +441,10 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	}
 
 	async deleteEntry(id: string): Promise<void> {
-		if (!this.client.trashNodes) {
+		if (!this.sdkClient.trashNodes) {
 			throw unsupportedRemoteOperationError("delete");
 		}
-		for await (const result of this.client.trashNodes([id])) {
+		for await (const result of this.sdkClient.trashNodes([id])) {
 			if (!result.ok) {
 				const detail = extractErrorMessage(result.error);
 				if (
@@ -450,14 +473,14 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	}
 
 	async moveEntry(id: string, newPath: string): Promise<void> {
-		if (!this.client.renameNode || !this.client.moveNodes) {
+		if (!this.sdkClient.renameNode || !this.sdkClient.moveNodes) {
 			throw unsupportedRemoteOperationError("move");
 		}
 		const normalized = normalizePath(newPath);
 		const targetParentPath = dirname(normalized);
 		const targetName = basename(normalized);
 		const parentId = await this.ensureRemoteFolder(targetParentPath);
-		for await (const result of this.client.moveNodes([id], parentId)) {
+		for await (const result of this.sdkClient.moveNodes([id], parentId)) {
 			if (!result.ok) {
 				throw mapRemoteOperationError(result.error, {
 					code: "REMOTE_WRITE_FAILED",
@@ -468,7 +491,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 				});
 			}
 		}
-		await this.client.renameNode(id, targetName);
+		await this.sdkClient.renameNode(id, targetName);
 	}
 
 	async ensureFolder(path: string): Promise<{ id?: string }> {
@@ -481,10 +504,10 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	}
 
 	private iterateFolderChildren(parentId: string): AsyncIterable<NodeEntity> {
-		if (!this.client.iterateFolderChildren) {
+		if (!this.sdkClient.iterateFolderChildren) {
 			throw unsupportedRemoteOperationError("iterate folder children");
 		}
-		const iterator = this.client.iterateFolderChildren(parentId);
+		const iterator = this.sdkClient.iterateFolderChildren(parentId);
 		return {
 			async *[Symbol.asyncIterator]() {
 				for await (const node of iterator) {
@@ -524,10 +547,10 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 				parentId = existing.id;
 				continue;
 			}
-			if (!this.client.createFolder) {
+			if (!this.sdkClient.createFolder) {
 				throw unsupportedRemoteOperationError("create folder");
 			}
-			const created = (await this.client.createFolder(parentId, part)) as MaybeNode;
+			const created = (await this.sdkClient.createFolder(parentId, part)) as MaybeNode;
 			if (!created.ok) {
 				throw mapRemoteOperationError(created.error, {
 					code: "REMOTE_WRITE_FAILED",

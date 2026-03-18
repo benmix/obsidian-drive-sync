@@ -1,5 +1,11 @@
 import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import type { RemoteProviderSession } from "../contracts/provider/remote-provider";
+import type {
+	AnyRemoteProvider,
+	RemoteProvider,
+	RemoteProviderClient,
+	RemoteProviderCredentialsOf,
+	RemoteProviderSessionOf,
+} from "../contracts/provider/remote-provider";
 import {
 	createDriveSyncError,
 	normalizeUnknownDriveSyncError,
@@ -11,14 +17,28 @@ import { trAny } from "../i18n";
 import { PluginDataStateStore } from "../sync/state/state-store";
 import { now } from "../sync/support/utils";
 
-export class SessionManager {
+function bindRemoteProvider<TProvider extends AnyRemoteProvider>(
+	provider: TProvider,
+): RemoteProvider<
+	RemoteProviderClient<TProvider>,
+	RemoteProviderSessionOf<TProvider>,
+	RemoteProviderCredentialsOf<TProvider>
+> {
+	return provider as unknown as RemoteProvider<
+		RemoteProviderClient<TProvider>,
+		RemoteProviderSessionOf<TProvider>,
+		RemoteProviderCredentialsOf<TProvider>
+	>;
+}
+
+export class SessionManager<TProvider extends AnyRemoteProvider> {
 	private authPaused = false;
 	private lastAuthError: string | undefined;
 
-	constructor(private readonly plugin: ObsidianDriveSyncPluginApi) {}
+	constructor(private readonly plugin: ObsidianDriveSyncPluginApi<TProvider>) {}
 
 	async restoreSession(): Promise<void> {
-		const provider = this.plugin.getRemoteProvider();
+		const provider = bindRemoteProvider(this.plugin.getRemoteProvider());
 		const credentials = this.plugin.getStoredProviderCredentials();
 		if (!credentials) {
 			this.plugin.setRemoteAuthSession(false);
@@ -69,8 +89,8 @@ export class SessionManager {
 		void this.recordAuthError(normalized, "Auth paused");
 	}
 
-	async buildActiveRemoteSession(): Promise<RemoteProviderSession | null> {
-		const provider = this.plugin.getRemoteProvider();
+	async buildActiveRemoteSession(): Promise<RemoteProviderSessionOf<TProvider> | null> {
+		const provider = bindRemoteProvider(this.plugin.getRemoteProvider());
 		const credentials = this.plugin.getStoredProviderCredentials();
 		let session = provider.getSession();
 
@@ -101,11 +121,11 @@ export class SessionManager {
 			return null;
 		}
 
-		return { ...session };
+		return session;
 	}
 
-	async connectClient(): Promise<unknown> {
-		const provider = this.plugin.getRemoteProvider();
+	async connectClient(): Promise<RemoteProviderClient<TProvider>> {
+		const provider = bindRemoteProvider(this.plugin.getRemoteProvider());
 		const session = await this.buildActiveRemoteSession();
 		if (!session) {
 			throw createDriveSyncError("AUTH_SIGN_IN_REQUIRED", {
@@ -135,7 +155,7 @@ export class SessionManager {
 	}
 
 	private async refreshAndPersistSession(): Promise<void> {
-		const provider = this.plugin.getRemoteProvider();
+		const provider = bindRemoteProvider(this.plugin.getRemoteProvider());
 		try {
 			await provider.refreshToken();
 			this.plugin.setStoredProviderCredentials(provider.getReusableCredentials());
