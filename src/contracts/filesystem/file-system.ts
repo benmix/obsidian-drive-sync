@@ -47,6 +47,7 @@ export interface RemoteFileSystem {
 	listEntries(): Promise<RemoteFileEntry[]>;
 	listFileEntries(): Promise<RemoteFileEntry[]>;
 	listFolderEntries(): Promise<RemoteFileEntry[]>;
+	listChildFolderEntries?(): Promise<RemoteFileEntry[]>;
 	getEntry(entryId: string): Promise<RemoteFileEntry | null>;
 	readFile(entryId: string): Promise<Uint8Array>;
 	writeFile(

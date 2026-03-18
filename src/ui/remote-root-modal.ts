@@ -253,7 +253,9 @@ export class RemoteFolderPickerModal extends Modal {
 			return;
 		}
 
-		const listedFolders = await this.remoteFileSystem.listFolderEntries();
+		const listedFolders = this.remoteFileSystem.listChildFolderEntries
+			? await this.remoteFileSystem.listChildFolderEntries()
+			: await this.remoteFileSystem.listFolderEntries();
 		const folders = listedFolders.filter((folder) => folder.id !== this.rootFolderId);
 		this.folders = [
 			{

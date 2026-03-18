@@ -159,4 +159,55 @@ describe("ProtonDriveRemoteFileSystem", () => {
 			retryable: true,
 		});
 	});
+
+	test("lists only root-level folders for child folder listing", async () => {
+		const fileSystem = new ProtonDriveRemoteFileSystem(
+			{
+				iterateFolderChildren: async function* (parentNodeUid: string) {
+					if (parentNodeUid === "root") {
+						yield {
+							ok: true,
+							value: {
+								uid: "folder-a",
+								parentUid: "root",
+								name: "Projects",
+								type: "folder",
+							},
+						};
+						yield {
+							ok: true,
+							value: {
+								uid: "file-a",
+								parentUid: "root",
+								name: "note.md",
+								type: "file",
+							},
+						};
+						return;
+					}
+
+					yield {
+						ok: true,
+						value: {
+							uid: "folder-b",
+							parentUid: "folder-a",
+							name: "Nested",
+							type: "folder",
+						},
+					};
+				},
+			},
+			"root",
+		);
+
+		const entries = await fileSystem.listChildFolderEntries();
+
+		expect(entries).toEqual([
+			expect.objectContaining({
+				id: "folder-a",
+				path: "Projects",
+				type: "folder",
+			}),
+		]);
+	});
 });

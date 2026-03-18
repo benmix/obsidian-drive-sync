@@ -76,10 +76,10 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		}
 
 		const remoteFolderPath = this.plugin.getRemoteScopePath();
-		const remoteFolderId = this.plugin.getRemoteScopeId();
+		const remoteScopeId = this.plugin.getRemoteScopeId();
 		const remotePathLabel = remoteFolderPath
 			? remoteFolderPath
-			: remoteFolderId
+			: remoteScopeId
 				? tr("settings.remoteFolderPath.idConfigured")
 				: tr("settings.remoteFolderPath.notSelected");
 		const remoteFolderSetting = new Setting(containerEl)

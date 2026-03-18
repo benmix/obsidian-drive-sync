@@ -140,20 +140,20 @@ function inferMediaType(fileName: string): string {
 
 export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	private client: ProtonDriveClient;
-	private remoteFolderId: string;
+	private scopeRootId: string;
 	private folderPathCache = new Map<string, string>();
 	private folderIdCache = new Map<string, string>();
 
-	constructor(client: ProtonDriveClient, remoteFolderId: string) {
+	constructor(client: ProtonDriveClient, scopeRootId: string) {
 		this.client = client;
-		this.remoteFolderId = remoteFolderId;
+		this.scopeRootId = scopeRootId;
 	}
 
 	async listEntries(): Promise<RemoteFileEntry[]> {
 		const entries: RemoteFileEntry[] = [];
-		const queue: Array<{ id: string; path: string }> = [{ id: this.remoteFolderId, path: "" }];
-		this.folderIdCache.set("", this.remoteFolderId);
-		this.folderPathCache.set(this.remoteFolderId, "");
+		const queue: Array<{ id: string; path: string }> = [{ id: this.scopeRootId, path: "" }];
+		this.folderIdCache.set("", this.scopeRootId);
+		this.folderPathCache.set(this.scopeRootId, "");
 
 		while (queue.length > 0) {
 			const current = queue.shift();
@@ -195,6 +195,36 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	async listFolderEntries(): Promise<RemoteFileEntry[]> {
 		const entries = await this.listEntries();
 		return entries.filter((entry) => entry.type === "folder");
+	}
+
+	async listChildFolderEntries(): Promise<RemoteFileEntry[]> {
+		const entries: RemoteFileEntry[] = [];
+		this.folderIdCache.set("", this.scopeRootId);
+		this.folderPathCache.set(this.scopeRootId, "");
+
+		for await (const node of this.iterateFolderChildren(this.scopeRootId)) {
+			if (node.type !== "folder") {
+				continue;
+			}
+
+			const relPath = normalizePath(node.name);
+			const entry: RemoteFileEntry = {
+				id: node.uid,
+				name: node.name,
+				path: relPath,
+				type: "folder",
+				parentId: node.parentUid ?? this.scopeRootId,
+				eventScopeId: node.treeEventScopeId,
+				mtimeMs: getNodeMtimeMs(node),
+				size: node.activeRevision?.storageSize ?? node.totalStorageSize ?? undefined,
+				revisionId: node.activeRevision?.uid,
+			};
+			entries.push(entry);
+			this.folderPathCache.set(entry.id, relPath);
+			this.folderIdCache.set(relPath, entry.id);
+		}
+
+		return entries;
 	}
 
 	async getEntry(id: string): Promise<RemoteFileEntry | null> {
@@ -444,7 +474,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	async ensureFolder(path: string): Promise<{ id?: string }> {
 		const normalized = normalizePath(path);
 		if (!normalized) {
-			return { id: this.remoteFolderId };
+			return { id: this.scopeRootId };
 		}
 		const id = await this.ensureRemoteFolder(normalized);
 		return { id };
@@ -471,14 +501,14 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	private async ensureRemoteFolder(path: string): Promise<string> {
 		const normalized = normalizePath(path);
 		if (!normalized) {
-			return this.remoteFolderId;
+			return this.scopeRootId;
 		}
 		const cached = this.folderIdCache.get(normalized);
 		if (cached) {
 			return cached;
 		}
 		const parts = splitPath(normalized);
-		let parentId = this.remoteFolderId;
+		let parentId = this.scopeRootId;
 		let builtPath = "";
 		for (const part of parts) {
 			builtPath = builtPath ? `${builtPath}/${part}` : part;
