@@ -6,6 +6,7 @@ import type { RemoteProvider } from "../contracts/provider/remote-provider";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
 import { tr, trAny } from "../i18n";
 
+import { shouldPreventTwoFactorKeydown } from "./login-modal-helpers";
 import { renderProviderIcon } from "./provider-icon";
 
 type RemoteProviderLoginModalOptions = {
@@ -214,7 +215,7 @@ export class RemoteProviderLoginModal extends Modal {
 						event.preventDefault();
 						return;
 					}
-					if (event.key.length === 1 && !/^\d$/.test(event.key)) {
+					if (shouldPreventTwoFactorKeydown(event)) {
 						event.preventDefault();
 					}
 				});
