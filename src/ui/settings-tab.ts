@@ -37,7 +37,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		const authPaused = this.plugin.isAuthPaused();
 		if (hasAuthSession) {
 			const providerChip = accountSetting.nameEl.createSpan({
-				cls: "drive-sync-account-provider",
+				cls: "drive-sync-account-chip drive-sync-account-provider",
 			});
 			renderProviderIcon(providerChip, provider.id, provider.label);
 			providerChip.createSpan({
@@ -46,11 +46,19 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			});
 			const accountEmail = this.plugin.getRemoteAccountEmail();
 			if (accountEmail) {
-				accountSetting.nameEl.createSpan({
-					cls: "drive-sync-account-user",
-					text: tr("settings.accountChip", {
-						email: accountEmail,
-					}),
+				const accountChip = accountSetting.nameEl.createSpan({
+					cls: "drive-sync-account-chip drive-sync-account-user",
+					attr: {
+						title: accountEmail,
+					},
+				});
+				accountChip.createSpan({
+					cls: "drive-sync-account-user-label",
+					text: tr("settings.accountChipLabel"),
+				});
+				accountChip.createSpan({
+					cls: "drive-sync-account-user-value",
+					text: accountEmail,
 				});
 			}
 		}

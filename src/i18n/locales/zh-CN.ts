@@ -115,6 +115,7 @@ export const ZH: Record<keyof typeof EN, string> = {
 
 	"settings.remoteAccount": "远端账号",
 	"settings.accountChip": "账号：{email}",
+	"settings.accountChipLabel": "账号：",
 	"settings.signOut": "退出登录",
 	"settings.signInToProviderTooltip": "登录到 {provider}",
 	"settings.remoteFolder": "远端文件夹",
@@ -132,7 +133,7 @@ export const ZH: Record<keyof typeof EN, string> = {
 	"settings.syncStrategy.remoteWin": "远端优先",
 	"settings.autoSync": "启用自动同步",
 	"settings.autoSyncDesc": "按周期执行同步检查并响应本地变更。",
-	"settings.networkPolicy": "实验功能：网络策略",
+	"settings.networkPolicy": "网络策略",
 	"settings.networkPolicyDesc": "根据在线状态与网络冷却时间决定是否执行同步。默认关闭。",
 	"settings.authStatus.pendingValidation": "会话已保存，等待校验。",
 	"settings.authStatus.signedIn": "已登录。",

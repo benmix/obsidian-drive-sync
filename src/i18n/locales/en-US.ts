@@ -119,6 +119,7 @@ export const EN = {
 
 	"settings.remoteAccount": "Remote account",
 	"settings.accountChip": "Account: {email}",
+	"settings.accountChipLabel": "Account:",
 	"settings.signOut": "Sign out",
 	"settings.signInToProviderTooltip": "Sign in to {provider}",
 	"settings.remoteFolder": "Remote folder",
@@ -136,7 +137,7 @@ export const EN = {
 	"settings.syncStrategy.remoteWin": "Remote authority",
 	"settings.autoSync": "Enable auto sync",
 	"settings.autoSyncDesc": "Schedule periodic sync checks and respond to local changes.",
-	"settings.networkPolicy": "Experimental: network policy",
+	"settings.networkPolicy": "Network policy",
 	"settings.networkPolicyDesc":
 		"Gate sync runs by online status and transient-network cooldown. Disabled by default.",
 	"settings.authStatus.pendingValidation": "Session stored. Validation pending.",
