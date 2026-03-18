@@ -10,13 +10,17 @@ export class ProtonDriveService {
 	private client: ProtonDriveConnectedClient | null = null;
 	private connecting: Promise<ProtonDriveConnectedClient | null> | null = null;
 	private latestEventIds = new Map<string, string>();
+	private sessionRef: ProtonSession | null = null;
 
 	async connect(
 		session: ProtonSession,
 		onTokenRefresh?: () => Promise<void>,
 	): Promise<ProtonDriveConnectedClient | null> {
-		if (this.client) {
+		if (this.client && this.sessionRef === session) {
 			return this.client;
+		}
+		if (this.client && this.sessionRef !== session) {
+			this.disconnect();
 		}
 
 		if (this.connecting) {
@@ -29,11 +33,13 @@ export class ProtonDriveService {
 
 		try {
 			this.client = await this.connecting;
+			this.sessionRef = session;
 			return this.client;
 		} catch (error) {
 			console.warn("Failed to connect to Proton Drive.", error);
 			new Notice("Unable to connect to Proton Drive.");
 			this.client = null;
+			this.sessionRef = null;
 			return null;
 		}
 	}
@@ -44,6 +50,7 @@ export class ProtonDriveService {
 
 	disconnect() {
 		this.client = null;
+		this.sessionRef = null;
 		this.latestEventIds.clear();
 	}
 

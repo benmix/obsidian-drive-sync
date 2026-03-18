@@ -76,6 +76,12 @@ async function prepareBody(body?: BodyInit | null): Promise<PreparedBody> {
 	return { body: arrayBuffer, contentType };
 }
 
+function createAbortError(reason: string): Error {
+	const error = new Error(reason);
+	error.name = "AbortError";
+	return error;
+}
+
 export async function requestHttp(
 	url: string,
 	options: HttpOptions,
@@ -91,12 +97,52 @@ export async function requestHttp(
 		headers["content-type"] = prepared.contentType;
 	}
 
-	const result = await requestUrl({
+	const requestPromise = requestUrl({
 		url,
 		method: options.method ?? "GET",
 		headers,
 		body: prepared.body,
 		throw: false,
+	});
+
+	const timeoutMs = options.timeoutMs;
+	const signal = options.signal;
+	let timeoutId: ReturnType<typeof setTimeout> | null = null;
+	let removeAbortListener: (() => void) | null = null;
+
+	const guardPromises: Array<Promise<Awaited<typeof requestPromise>>> = [requestPromise];
+	if (timeoutMs && timeoutMs > 0) {
+		guardPromises.push(
+			new Promise<never>((_, reject) => {
+				timeoutId = setTimeout(() => {
+					reject(createAbortError(`Request timed out after ${timeoutMs}ms.`));
+				}, timeoutMs);
+			}),
+		);
+	}
+	if (signal) {
+		guardPromises.push(
+			new Promise<never>((_, reject) => {
+				if (signal.aborted) {
+					reject(createAbortError("Request was aborted."));
+					return;
+				}
+				const onAbort = () => {
+					reject(createAbortError("Request was aborted."));
+				};
+				signal.addEventListener("abort", onAbort, { once: true });
+				removeAbortListener = () => {
+					signal.removeEventListener("abort", onAbort);
+				};
+			}),
+		);
+	}
+
+	const result = await Promise.race(guardPromises).finally(() => {
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+		}
+		removeAbortListener?.();
 	});
 
 	let body: BodyInit | null = null;

@@ -210,4 +210,101 @@ describe("ProtonDriveRemoteFileSystem", () => {
 			}),
 		]);
 	});
+
+	test("resolves nested paths from parent chain when entry cache is cold", async () => {
+		const fileSystem = new ProtonDriveRemoteFileSystem(
+			{
+				getNode: async (nodeUid: string) => {
+					if (nodeUid === "file-a") {
+						return {
+							ok: true,
+							value: {
+								uid: "file-a",
+								parentUid: "folder-a",
+								name: "note.md",
+								type: "file",
+							},
+						};
+					}
+					if (nodeUid === "folder-a") {
+						return {
+							ok: true,
+							value: {
+								uid: "folder-a",
+								parentUid: "root",
+								name: "docs",
+								type: "folder",
+							},
+						};
+					}
+					throw new Error(`unexpected node: ${nodeUid}`);
+				},
+			},
+			"root",
+		);
+
+		const entry = await fileSystem.getEntry("file-a");
+
+		expect(entry).toEqual(
+			expect.objectContaining({
+				id: "file-a",
+				path: "docs/note.md",
+			}),
+		);
+	});
+
+	test("uses the selected scope root for event subscription bootstrap", async () => {
+		const getNode = async (nodeUid: string) => {
+			if (nodeUid !== "folder-a") {
+				throw new Error(`unexpected node: ${nodeUid}`);
+			}
+			return {
+				ok: true,
+				value: {
+					uid: "folder-a",
+					parentUid: "root",
+					name: "Scoped",
+					type: "folder",
+					treeEventScopeId: "scope-1",
+				},
+			};
+		};
+		const fileSystem = new ProtonDriveRemoteFileSystem(
+			{
+				getNode,
+				getMyFilesRootFolder: async () => {
+					throw new Error("should not use my-files root for scoped polling");
+				},
+			},
+			"folder-a",
+		);
+
+		const rootEntry = await fileSystem.getRootEntry();
+
+		expect(rootEntry).toEqual(
+			expect.objectContaining({
+				id: "folder-a",
+				path: "",
+				eventScopeId: "scope-1",
+			}),
+		);
+	});
+
+	test("does not treat transient getNode failures as missing entries", async () => {
+		const fileSystem = new ProtonDriveRemoteFileSystem(
+			{
+				getNode: async () => ({
+					ok: false,
+					error: { status: 429 },
+				}),
+			},
+			"root",
+		);
+
+		await expect(fileSystem.getEntry("file-a")).rejects.toMatchObject({
+			code: "NETWORK_RATE_LIMITED",
+			category: "network",
+			retryable: true,
+		});
+	});
 });

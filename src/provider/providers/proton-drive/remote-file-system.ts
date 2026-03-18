@@ -153,6 +153,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	constructor(client: ProtonDriveClient, scopeRootId: string) {
 		this.client = client;
 		this.scopeRootId = scopeRootId;
+		this.primeScopeRootCache();
 	}
 
 	private get sdkClient(): ProtonDriveSdkApi {
@@ -162,8 +163,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	async listEntries(): Promise<RemoteFileEntry[]> {
 		const entries: RemoteFileEntry[] = [];
 		const queue: Array<{ id: string; path: string }> = [{ id: this.scopeRootId, path: "" }];
-		this.folderIdCache.set("", this.scopeRootId);
-		this.folderPathCache.set(this.scopeRootId, "");
+		this.primeScopeRootCache();
 
 		while (queue.length > 0) {
 			const current = queue.shift();
@@ -174,17 +174,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 				const relPath = normalizePath(
 					current.path ? `${current.path}/${node.name}` : node.name,
 				);
-				const entry: RemoteFileEntry = {
-					id: node.uid,
-					name: node.name,
-					path: relPath,
-					type: node.type === "folder" ? "folder" : "file",
-					parentId: node.parentUid ?? current.id,
-					eventScopeId: node.treeEventScopeId,
-					mtimeMs: getNodeMtimeMs(node),
-					size: node.activeRevision?.storageSize ?? node.totalStorageSize ?? undefined,
-					revisionId: node.activeRevision?.uid,
-				};
+				const entry = this.createRemoteEntry(node, relPath, node.parentUid ?? current.id);
 				entries.push(entry);
 				if (entry.type === "folder") {
 					this.folderPathCache.set(entry.id, relPath);
@@ -209,8 +199,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 
 	async listChildFolderEntries(): Promise<RemoteFileEntry[]> {
 		const entries: RemoteFileEntry[] = [];
-		this.folderIdCache.set("", this.scopeRootId);
-		this.folderPathCache.set(this.scopeRootId, "");
+		this.primeScopeRootCache();
 
 		for await (const node of this.iterateFolderChildren(this.scopeRootId)) {
 			if (node.type !== "folder") {
@@ -218,17 +207,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 			}
 
 			const relPath = normalizePath(node.name);
-			const entry: RemoteFileEntry = {
-				id: node.uid,
-				name: node.name,
-				path: relPath,
-				type: "folder",
-				parentId: node.parentUid ?? this.scopeRootId,
-				eventScopeId: node.treeEventScopeId,
-				mtimeMs: getNodeMtimeMs(node),
-				size: node.activeRevision?.storageSize ?? node.totalStorageSize ?? undefined,
-				revisionId: node.activeRevision?.uid,
-			};
+			const entry = this.createRemoteEntry(node, relPath, node.parentUid ?? this.scopeRootId);
 			entries.push(entry);
 			this.folderPathCache.set(entry.id, relPath);
 			this.folderIdCache.set(relPath, entry.id);
@@ -241,22 +220,25 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		if (!this.sdkClient.getNode) {
 			return null;
 		}
-		const result = (await this.sdkClient.getNode(id)) as MaybeNode;
-		if (!result.ok) {
+		const node = await this.getNodeEntity(id, {
+			code: "REMOTE_WRITE_FAILED",
+			category: "remote_fs",
+			userMessage: "Failed to load remote item.",
+			debugMessage: "Failed to load remote node.",
+			details: { nodeId: id },
+		});
+		if (!node) {
 			return null;
 		}
-		return this.mapNodeToEntry(result.value);
+		const relPath = await this.resolveScopedPath(node);
+		if (relPath === null) {
+			return null;
+		}
+		return this.createRemoteEntry(node, relPath);
 	}
 
 	async getRootEntry(): Promise<RemoteFileEntry | null> {
-		if (!this.sdkClient.getMyFilesRootFolder) {
-			return null;
-		}
-		const result = (await this.sdkClient.getMyFilesRootFolder()) as MaybeNode;
-		if (!result.ok) {
-			return null;
-		}
-		return this.mapNodeToEntry(result.value);
+		return await this.getEntry(this.scopeRootId);
 	}
 
 	async subscribeToEntryChanges(
@@ -513,12 +495,47 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 				for await (const node of iterator) {
 					const maybe = node as MaybeNode;
 					if (!maybe.ok) {
-						continue;
+						throw mapRemoteOperationError(maybe.error, {
+							code: "REMOTE_WRITE_FAILED",
+							category: "remote_fs",
+							userMessage: "Failed to list remote folder.",
+							debugMessage: "Failed to iterate remote folder children.",
+							details: { parentId },
+						});
 					}
 					yield maybe.value;
 				}
 			},
 		};
+	}
+
+	private primeScopeRootCache(): void {
+		this.folderIdCache.set("", this.scopeRootId);
+		this.folderPathCache.set(this.scopeRootId, "");
+	}
+
+	private async getNodeEntity(
+		nodeId: string,
+		mapping: {
+			code: DriveSyncErrorCode;
+			category: ErrorCategory;
+			userMessage: string;
+			debugMessage?: string;
+			details?: Record<string, unknown>;
+		},
+	): Promise<NodeEntity | null> {
+		if (!this.sdkClient.getNode) {
+			return null;
+		}
+		const result = (await this.sdkClient.getNode(nodeId)) as MaybeNode;
+		if (result.ok) {
+			return result.value;
+		}
+		const normalized = mapRemoteOperationError(result.error, mapping);
+		if (isNotFoundDriveSyncError(normalized)) {
+			return null;
+		}
+		throw normalized;
 	}
 
 	private async ensureRemoteFolder(path: string): Promise<string> {
@@ -580,15 +597,62 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		return null;
 	}
 
-	private mapNodeToEntry(node: NodeEntity): RemoteFileEntry {
-		const parentPath = node.parentUid ? (this.folderPathCache.get(node.parentUid) ?? "") : "";
-		const relPath = normalizePath(parentPath ? `${parentPath}/${node.name}` : node.name);
+	private async resolveScopedPath(
+		node: NodeEntity,
+		visited = new Set<string>(),
+	): Promise<string | null> {
+		if (node.uid === this.scopeRootId) {
+			this.primeScopeRootCache();
+			return "";
+		}
+		if (visited.has(node.uid)) {
+			throw createDriveSyncError("REMOTE_WRITE_FAILED", {
+				category: "remote_fs",
+				userMessage: "Failed to resolve remote path.",
+				debugMessage: "Detected cyclic remote parent chain.",
+				details: { nodeId: node.uid },
+			});
+		}
+		visited.add(node.uid);
+		if (!node.parentUid) {
+			return null;
+		}
+		const cachedParentPath = this.folderPathCache.get(node.parentUid);
+		if (cachedParentPath !== undefined) {
+			return normalizePath(cachedParentPath ? `${cachedParentPath}/${node.name}` : node.name);
+		}
+		const parentNode = await this.getNodeEntity(node.parentUid, {
+			code: "REMOTE_WRITE_FAILED",
+			category: "remote_fs",
+			userMessage: "Failed to resolve remote path.",
+			debugMessage: "Failed to load parent remote node.",
+			details: { nodeId: node.uid, parentId: node.parentUid },
+		});
+		if (!parentNode) {
+			return null;
+		}
+		const parentPath = await this.resolveScopedPath(parentNode, visited);
+		if (parentPath === null) {
+			return null;
+		}
+		if (parentNode.type === "folder") {
+			this.folderPathCache.set(parentNode.uid, parentPath);
+			this.folderIdCache.set(parentPath, parentNode.uid);
+		}
+		return normalizePath(parentPath ? `${parentPath}/${node.name}` : node.name);
+	}
+
+	private createRemoteEntry(
+		node: NodeEntity,
+		relPath: string,
+		parentId = node.parentUid,
+	): RemoteFileEntry {
 		return {
 			id: node.uid,
 			name: node.name,
 			path: relPath,
 			type: node.type === "folder" ? "folder" : "file",
-			parentId: node.parentUid,
+			parentId,
 			eventScopeId: node.treeEventScopeId,
 			mtimeMs: getNodeMtimeMs(node),
 			size: node.activeRevision?.storageSize ?? node.totalStorageSize ?? undefined,
