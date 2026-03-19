@@ -1,7 +1,6 @@
+import type { LocalFileEntry, LocalFileSystem } from "@contracts/filesystem/file-system";
+import { createDriveSyncError } from "@errors";
 import { type App, type TAbstractFile, TFile, TFolder } from "obsidian";
-
-import type { LocalFileEntry, LocalFileSystem } from "../../../contracts/filesystem/file-system";
-import { createDriveSyncError } from "../../../errors";
 
 export class ObsidianLocalFileSystem implements LocalFileSystem {
 	private app: App;

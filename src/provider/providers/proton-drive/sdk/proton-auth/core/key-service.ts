@@ -1,5 +1,3 @@
-import * as openpgp from "openpgp";
-
 import type {
 	Address,
 	AddressData,
@@ -7,9 +5,10 @@ import type {
 	PasswordMode,
 	Session,
 	User,
-} from "../../../../../../contracts/provider/proton/auth-types";
-import { logger } from "../../logger";
-import { computeKeyPassword } from "../crypto/crypto-utils";
+} from "@contracts/provider/proton/auth-types";
+import { logger } from "@provider/providers/proton-drive/sdk/logger";
+import { computeKeyPassword } from "@provider/providers/proton-drive/sdk/proton-auth/crypto/crypto-utils";
+import { decrypt, decryptKey, type PrivateKey, readMessage, readPrivateKey } from "openpgp";
 
 export class ProtonAuthKeyService {
 	async hydrateSessionFromPassword(
@@ -32,10 +31,10 @@ export class ProtonAuthKeyService {
 				const keyPassword = await computeKeyPassword(password, keySalt.KeySalt);
 				enrichedSession.keyPassword = keyPassword;
 				try {
-					const privateKey = await openpgp.readPrivateKey({
+					const privateKey = await readPrivateKey({
 						armoredKey: primaryKey.PrivateKey,
 					});
-					enrichedSession.primaryKey = await openpgp.decryptKey({
+					enrichedSession.primaryKey = await decryptKey({
 						privateKey,
 						passphrase: keyPassword,
 					});
@@ -72,10 +71,10 @@ export class ProtonAuthKeyService {
 		const primaryUserKey = bootstrap.user.Keys?.[0];
 		if (primaryUserKey && saltedKeyPass) {
 			try {
-				const privateKey = await openpgp.readPrivateKey({
+				const privateKey = await readPrivateKey({
 					armoredKey: primaryUserKey.PrivateKey,
 				});
-				enrichedSession.primaryKey = await openpgp.decryptKey({
+				enrichedSession.primaryKey = await decryptKey({
 					privateKey,
 					passphrase: saltedKeyPass,
 				});
@@ -106,7 +105,7 @@ export class ProtonAuthKeyService {
 		keyPassword: string,
 		password: string | undefined,
 		passwordMode: PasswordMode,
-		primaryKey?: openpgp.PrivateKey,
+		primaryKey?: PrivateKey,
 	): Promise<AddressData[]> {
 		const result: AddressData[] = [];
 
@@ -123,8 +122,8 @@ export class ProtonAuthKeyService {
 				try {
 					let addressKeyPassword: string | undefined;
 					if (key.Token && primaryKey) {
-						const decryptedToken = await openpgp.decrypt({
-							message: await openpgp.readMessage({
+						const decryptedToken = await decrypt({
+							message: await readMessage({
 								armoredMessage: key.Token,
 							}),
 							decryptionKeys: primaryKey,
@@ -155,10 +154,10 @@ export class ProtonAuthKeyService {
 
 					if (addressKeyPassword && passwordMode === 2) {
 						try {
-							const privateKey = await openpgp.readPrivateKey({
+							const privateKey = await readPrivateKey({
 								armoredKey: key.PrivateKey,
 							});
-							await openpgp.decryptKey({
+							await decryptKey({
 								privateKey,
 								passphrase: addressKeyPassword,
 							});

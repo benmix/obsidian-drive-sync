@@ -1,11 +1,6 @@
-import { API_BASE_URL, APP_VERSION } from "../../../../../../contracts/provider/proton/auth-types";
-import type {
-	ApiError,
-	ApiResponse,
-	Session,
-} from "../../../../../../contracts/provider/proton/auth-types";
-
-import { requestHttp } from "./http";
+import { API_BASE_URL, APP_VERSION } from "@contracts/provider/proton/auth-types";
+import type { ApiError, ApiResponse, Session } from "@contracts/provider/proton/auth-types";
+import { requestHttp } from "@provider/providers/proton-drive/sdk/proton-auth/transport/http";
 
 // ============================================================================
 // HTTP Client

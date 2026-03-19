@@ -1,42 +1,60 @@
+import type {
+	DrivePrivateKey,
+	DrivePublicKey,
+	DriveSessionKey,
+	EncryptMessageArmoredDetachedResult,
+	EncryptMessageArmoredResult,
+	EncryptMessageBinaryDetachedResult,
+	EncryptMessageBinaryResult,
+	EncryptMessageOptions,
+	SessionKeyWithMetadata,
+	VerificationStatus,
+} from "@contracts/provider/proton/openpgp-proxy";
 import type { OpenPGPCryptoProxy } from "@protontech/drive-sdk";
-import * as openpgp from "openpgp";
+import {
+	createMessage,
+	decrypt,
+	decryptKey,
+	decryptSessionKeys,
+	encrypt,
+	encryptKey,
+	encryptSessionKey,
+	enums,
+	generateKey,
+	generateSessionKey,
+	type PrivateKey as OpenPGPPrivateKey,
+	type PublicKey as OpenPGPPublicKey,
+	type SessionKey as OpenPGPSessionKey,
+	readMessage,
+	readPrivateKey,
+	readSignature,
+	sign,
+	verify,
+} from "openpgp";
 
-type DrivePrivateKey = Awaited<ReturnType<OpenPGPCryptoProxy["generateKey"]>>;
-type DrivePublicKey = Parameters<
-	OpenPGPCryptoProxy["generateSessionKey"]
->[0]["recipientKeys"][number];
-type DriveSessionKey = Awaited<ReturnType<OpenPGPCryptoProxy["generateSessionKey"]>>;
-type VerificationStatus = Awaited<
-	ReturnType<OpenPGPCryptoProxy["verifyMessage"]>
->["verificationStatus"];
-
-type EncryptMessageOptions = {
-	format?: "armored" | "binary";
-	binaryData: Uint8Array;
-	sessionKey?: DriveSessionKey;
-	encryptionKeys: DrivePublicKey[];
-	signingKeys?: DrivePrivateKey;
-	detached?: boolean;
-	compress?: boolean;
+const openpgp = {
+	createMessage,
+	decrypt,
+	decryptKey,
+	decryptSessionKeys,
+	encrypt,
+	encryptKey,
+	encryptSessionKey,
+	enums,
+	generateKey,
+	generateSessionKey,
+	readMessage,
+	readPrivateKey,
+	readSignature,
+	sign,
+	verify,
 };
 
-type EncryptMessageArmoredResult = { message: string };
-type EncryptMessageBinaryResult = { message: Uint8Array };
-type EncryptMessageArmoredDetachedResult = {
-	message: string;
-	signature: string;
-};
-type EncryptMessageBinaryDetachedResult = {
-	message: Uint8Array;
-	signature: Uint8Array;
-};
+type OpenPGPSymmetricName = OpenPGPSessionKey["algorithm"];
+type OpenPGPAeadName = Exclude<OpenPGPSessionKey["aeadAlgorithm"], null | undefined>;
 
-const sessionKeyStore = new WeakMap<DriveSessionKey, openpgp.SessionKey>();
+const sessionKeyStore = new WeakMap<DriveSessionKey, OpenPGPSessionKey>();
 const SESSION_KEY_ALGORITHM_FIELD = "__openpgpAlgorithm";
-
-type SessionKeyWithMetadata = DriveSessionKey & {
-	[SESSION_KEY_ALGORITHM_FIELD]?: openpgp.enums.symmetricNames;
-};
 
 const VERIFICATION_NOT_SIGNED = 0 as VerificationStatus;
 const VERIFICATION_SIGNED_AND_VALID = 1 as VerificationStatus;
@@ -48,9 +66,9 @@ function toStrictUint8Array(data: Uint8Array | ArrayBufferLike): Uint8Array<Arra
 	) as Uint8Array<ArrayBuffer>;
 }
 
-export function wrapPublicKey(key: openpgp.PublicKey): DrivePublicKey {
-	const wrapped = key as openpgp.PublicKey & {
-		_idx?: openpgp.PublicKey;
+export function wrapPublicKey(key: OpenPGPPublicKey): DrivePublicKey {
+	const wrapped = key as OpenPGPPublicKey & {
+		_idx?: OpenPGPPublicKey;
 		_keyContentHash?: [string, string];
 	};
 	if (!wrapped._idx) {
@@ -69,8 +87,8 @@ export function wrapPublicKey(key: openpgp.PublicKey): DrivePublicKey {
 	return wrapped as unknown as DrivePublicKey;
 }
 
-export function wrapPrivateKey(key: openpgp.PrivateKey): DrivePrivateKey {
-	const wrapped = wrapPublicKey(key) as unknown as openpgp.PrivateKey & {
+export function wrapPrivateKey(key: OpenPGPPrivateKey): DrivePrivateKey {
+	const wrapped = wrapPublicKey(key) as unknown as OpenPGPPrivateKey & {
 		_dummyType?: "private";
 	};
 	if (!wrapped._dummyType) {
@@ -82,43 +100,42 @@ export function wrapPrivateKey(key: openpgp.PrivateKey): DrivePrivateKey {
 	return wrapped as unknown as DrivePrivateKey;
 }
 
-function unwrapPublicKey(key: DrivePublicKey): openpgp.PublicKey {
+function unwrapPublicKey(key: DrivePublicKey): OpenPGPPublicKey {
 	const raw = key._idx;
 	if (!raw || typeof raw !== "object") {
 		throw new Error("Invalid OpenPGP public key.");
 	}
-	return raw as openpgp.PublicKey;
+	return raw as OpenPGPPublicKey;
 }
 
-function unwrapPrivateKey(key: DrivePrivateKey): openpgp.PrivateKey {
+function unwrapPrivateKey(key: DrivePrivateKey): OpenPGPPrivateKey {
 	const raw = key._idx;
 	if (!raw || typeof raw !== "object") {
 		throw new Error("Invalid OpenPGP private key.");
 	}
-	return raw as openpgp.PrivateKey;
+	return raw as OpenPGPPrivateKey;
 }
 
-function unwrapPrivateKeys(keys: DrivePrivateKey | DrivePrivateKey[]): openpgp.PrivateKey[] {
+function unwrapPrivateKeys(keys: DrivePrivateKey | DrivePrivateKey[]): OpenPGPPrivateKey[] {
 	return (Array.isArray(keys) ? keys : [keys]).map(unwrapPrivateKey);
 }
 
-function unwrapPublicKeys(keys: DrivePublicKey | DrivePublicKey[]): openpgp.PublicKey[] {
+function unwrapPublicKeys(keys: DrivePublicKey | DrivePublicKey[]): OpenPGPPublicKey[] {
 	return (Array.isArray(keys) ? keys : [keys]).map(unwrapPublicKey);
 }
 
-function wrapSessionKey(key: openpgp.SessionKey): DriveSessionKey {
+function wrapSessionKey(key: OpenPGPSessionKey): DriveSessionKey {
 	const sessionKey: SessionKeyWithMetadata = {
 		data: toStrictUint8Array(key.data),
 		algorithm: key.algorithm,
 		aeadAlgorithm: key.aeadAlgorithm ?? null,
-		[SESSION_KEY_ALGORITHM_FIELD]:
-			(key.algorithm as openpgp.enums.symmetricNames | null) ?? undefined,
+		[SESSION_KEY_ALGORITHM_FIELD]: (key.algorithm as OpenPGPSymmetricName | null) ?? undefined,
 	};
 	sessionKeyStore.set(sessionKey, key);
 	return sessionKey;
 }
 
-function unwrapSessionKey(key: DriveSessionKey): openpgp.SessionKey {
+function unwrapSessionKey(key: DriveSessionKey): OpenPGPSessionKey {
 	const stored = sessionKeyStore.get(key);
 	if (!stored) {
 		const withMetadata = key as SessionKeyWithMetadata;
@@ -130,8 +147,7 @@ function unwrapSessionKey(key: DriveSessionKey): openpgp.SessionKey {
 				data: toStrictUint8Array(withMetadata.data),
 				algorithm,
 				aeadAlgorithm:
-					(withMetadata.aeadAlgorithm as openpgp.enums.aeadNames | null | undefined) ??
-					undefined,
+					(withMetadata.aeadAlgorithm as OpenPGPAeadName | null | undefined) ?? undefined,
 			};
 		}
 		throw new Error("Session key is missing OpenPGP metadata.");
@@ -139,7 +155,7 @@ function unwrapSessionKey(key: DriveSessionKey): openpgp.SessionKey {
 	return stored;
 }
 
-function inferSessionKeyAlgorithm(data?: Uint8Array): openpgp.enums.symmetricNames | undefined {
+function inferSessionKeyAlgorithm(data?: Uint8Array): OpenPGPSymmetricName | undefined {
 	if (!data) {
 		return undefined;
 	}

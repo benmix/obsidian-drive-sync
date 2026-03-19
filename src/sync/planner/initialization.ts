@@ -1,5 +1,5 @@
-import type { SyncEntry } from "../../contracts/data/sync-schema";
-import type { SyncState } from "../../contracts/sync/state";
+import type { SyncEntry } from "@contracts/data/sync-schema";
+import type { SyncState } from "@contracts/sync/state";
 
 function hasSyncedBaselineEntry(entry: SyncEntry): boolean {
 	return Boolean(entry.syncedLocalHash || entry.syncedRemoteRev);

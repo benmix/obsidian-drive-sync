@@ -1,27 +1,23 @@
-import type { RemoteFileSystem } from "../../../contracts/filesystem/file-system";
-import type { ReusableCredentials } from "../../../contracts/provider/proton/auth-types";
+import type { RemoteFileSystem } from "@contracts/filesystem/file-system";
+import type { ReusableCredentials } from "@contracts/provider/proton/auth-types";
 import type {
 	ProtonDriveAuthServiceContract,
 	ProtonDriveConnectedClient,
 	ProtonDriveProvider,
 	ProtonDriveProviderInitOptions,
 	ProtonDriveServiceContract,
-} from "../../../contracts/provider/proton/drive-provider";
-import type { ProtonSession } from "../../../contracts/provider/proton/sdk-session";
+} from "@contracts/provider/proton/drive-provider";
+import type { ProtonRootNodeResult } from "@contracts/provider/proton/drive-sdk";
+import type { ProtonSession } from "@contracts/provider/proton/sdk-session";
 import type {
 	RemoteProviderConnectOptions,
 	RemoteProviderLoginInput,
 	RemoteScopeRoot,
-} from "../../../contracts/provider/remote-provider";
-import { createDriveSyncError } from "../../../errors";
-
-import { ProtonDriveRemoteFileSystem } from "./remote-file-system";
-import { ProtonDriveAuthService } from "./sdk/auth";
-import { ProtonDriveService } from "./sdk/service";
-
-type ProtonRootNodeResult =
-	| { ok: true; value: { uid: string; name: string } }
-	| { ok: false; error?: unknown };
+} from "@contracts/provider/remote-provider";
+import { createDriveSyncError } from "@errors";
+import { ProtonDriveRemoteFileSystem } from "@provider/providers/proton-drive/remote-file-system";
+import { ProtonDriveAuthService } from "@provider/providers/proton-drive/sdk/auth";
+import { ProtonDriveService } from "@provider/providers/proton-drive/sdk/service";
 
 export class ProtonDriveRemoteProvider implements ProtonDriveProvider {
 	readonly id = "proton-drive";

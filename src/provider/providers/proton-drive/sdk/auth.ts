@@ -1,17 +1,12 @@
-import type { AuthSession } from "../../../../contracts/provider/proton/auth-session";
-import { INVALID_REFRESH_TOKEN_CODE } from "../../../../contracts/provider/proton/auth-types";
-import type {
-	ApiError,
-	ReusableCredentials,
-	Session,
-} from "../../../../contracts/provider/proton/auth-types";
-import { createDriveSyncError, normalizeUnknownDriveSyncError } from "../../../../errors";
-
-import { logger } from "./logger";
-import { isProtonAuthError } from "./proton-auth/core/auth-errors";
-import type { ProtonAuth } from "./proton-auth/core/client";
-import { ProtonAuth as ProtonAuthClient } from "./proton-auth/core/client";
-import { createProtonHttpClient } from "./proton-auth/sdk/adapters";
+import type { AuthSession } from "@contracts/provider/proton/auth-session";
+import { INVALID_REFRESH_TOKEN_CODE } from "@contracts/provider/proton/auth-types";
+import type { ApiError, ReusableCredentials, Session } from "@contracts/provider/proton/auth-types";
+import { createDriveSyncError, normalizeUnknownDriveSyncError } from "@errors";
+import { logger } from "@provider/providers/proton-drive/sdk/logger";
+import { isProtonAuthError } from "@provider/providers/proton-drive/sdk/proton-auth/core/auth-errors";
+import type { ProtonAuth } from "@provider/providers/proton-drive/sdk/proton-auth/core/client";
+import { ProtonAuth as ProtonAuthClient } from "@provider/providers/proton-drive/sdk/proton-auth/core/client";
+import { createProtonHttpClient } from "@provider/providers/proton-drive/sdk/proton-auth/sdk/adapters";
 
 export class ProtonDriveAuthService {
 	private authClient: ProtonAuth | null = null;

@@ -1,9 +1,9 @@
-import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
-import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
-import type { ExecuteResult } from "../../contracts/sync/execution";
-import { createDriveSyncError } from "../../errors";
-import { hashBytes } from "../support/hash";
-import { now } from "../support/utils";
+import type { SyncEntry, SyncJob } from "@contracts/data/sync-schema";
+import type { LocalFileSystem, RemoteFileSystem } from "@contracts/filesystem/file-system";
+import type { ExecuteResult } from "@contracts/sync/execution";
+import { createDriveSyncError } from "@errors";
+import { hashBytes } from "@sync/support/hash";
+import { now } from "@sync/support/utils";
 
 export async function executeJobs(
 	localFileSystem: LocalFileSystem,

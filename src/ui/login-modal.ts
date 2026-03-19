@@ -1,13 +1,11 @@
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { RemoteProvider } from "@contracts/provider/remote-provider";
+import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
+import { tr, trAny } from "@i18n";
+import { shouldPreventTwoFactorKeydown } from "@ui/login-modal-helpers";
+import { renderProviderIcon } from "@ui/provider-icon";
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
-
-import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import type { RemoteProvider } from "../contracts/provider/remote-provider";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
-import { tr, trAny } from "../i18n";
-
-import { shouldPreventTwoFactorKeydown } from "./login-modal-helpers";
-import { renderProviderIcon } from "./provider-icon";
 
 type RemoteProviderLoginModalOptions = {
 	providerId?: string;

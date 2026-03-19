@@ -1,7 +1,7 @@
-import type { LocalProvider } from "../contracts/provider/local-provider";
-import type { LocalProviderId, RemoteProviderId } from "../contracts/provider/provider-ids";
-import type { AnyRemoteProvider } from "../contracts/provider/remote-provider";
-import { createDriveSyncError } from "../errors";
+import type { LocalProvider } from "@contracts/provider/local-provider";
+import type { LocalProviderId, RemoteProviderId } from "@contracts/provider/provider-ids";
+import type { AnyRemoteProvider } from "@contracts/provider/remote-provider";
+import { createDriveSyncError } from "@errors";
 
 export class RemoteProviderRegistry<TProvider extends AnyRemoteProvider = AnyRemoteProvider> {
 	private readonly providers = new Map<RemoteProviderId, TProvider>();

@@ -1,0 +1,38 @@
+{
+	"compilerOptions": {
+		"baseUrl": ".",
+		"rootDir": ".",
+		"module": "ESNext",
+		"target": "ES2020",
+		"moduleResolution": "bundler",
+		"paths": {
+			"@commands": ["./src/commands/index.ts"],
+			"@commands/*": ["./src/commands/*"],
+			"@config": ["./src/internal-config.ts"],
+			"@contracts/*": ["./src/types/*"],
+			"@data/*": ["./src/data/*"],
+			"@errors": ["./src/errors/index.ts"],
+			"@errors/*": ["./src/errors/*"],
+			"@filesystem/*": ["./src/filesystem/*"],
+			"@i18n": ["./src/i18n/index.ts"],
+			"@i18n/*": ["./src/i18n/*"],
+			"@provider/*": ["./src/provider/*"],
+			"@runtime/*": ["./src/runtime/*"],
+			"@sync/*": ["./src/sync/*"],
+			"@tests/*": ["./tests/*"],
+			"@ui/*": ["./src/ui/*"]
+		},
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitReturns": true,
+		"useUnknownInCatchVariables": true,
+		"isolatedModules": true,
+		"verbatimModuleSyntax": true,
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"importHelpers": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true
+	}
+}

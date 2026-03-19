@@ -1,8 +1,8 @@
-import type { PluginData, PluginDataStore } from "../contracts/data/plugin-data";
-import { DEFAULT_SETTINGS } from "../contracts/plugin/default-settings";
-import type { DriveSyncSettings } from "../contracts/plugin/settings";
-import { isSupportedRemoteProviderId } from "../contracts/provider/provider-ids";
-import { normalizeSyncStrategy } from "../contracts/sync/strategy";
+import type { PluginData, PluginDataStore } from "@contracts/data/plugin-data";
+import { DEFAULT_SETTINGS } from "@contracts/plugin/default-settings";
+import type { DriveSyncSettings } from "@contracts/plugin/settings";
+import { isSupportedRemoteProviderId } from "@contracts/provider/provider-ids";
+import { normalizeSyncStrategy } from "@contracts/sync/strategy";
 
 function normalizeString(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";

@@ -1,6 +1,5 @@
+import { shouldPreventTwoFactorKeydown } from "@ui/login-modal-helpers";
 import { describe, expect, test } from "vitest";
-
-import { shouldPreventTwoFactorKeydown } from "../../src/ui/login-modal-helpers";
 
 describe("shouldPreventTwoFactorKeydown", () => {
 	test("allows numeric input", () => {

@@ -1,17 +1,12 @@
+import type { LocalProvider } from "@contracts/provider/local-provider";
+import type { AnyRemoteProvider, RemoteProviderClient } from "@contracts/provider/remote-provider";
+import { type SyncStrategy } from "@contracts/sync/strategy";
+import { syncLocalToRemote, syncRemoteToLocal } from "@runtime/use-cases/manual-sync";
+import { SyncEngine } from "@sync/engine/sync-engine";
+import { isInitializationPhase } from "@sync/planner/initialization";
+import { pollRemoteChanges } from "@sync/planner/remote-poller";
+import { PluginDataStateStore } from "@sync/state/state-store";
 import { type App } from "obsidian";
-
-import type { LocalProvider } from "../../contracts/provider/local-provider";
-import type {
-	AnyRemoteProvider,
-	RemoteProviderClient,
-} from "../../contracts/provider/remote-provider";
-import { type SyncStrategy } from "../../contracts/sync/strategy";
-import { SyncEngine } from "../../sync/engine/sync-engine";
-import { isInitializationPhase } from "../../sync/planner/initialization";
-import { pollRemoteChanges } from "../../sync/planner/remote-poller";
-import { PluginDataStateStore } from "../../sync/state/state-store";
-
-import { syncLocalToRemote, syncRemoteToLocal } from "./manual-sync";
 
 export async function syncVaultToRemote<TProvider extends AnyRemoteProvider>(
 	app: App,

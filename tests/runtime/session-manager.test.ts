@@ -1,3 +1,4 @@
+import type { SyncState } from "@contracts/sync/state";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const stateHarness = vi.hoisted(() => ({
@@ -6,10 +7,10 @@ const stateHarness = vi.hoisted(() => ({
 		jobs: [],
 		logs: [],
 		runtimeMetrics: {},
-	},
+	} as SyncState,
 }));
 
-vi.mock("../../src/sync/state/state-store", () => ({
+vi.mock("@sync/state/state-store", () => ({
 	PluginDataStateStore: class {
 		async load() {
 			return stateHarness.state;
@@ -21,7 +22,7 @@ vi.mock("../../src/sync/state/state-store", () => ({
 	},
 }));
 
-vi.mock("../../src/i18n", () => ({
+vi.mock("@i18n", () => ({
 	trAny: (key: string) => {
 		if (key === "error.auth.reauthRequired") {
 			return "Authentication required. Sign in again to continue.";
@@ -30,8 +31,8 @@ vi.mock("../../src/i18n", () => ({
 	},
 }));
 
-import { createDriveSyncError } from "../../src/errors";
-import { SessionManager } from "../../src/runtime/session-manager";
+import { createDriveSyncError } from "@errors";
+import { SessionManager } from "@runtime/session-manager";
 
 describe("SessionManager", () => {
 	beforeEach(() => {
@@ -40,7 +41,7 @@ describe("SessionManager", () => {
 			jobs: [],
 			logs: [],
 			runtimeMetrics: {},
-		};
+		} as SyncState;
 		vi.restoreAllMocks();
 		vi.spyOn(console, "warn").mockImplementation(() => {});
 	});

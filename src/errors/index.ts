@@ -24,7 +24,7 @@ import {
 	shouldRetryBlockedDriveSyncErrorCode,
 	toDriveSyncErrorSummary,
 	translateDriveSyncErrorUserMessage,
-} from "./drive-sync-error";
+} from "@errors/drive-sync-error";
 
 export {
 	createDriveSyncError,

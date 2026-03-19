@@ -6,7 +6,7 @@ vi.mock("obsidian", () => ({
 	requestUrl: requestUrlMock,
 }));
 
-import { requestHttp } from "../../src/provider/providers/proton-drive/sdk/proton-auth/transport/http";
+import { requestHttp } from "@provider/providers/proton-drive/sdk/proton-auth/transport/http";
 
 describe("requestHttp", () => {
 	beforeEach(() => {

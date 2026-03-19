@@ -1,9 +1,9 @@
-import type { NetworkDecision } from "../contracts/runtime/network-policy";
+import type { NetworkDecision } from "@contracts/runtime/network-policy";
 import {
 	createDriveSyncError,
 	isTransientNetworkDriveSyncError,
 	normalizeUnknownDriveSyncError,
-} from "../errors";
+} from "@errors";
 
 type NetworkPolicyOptions = {
 	enabled: boolean;

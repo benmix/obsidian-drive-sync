@@ -1,6 +1,5 @@
+import { LocalProviderRegistry, RemoteProviderRegistry } from "@provider/registry";
 import { describe, expect, test } from "vitest";
-
-import { LocalProviderRegistry, RemoteProviderRegistry } from "../../src/provider/registry";
 
 describe("provider registry errors", () => {
 	test("empty remote registry get throws CONFIG_PROVIDER_MISSING", () => {

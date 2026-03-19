@@ -1,7 +1,6 @@
+import { createDriveSyncError } from "@errors";
+import { NetworkPolicy } from "@runtime/network-policy";
 import { describe, expect, test } from "vitest";
-
-import { createDriveSyncError } from "../../src/errors";
-import { NetworkPolicy } from "../../src/runtime/network-policy";
 
 describe("NetworkPolicy", () => {
 	test("allows all runs when policy is disabled", () => {

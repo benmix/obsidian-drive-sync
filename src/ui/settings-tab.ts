@@ -1,14 +1,12 @@
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { DriveSyncSettings } from "@contracts/plugin/settings";
+import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
+import { tr, trAny } from "@i18n";
+import { openProviderLoginModal, openRemoteLoginModal } from "@ui/auth-required-modal";
+import { renderProviderIcon } from "@ui/provider-icon";
+import { RemoteFolderPickerModal } from "@ui/remote-root-modal";
 import { PluginSettingTab, Setting } from "obsidian";
 import type { App } from "obsidian";
-
-import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import type { DriveSyncSettings } from "../contracts/plugin/settings";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
-import { tr, trAny } from "../i18n";
-
-import { openProviderLoginModal, openRemoteLoginModal } from "./auth-required-modal";
-import { renderProviderIcon } from "./provider-icon";
-import { RemoteFolderPickerModal } from "./remote-root-modal";
 
 export class DriveSyncSettingTab extends PluginSettingTab {
 	plugin: ObsidianDriveSyncPluginApi;

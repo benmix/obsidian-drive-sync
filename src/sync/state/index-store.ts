@@ -1,5 +1,5 @@
-import type { SyncEntry, SyncJob, SyncLog } from "../../contracts/data/sync-schema";
-import type { SyncRuntimeMetrics, SyncState } from "../../contracts/sync/state";
+import type { SyncEntry, SyncJob, SyncLog } from "@contracts/data/sync-schema";
+import type { SyncRuntimeMetrics, SyncState } from "@contracts/sync/state";
 
 export const DEFAULT_SYNC_STATE: SyncState = {
 	entries: {},

@@ -1,8 +1,7 @@
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import { tr } from "@i18n";
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
-
-import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import { tr } from "../i18n";
 
 type ConflictItem = {
 	path: string;

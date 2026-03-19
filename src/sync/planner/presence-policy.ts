@@ -1,14 +1,13 @@
-import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
-import type { EntryType } from "../../contracts/filesystem/entry";
+import type { SyncEntry, SyncJob } from "@contracts/data/sync-schema";
+import type { EntryType } from "@contracts/filesystem/entry";
 import type {
 	BothChangedDecision,
 	PresenceDecision,
 	RemoteMissingConfirmation,
-} from "../../contracts/sync/presence-policy";
-import type { SyncStrategy } from "../../contracts/sync/strategy";
-import { buildConflictName } from "../support/utils";
-
-import { compareMtimeWithTolerance } from "./mtime";
+} from "@contracts/sync/presence-policy";
+import type { SyncStrategy } from "@contracts/sync/strategy";
+import { compareMtimeWithTolerance } from "@sync/planner/mtime";
+import { buildConflictName } from "@sync/support/utils";
 
 export const REMOTE_MISSING_CONFIRM_ROUNDS = 2;
 

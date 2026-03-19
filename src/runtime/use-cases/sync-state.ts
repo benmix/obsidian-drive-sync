@@ -1,5 +1,5 @@
-import type { SyncState } from "../../contracts/sync/state";
-import { PluginDataStateStore } from "../../sync/state/state-store";
+import type { SyncState } from "@contracts/sync/state";
+import { PluginDataStateStore } from "@sync/state/state-store";
 
 export async function loadSyncState(): Promise<SyncState> {
 	return await new PluginDataStateStore().load();

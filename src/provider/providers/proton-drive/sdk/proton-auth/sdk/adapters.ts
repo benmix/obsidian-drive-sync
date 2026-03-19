@@ -1,31 +1,30 @@
 import type {
-	ProtonDriveAccount,
-	ProtonDriveAccountAddress,
-	ProtonDriveHTTPClient,
-	ProtonDriveHTTPClientBlobRequest,
-	ProtonDriveHTTPClientJsonRequest,
-} from "@protontech/drive-sdk";
-import * as openpgp from "openpgp";
-
-import type {
 	AddressKeyInfo,
 	ApiResponse,
 	AuthInfo,
 	Session,
 	SrpResult,
-} from "../../../../../../contracts/provider/proton/auth-types";
+} from "@contracts/provider/proton/auth-types";
 import {
 	API_BASE_URL,
 	APP_VERSION,
 	AUTH_VERSION,
 	SRP_LEN,
-} from "../../../../../../contracts/provider/proton/auth-types";
-import type { OpenPGPCryptoInterface } from "../../../../../../contracts/provider/proton/openpgp";
+} from "@contracts/provider/proton/auth-types";
+import type { OpenPGPCryptoInterface } from "@contracts/provider/proton/openpgp";
 import type {
-	SRPModuleInterface,
-	SRPVerifier,
-} from "../../../../../../contracts/provider/proton/srp-module";
-import { wrapPrivateKey, wrapPublicKey } from "../../openpgp-proxy";
+	DriveAccountPrivateKey,
+	DriveAccountPublicKey,
+	OwnAddress,
+} from "@contracts/provider/proton/sdk-adapters";
+import type { SRPModuleInterface, SRPVerifier } from "@contracts/provider/proton/srp-module";
+import type {
+	ProtonDriveAccount,
+	ProtonDriveHTTPClient,
+	ProtonDriveHTTPClientBlobRequest,
+	ProtonDriveHTTPClientJsonRequest,
+} from "@protontech/drive-sdk";
+import { wrapPrivateKey, wrapPublicKey } from "@provider/providers/proton-drive/sdk/openpgp-proxy";
 import {
 	base64Encode,
 	bigIntToUint8ArrayLE,
@@ -34,18 +33,18 @@ import {
 	modExp,
 	uint8ArrayToBigIntLE,
 	uint8ArrayToBinaryString,
-} from "../crypto/crypto-utils";
-import { getSrp, verifyAndGetModulus } from "../crypto/srp";
-import { apiRequest } from "../transport/api";
-import { requestHttp } from "../transport/http";
+} from "@provider/providers/proton-drive/sdk/proton-auth/crypto/crypto-utils";
+import {
+	getSrp,
+	verifyAndGetModulus,
+} from "@provider/providers/proton-drive/sdk/proton-auth/crypto/srp";
+import { apiRequest } from "@provider/providers/proton-drive/sdk/proton-auth/transport/api";
+import { requestHttp } from "@provider/providers/proton-drive/sdk/proton-auth/transport/http";
+import { type PrivateKey, readKey } from "openpgp";
 
 // ============================================================================
 // SDK Integration Helpers
 // ============================================================================
-
-type OwnAddress = ProtonDriveAccountAddress;
-type DrivePrivateKey = OwnAddress["keys"][number]["key"];
-type DrivePublicKey = Awaited<ReturnType<ProtonDriveAccount["getPublicKeys"]>>[number];
 
 function getRequiredSession(getSession: () => Session | null): Session {
 	const currentSession = getSession();
@@ -172,12 +171,12 @@ export function createProtonAccount(
 	const getSession = (): Session | null => (typeof session === "function" ? session() : session);
 
 	// Cache for decrypted keys to avoid re-decrypting on each call
-	const decryptedKeysCache = new Map<string, openpgp.PrivateKey>();
+	const decryptedKeysCache = new Map<string, PrivateKey>();
 
 	async function decryptAddressKeys(
 		keys: AddressKeyInfo[],
-	): Promise<{ id: string; key: DrivePrivateKey }[]> {
-		const result: { id: string; key: DrivePrivateKey }[] = [];
+	): Promise<{ id: string; key: DriveAccountPrivateKey }[]> {
+		const result: { id: string; key: DriveAccountPrivateKey }[] = [];
 		for (const k of keys) {
 			let decryptedKey = decryptedKeysCache.get(k.ID);
 			if (!decryptedKey) {
@@ -264,7 +263,7 @@ export function createProtonAccount(
 			}
 		},
 
-		async getPublicKeys(email: string): Promise<DrivePublicKey[]> {
+		async getPublicKeys(email: string): Promise<DriveAccountPublicKey[]> {
 			const currentSession = getRequiredSession(getSession);
 			try {
 				const response = await apiRequest<ApiResponse & { Keys?: { PublicKey: string }[] }>(
@@ -274,10 +273,10 @@ export function createProtonAccount(
 					currentSession,
 				);
 
-				const keys: DrivePublicKey[] = [];
+				const keys: DriveAccountPublicKey[] = [];
 				for (const keyData of response.Keys || []) {
 					try {
-						const key = await openpgp.readKey({
+						const key = await readKey({
 							armoredKey: keyData.PublicKey,
 						});
 						keys.push(wrapPublicKey(key));

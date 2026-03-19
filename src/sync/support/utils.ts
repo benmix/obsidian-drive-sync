@@ -1,4 +1,4 @@
-import { splitPath } from "../../filesystem/path";
+import { splitPath } from "@filesystem/path";
 
 export function buildConflictName(
 	path: string,

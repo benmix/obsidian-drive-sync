@@ -1,16 +1,21 @@
+import { INVALID_REFRESH_TOKEN_CODE } from "@contracts/provider/proton/auth-types";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { INVALID_REFRESH_TOKEN_CODE } from "../../src/contracts/provider/proton/auth-types";
+type SessionShape = {
+	UID: string;
+	AccessToken: string;
+	RefreshToken: string;
+};
 
 const requestHttpMock = vi.hoisted(() =>
 	vi.fn(async () => new Response(JSON.stringify({ Code: 1000 }), { status: 200 })),
 );
 
-vi.mock("../../src/provider/providers/proton-drive/sdk/proton-auth/transport/http", () => ({
+vi.mock("@provider/providers/proton-drive/sdk/proton-auth/transport/http", () => ({
 	requestHttp: requestHttpMock,
 }));
 
-import { ProtonAuth } from "../../src/provider/providers/proton-drive/sdk/proton-auth/core/client";
+import { ProtonAuth } from "@provider/providers/proton-drive/sdk/proton-auth/core/client";
 
 describe("ProtonAuth", () => {
 	beforeEach(() => {
@@ -21,19 +26,12 @@ describe("ProtonAuth", () => {
 	});
 
 	test("logout revokes child and parent sessions and clears auth state", async () => {
-		const auth = new ProtonAuth() as ProtonAuth & {
+		const auth = new ProtonAuth() as unknown as {
+			logout(): Promise<void>;
 			store: {
 				setAuthenticated: (sessions: {
-					parentSession: {
-						UID: string;
-						AccessToken: string;
-						RefreshToken: string;
-					};
-					childSession: {
-						UID: string;
-						AccessToken: string;
-						RefreshToken: string;
-					};
+					parentSession: SessionShape;
+					childSession: SessionShape;
 				}) => void;
 				getState: () => { kind: string };
 				getSession: () => unknown;
@@ -86,19 +84,12 @@ describe("ProtonAuth", () => {
 	});
 
 	test("logout still clears all session state when revoke requests fail", async () => {
-		const auth = new ProtonAuth() as ProtonAuth & {
+		const auth = new ProtonAuth() as unknown as {
+			logout(): Promise<void>;
 			store: {
 				setAuthenticated: (sessions: {
-					parentSession: {
-						UID: string;
-						AccessToken: string;
-						RefreshToken: string;
-					};
-					childSession: {
-						UID: string;
-						AccessToken: string;
-						RefreshToken: string;
-					};
+					parentSession: SessionShape;
+					childSession: SessionShape;
 				}) => void;
 				getState: () => { kind: string };
 				getSession: () => unknown;
@@ -146,13 +137,10 @@ describe("ProtonAuth", () => {
 				keyPassword: "salted-key-pass",
 			})),
 		};
-		const auth = new ProtonAuth(apiClient as never, keyService as never) as ProtonAuth & {
+		const auth = new ProtonAuth(apiClient as never, keyService as never) as unknown as {
+			submitMailboxPassword(password: string): Promise<unknown>;
 			store: {
-				beginMailboxPasswordChallenge: (parentSession: {
-					UID: string;
-					AccessToken: string;
-					RefreshToken: string;
-				}) => void;
+				beginMailboxPasswordChallenge: (parentSession: SessionShape) => void;
 				getState: () => { kind: string };
 				getSession: () => unknown;
 				getParentSession: () => unknown;
@@ -203,7 +191,8 @@ describe("ProtonAuth", () => {
 				UserID: "user-1",
 			})),
 		};
-		const auth = new ProtonAuth(apiClient as never) as ProtonAuth & {
+		const auth = new ProtonAuth(apiClient as never) as unknown as {
+			refreshToken(): Promise<unknown>;
 			store: {
 				setAuthenticated: (sessions: {
 					parentSession: {

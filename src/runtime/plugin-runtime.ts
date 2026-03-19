@@ -1,32 +1,30 @@
-import { Notice } from "obsidian";
-
-import { type ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "@config";
+import { type ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
 import type {
 	AnyRemoteProvider,
 	RemoteProviderClient,
 	RemoteProviderSessionOf,
-} from "../contracts/provider/remote-provider";
-import { type SyncRunRequest } from "../contracts/sync/run-request";
+} from "@contracts/provider/remote-provider";
+import { type SyncRunRequest } from "@contracts/sync/run-request";
 import {
 	createDriveSyncError,
 	normalizeUnknownDriveSyncError,
 	toDriveSyncErrorSummary,
 	translateDriveSyncErrorUserMessage,
-} from "../errors";
-import { trAny } from "../i18n";
-import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "../internal-config";
-import { getBuiltInExcludePatterns as getBuiltInExcludePatternsUseCase } from "../sync/planner/exclude";
-import { PluginDataStateStore } from "../sync/state/state-store";
-import { now } from "../sync/support/utils";
-
-import { NetworkPolicy } from "./network-policy";
-import { SessionManager } from "./session-manager";
-import { SyncCoordinator } from "./sync-coordinator";
-import { TriggerScheduler } from "./trigger-scheduler";
+} from "@errors";
+import { trAny } from "@i18n";
+import { NetworkPolicy } from "@runtime/network-policy";
+import { SessionManager } from "@runtime/session-manager";
+import { SyncCoordinator } from "@runtime/sync-coordinator";
+import { TriggerScheduler } from "@runtime/trigger-scheduler";
 import {
 	clearConflictMarker as clearConflictMarkerUseCase,
 	loadSyncState as loadSyncStateUseCase,
-} from "./use-cases/sync-state";
+} from "@runtime/use-cases/sync-state";
+import { getBuiltInExcludePatterns as getBuiltInExcludePatternsUseCase } from "@sync/planner/exclude";
+import { PluginDataStateStore } from "@sync/state/state-store";
+import { now } from "@sync/support/utils";
+import { Notice } from "obsidian";
 
 export class PluginRuntime<TProvider extends AnyRemoteProvider> {
 	private autoSyncPaused = false;

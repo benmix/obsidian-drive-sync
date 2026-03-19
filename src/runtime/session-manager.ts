@@ -1,21 +1,21 @@
-import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
 import type {
 	AnyRemoteProvider,
 	RemoteProvider,
 	RemoteProviderClient,
 	RemoteProviderCredentialsOf,
 	RemoteProviderSessionOf,
-} from "../contracts/provider/remote-provider";
+} from "@contracts/provider/remote-provider";
 import {
 	createDriveSyncError,
 	normalizeUnknownDriveSyncError,
 	shouldPauseAuthForError,
 	toDriveSyncErrorSummary,
 	translateDriveSyncErrorUserMessage,
-} from "../errors";
-import { trAny } from "../i18n";
-import { PluginDataStateStore } from "../sync/state/state-store";
-import { now } from "../sync/support/utils";
+} from "@errors";
+import { trAny } from "@i18n";
+import { PluginDataStateStore } from "@sync/state/state-store";
+import { now } from "@sync/support/utils";
 
 function bindRemoteProvider<TProvider extends AnyRemoteProvider>(
 	provider: TProvider,

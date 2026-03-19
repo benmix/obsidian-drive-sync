@@ -1,20 +1,16 @@
-import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
-import type {
-	RemoteEntryChangeEvent,
-	RemoteFileSystem,
-} from "../../contracts/filesystem/file-system";
-import type { RemotePollResult } from "../../contracts/sync/remote-poller";
-import type { SyncState } from "../../contracts/sync/state";
-import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
-import { normalizePath } from "../../filesystem/path";
-import { now } from "../support/utils";
-
+import type { SyncEntry, SyncJob } from "@contracts/data/sync-schema";
+import type { RemoteEntryChangeEvent, RemoteFileSystem } from "@contracts/filesystem/file-system";
+import type { RemotePollResult } from "@contracts/sync/remote-poller";
+import type { SyncState } from "@contracts/sync/state";
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "@contracts/sync/strategy";
+import { normalizePath } from "@filesystem/path";
 import {
 	evaluateRemoteMissingConfirmation,
 	resolveBothPresentDecision,
 	resolveLocalOnlyDecision,
 	resolveRemoteOnlyDecision,
-} from "./presence-policy";
+} from "@sync/planner/presence-policy";
+import { now } from "@sync/support/utils";
 
 export async function pollRemoteChanges(
 	remoteFileSystem: RemoteFileSystem,

@@ -1,7 +1,6 @@
+import type { CommandContext } from "@contracts/plugin/command-context";
+import { tr } from "@i18n";
 import { Notice } from "obsidian";
-
-import type { CommandContext } from "../contracts/plugin/command-context";
-import { tr } from "../i18n";
 
 export function registerDriveSyncResumeAutoSyncCommand(context: CommandContext) {
 	const { plugin } = context;

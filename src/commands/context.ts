@@ -1,16 +1,15 @@
-import { Notice } from "obsidian";
-
 import type {
 	CommandContext,
 	CommandErrorOptions,
 	ConnectedRemoteClient,
-} from "../contracts/plugin/command-context";
-import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import type { AnyRemoteProvider } from "../contracts/provider/remote-provider";
-import type { DriveSyncErrorCode, ErrorCategory } from "../errors";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
-import { tr, trAny } from "../i18n";
-import { RemoteAuthRequiredModal } from "../ui/auth-required-modal";
+} from "@contracts/plugin/command-context";
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { AnyRemoteProvider } from "@contracts/provider/remote-provider";
+import type { DriveSyncErrorCode, ErrorCategory } from "@errors";
+import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
+import { tr, trAny } from "@i18n";
+import { RemoteAuthRequiredModal } from "@ui/auth-required-modal";
+import { Notice } from "obsidian";
 
 export function createCommandContext<TProvider extends AnyRemoteProvider>(
 	plugin: ObsidianDriveSyncPluginApi<TProvider>,

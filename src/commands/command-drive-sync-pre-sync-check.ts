@@ -1,9 +1,8 @@
+import type { CommandContext } from "@contracts/plugin/command-context";
+import { tr } from "@i18n";
+import { estimateSyncPlan, planSync, runPlannedSync } from "@runtime/use-cases/sync-workflows";
+import { SyncPreflightModal } from "@ui/pre-sync-modal";
 import { Notice } from "obsidian";
-
-import type { CommandContext } from "../contracts/plugin/command-context";
-import { tr } from "../i18n";
-import { estimateSyncPlan, planSync, runPlannedSync } from "../runtime/use-cases/sync-workflows";
-import { SyncPreflightModal } from "../ui/pre-sync-modal";
 
 export function registerDriveSyncPreSyncCheckCommand(context: CommandContext) {
 	const { plugin, localProvider, runRemoteCommand, showCommandError } = context;

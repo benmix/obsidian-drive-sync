@@ -1,10 +1,8 @@
+import type { ProtonDriveConnectedClient } from "@contracts/provider/proton/drive-provider";
+import type { ProtonSession } from "@contracts/provider/proton/sdk-session";
 import { MemoryCache, ProtonDriveClient } from "@protontech/drive-sdk";
+import { buildSdkSessionClient } from "@provider/providers/proton-drive/sdk/sdk-session";
 import { Notice } from "obsidian";
-
-import type { ProtonDriveConnectedClient } from "../../../../contracts/provider/proton/drive-provider";
-import type { ProtonSession } from "../../../../contracts/provider/proton/sdk-session";
-
-import { buildSdkSessionClient } from "./sdk-session";
 
 export class ProtonDriveService {
 	private client: ProtonDriveConnectedClient | null = null;

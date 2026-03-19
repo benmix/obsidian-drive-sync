@@ -1,12 +1,10 @@
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { PreSyncEstimate } from "@contracts/ui/pre-sync";
+import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
+import { tr, trAny } from "@i18n";
+import { formatBytes } from "@ui/format";
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
-
-import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import type { PreSyncEstimate } from "../contracts/ui/pre-sync";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
-import { tr, trAny } from "../i18n";
-
-import { formatBytes } from "./format";
 
 export class SyncPreflightModal extends Modal {
 	private plugin: ObsidianDriveSyncPluginApi;

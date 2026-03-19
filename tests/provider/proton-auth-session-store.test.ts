@@ -1,6 +1,5 @@
+import { ProtonAuthSessionStore } from "@provider/providers/proton-drive/sdk/proton-auth/core/session-store";
 import { describe, expect, test } from "vitest";
-
-import { ProtonAuthSessionStore } from "../../src/provider/providers/proton-drive/sdk/proton-auth/core/session-store";
 
 describe("ProtonAuthSessionStore", () => {
 	test("tracks pending two-factor challenges explicitly", () => {

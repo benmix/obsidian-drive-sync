@@ -1,11 +1,10 @@
+import type { LocalFileSystem, RemoteFileSystem } from "@contracts/filesystem/file-system";
+import type { SyncState } from "@contracts/sync/state";
+import type { StateStore } from "@contracts/sync/state-store";
+import { createDriveSyncError } from "@errors";
+import { SyncEngine } from "@sync/engine/sync-engine";
+import { createJob, createState, textBytes } from "@tests/helpers/sync-fixtures";
 import { describe, expect, test } from "vitest";
-
-import type { LocalFileSystem, RemoteFileSystem } from "../../src/contracts/filesystem/file-system";
-import type { SyncState } from "../../src/contracts/sync/state";
-import type { StateStore } from "../../src/contracts/sync/state-store";
-import { createDriveSyncError } from "../../src/errors";
-import { SyncEngine } from "../../src/sync/engine/sync-engine";
-import { createJob, createState, textBytes } from "../helpers/sync-fixtures";
 
 class MemoryStateStore implements StateStore {
 	state: SyncState;

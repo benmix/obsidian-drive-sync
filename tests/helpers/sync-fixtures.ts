@@ -1,11 +1,11 @@
-import type { SyncEntry, SyncJob } from "../../src/contracts/data/sync-schema";
+import type { SyncEntry, SyncJob } from "@contracts/data/sync-schema";
 import type {
 	LocalFileEntry,
 	LocalFileSystem,
 	RemoteFileEntry,
 	RemoteFileSystem,
-} from "../../src/contracts/filesystem/file-system";
-import type { SyncState } from "../../src/contracts/sync/state";
+} from "@contracts/filesystem/file-system";
+import type { SyncState } from "@contracts/sync/state";
 
 export const FIXED_NOW = 1_700_000_000_000;
 const encoder = new TextEncoder();
@@ -77,6 +77,10 @@ export function createRemoteFileSystem(
 		listEntries: async () => entries,
 		listFileEntries: async () => entries.filter((entry) => entry.type === "file"),
 		listFolderEntries: async () => entries.filter((entry) => entry.type === "folder"),
+		getEntry: async (id: string) => {
+			const entry = entries.find((candidate) => candidate.id === id);
+			return entry ?? null;
+		},
 		writeFile: async () => ({
 			id: "remote-uploaded",
 			revisionId: "rev-next",

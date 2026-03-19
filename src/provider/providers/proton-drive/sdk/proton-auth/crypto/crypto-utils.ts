@@ -1,7 +1,6 @@
+import { BCRYPT_PREFIX } from "@contracts/provider/proton/auth-types";
+import type { ForkEncryptedBlob } from "@contracts/provider/proton/auth-types";
 import bcrypt from "bcryptjs";
-
-import { BCRYPT_PREFIX } from "../../../../../../contracts/provider/proton/auth-types";
-import type { ForkEncryptedBlob } from "../../../../../../contracts/provider/proton/auth-types";
 
 // ============================================================================
 // BigInt Utilities

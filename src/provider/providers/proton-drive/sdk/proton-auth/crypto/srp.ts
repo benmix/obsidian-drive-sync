@@ -1,13 +1,10 @@
-import * as openpgp from "openpgp";
-
 import type {
 	AuthInfo,
 	Credentials,
 	SrpProofs,
 	SrpResult,
-} from "../../../../../../contracts/provider/proton/auth-types";
-import { SRP_LEN, SRP_MODULUS_KEY } from "../../../../../../contracts/provider/proton/auth-types";
-
+} from "@contracts/provider/proton/auth-types";
+import { SRP_LEN, SRP_MODULUS_KEY } from "@contracts/provider/proton/auth-types";
 import {
 	base64Decode,
 	base64Encode,
@@ -20,7 +17,8 @@ import {
 	modExp,
 	uint8ArrayToBigIntLE,
 	uint8ArrayToBinaryString,
-} from "./crypto-utils";
+} from "@provider/providers/proton-drive/sdk/proton-auth/crypto/crypto-utils";
+import { readCleartextMessage, readKey, verify } from "openpgp";
 
 // ============================================================================
 // SRP Protocol
@@ -38,13 +36,13 @@ interface GenerateProofsParams {
  */
 export async function verifyAndGetModulus(signedModulus: string): Promise<Uint8Array> {
 	// Import the verification key
-	const publicKey = await openpgp.readKey({ armoredKey: SRP_MODULUS_KEY });
+	const publicKey = await readKey({ armoredKey: SRP_MODULUS_KEY });
 
 	// Read and verify the cleartext message
-	const message = await openpgp.readCleartextMessage({
+	const message = await readCleartextMessage({
 		cleartextMessage: signedModulus,
 	});
-	const verificationResult = await openpgp.verify({
+	const verificationResult = await verify({
 		message,
 		verificationKeys: publicKey,
 	});

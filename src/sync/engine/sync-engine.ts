@@ -1,11 +1,12 @@
-import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
-import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
-import type { ExcludeRule } from "../../contracts/sync/exclude";
-import type { ExecuteResult } from "../../contracts/sync/execution";
-import type { SyncState } from "../../contracts/sync/state";
-import type { StateStore } from "../../contracts/sync/state-store";
-import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
-import type { DriveSyncError } from "../../errors";
+import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "@config";
+import type { SyncEntry, SyncJob } from "@contracts/data/sync-schema";
+import type { LocalFileSystem, RemoteFileSystem } from "@contracts/filesystem/file-system";
+import type { ExcludeRule } from "@contracts/sync/exclude";
+import type { ExecuteResult } from "@contracts/sync/execution";
+import type { SyncState } from "@contracts/sync/state";
+import type { StateStore } from "@contracts/sync/state-store";
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "@contracts/sync/strategy";
+import type { DriveSyncError } from "@errors";
 import {
 	createDriveSyncError,
 	type DriveSyncErrorSummary,
@@ -18,16 +19,14 @@ import {
 	shouldPauseAuthForError,
 	shouldRetryBlockedDriveSyncErrorCode,
 	toDriveSyncErrorSummary,
-} from "../../errors";
-import { normalizePath } from "../../filesystem/path";
-import { INTERNAL_MAX_CONCURRENT_JOBS, INTERNAL_MAX_RETRY_ATTEMPTS } from "../../internal-config";
-import { getBuiltInExcludeRules } from "../planner/exclude";
-import { reconcileSnapshot } from "../planner/reconciler";
-import { SyncIndexStore } from "../state/index-store";
-import { now } from "../support/utils";
-
-import { executeJobs } from "./executor";
-import { SyncJobQueue } from "./job-queue";
+} from "@errors";
+import { normalizePath } from "@filesystem/path";
+import { executeJobs } from "@sync/engine/executor";
+import { SyncJobQueue } from "@sync/engine/job-queue";
+import { getBuiltInExcludeRules } from "@sync/planner/exclude";
+import { reconcileSnapshot } from "@sync/planner/reconciler";
+import { SyncIndexStore } from "@sync/state/index-store";
+import { now } from "@sync/support/utils";
 
 type SyncEngineOptions = {
 	syncStrategy?: SyncStrategy;

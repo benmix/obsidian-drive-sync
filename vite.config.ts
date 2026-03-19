@@ -1,4 +1,5 @@
 import { builtinModules } from "node:module";
+import path from "node:path";
 
 import { defineConfig } from "vite";
 
@@ -27,6 +28,21 @@ const external = [
 ];
 
 export default defineConfig(({ mode }) => ({
+	resolve: {
+		alias: {
+			"@commands": path.resolve(__dirname, "src/commands"),
+			"@config": path.resolve(__dirname, "src/internal-config.ts"),
+			"@contracts": path.resolve(__dirname, "src/types"),
+			"@data": path.resolve(__dirname, "src/data"),
+			"@errors": path.resolve(__dirname, "src/errors"),
+			"@filesystem": path.resolve(__dirname, "src/filesystem"),
+			"@i18n": path.resolve(__dirname, "src/i18n"),
+			"@provider": path.resolve(__dirname, "src/provider"),
+			"@runtime": path.resolve(__dirname, "src/runtime"),
+			"@sync": path.resolve(__dirname, "src/sync"),
+			"@ui": path.resolve(__dirname, "src/ui"),
+		},
+	},
 	build: {
 		lib: {
 			entry: "src/main.ts",

@@ -1,4 +1,4 @@
-import type { TwoFAInfo } from "../../../../../../contracts/provider/proton/auth-types";
+import type { TwoFAInfo } from "@contracts/provider/proton/auth-types";
 
 export type ProtonAuthErrorKind =
 	| "two_factor_required"

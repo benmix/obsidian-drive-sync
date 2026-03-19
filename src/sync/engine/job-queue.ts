@@ -1,4 +1,4 @@
-import type { SyncJob } from "../../contracts/data/sync-schema";
+import type { SyncJob } from "@contracts/data/sync-schema";
 
 export class SyncJobQueue {
 	private jobs: SyncJob[];

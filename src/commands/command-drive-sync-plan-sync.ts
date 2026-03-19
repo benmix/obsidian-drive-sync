@@ -1,8 +1,7 @@
+import type { CommandContext } from "@contracts/plugin/command-context";
+import { tr } from "@i18n";
+import { planSync } from "@runtime/use-cases/sync-workflows";
 import { Notice } from "obsidian";
-
-import type { CommandContext } from "../contracts/plugin/command-context";
-import { tr } from "../i18n";
-import { planSync } from "../runtime/use-cases/sync-workflows";
 
 export function registerDriveSyncPlanSyncCommand(context: CommandContext) {
 	const { plugin, localProvider, runRemoteCommand, showCommandError } = context;

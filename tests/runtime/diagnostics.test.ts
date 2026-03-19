@@ -1,8 +1,7 @@
+import { exportDiagnostics } from "@runtime/use-cases/diagnostics";
 import { describe, expect, test, vi } from "vitest";
 
-import { exportDiagnostics } from "../../src/runtime/use-cases/diagnostics";
-
-vi.mock("../../src/sync/state/state-store", () => ({
+vi.mock("@sync/state/state-store", () => ({
 	PluginDataStateStore: class {
 		async load() {
 			return {

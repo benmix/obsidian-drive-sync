@@ -2,10 +2,10 @@ import type {
 	LocalChange,
 	LocalFileEntry,
 	LocalFileSystem,
-} from "../../contracts/filesystem/file-system";
-import type { SyncState } from "../../contracts/sync/state";
-import { normalizePath } from "../../filesystem/path";
-import { hashBytes } from "../support/hash";
+} from "@contracts/filesystem/file-system";
+import type { SyncState } from "@contracts/sync/state";
+import { normalizePath } from "@filesystem/path";
+import { hashBytes } from "@sync/support/hash";
 
 export async function filterLocalChanges(
 	changes: LocalChange[],

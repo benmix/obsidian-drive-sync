@@ -1,20 +1,19 @@
-import type { SyncEntry, SyncJob } from "../../contracts/data/sync-schema";
-import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
-import type { ReconcileResult } from "../../contracts/sync/reconcile";
-import type { SyncState } from "../../contracts/sync/state";
-import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
-import { normalizePath } from "../../filesystem/path";
-import { now } from "../support/utils";
-
-import { isInitializationPhase, shouldPreferRemoteSeed } from "./initialization";
-import { compareMtimeWithTolerance } from "./mtime";
+import type { SyncEntry, SyncJob } from "@contracts/data/sync-schema";
+import type { LocalFileSystem, RemoteFileSystem } from "@contracts/filesystem/file-system";
+import type { ReconcileResult } from "@contracts/sync/reconcile";
+import type { SyncState } from "@contracts/sync/state";
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "@contracts/sync/strategy";
+import { normalizePath } from "@filesystem/path";
+import { isInitializationPhase, shouldPreferRemoteSeed } from "@sync/planner/initialization";
+import { compareMtimeWithTolerance } from "@sync/planner/mtime";
 import {
 	evaluateRemoteMissingConfirmation,
 	resolveBothPresentDecision,
 	resolveLocalOnlyDecision,
 	resolveRemoteOnlyDecision,
 	resolveTrackedMissingDecision,
-} from "./presence-policy";
+} from "@sync/planner/presence-policy";
+import { now } from "@sync/support/utils";
 
 type EntrySnapshot = {
 	path: string;

@@ -9,16 +9,18 @@ import type {
 	PushForkResponse,
 	Session,
 	User,
-} from "../../../../../../contracts/provider/proton/auth-types";
+} from "@contracts/provider/proton/auth-types";
 import {
 	API_BASE_URL,
 	APP_VERSION,
 	CHILD_CLIENT_ID,
 	INVALID_REFRESH_TOKEN_CODE,
-} from "../../../../../../contracts/provider/proton/auth-types";
-
-import { apiRequest, createHeaders } from "./api";
-import { requestHttp } from "./http";
+} from "@contracts/provider/proton/auth-types";
+import {
+	apiRequest,
+	createHeaders,
+} from "@provider/providers/proton-drive/sdk/proton-auth/transport/api";
+import { requestHttp } from "@provider/providers/proton-drive/sdk/proton-auth/transport/http";
 
 export class ProtonAuthApiClient {
 	async getAuthInfo(username: string): Promise<AuthInfo & ApiResponse> {

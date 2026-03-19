@@ -1,12 +1,10 @@
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
+import { tr, trAny } from "@i18n";
+import { RemoteProviderLoginModal } from "@ui/login-modal";
+import { renderProviderIcon } from "@ui/provider-icon";
 import { Modal, Notice } from "obsidian";
 import type { App } from "obsidian";
-
-import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "../errors";
-import { tr, trAny } from "../i18n";
-
-import { RemoteProviderLoginModal } from "./login-modal";
-import { renderProviderIcon } from "./provider-icon";
 
 type RemoteLoginFlowOptions = {
 	onCancel?: () => void;

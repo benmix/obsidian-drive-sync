@@ -1,8 +1,7 @@
+import type { CommandContext } from "@contracts/plugin/command-context";
+import { tr } from "@i18n";
+import { exportDiagnostics } from "@runtime/use-cases/diagnostics";
 import { Notice } from "obsidian";
-
-import type { CommandContext } from "../contracts/plugin/command-context";
-import { tr } from "../i18n";
-import { exportDiagnostics } from "../runtime/use-cases/diagnostics";
 
 export function registerDriveSyncExportDiagnosticsCommand(context: CommandContext) {
 	const { plugin, showCommandError } = context;

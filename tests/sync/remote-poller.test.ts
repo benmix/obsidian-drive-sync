@@ -1,7 +1,6 @@
+import { pollRemoteChanges } from "@sync/planner/remote-poller";
+import { createState } from "@tests/helpers/sync-fixtures";
 import { afterEach, describe, expect, test, vi } from "vitest";
-
-import { pollRemoteChanges } from "../../src/sync/planner/remote-poller";
-import { createState } from "../helpers/sync-fixtures";
 
 describe("pollRemoteChanges", () => {
 	afterEach(() => {
@@ -43,6 +42,10 @@ describe("pollRemoteChanges", () => {
 			getLatestEventCursor: vi.fn(() => null),
 			getEntry,
 			listEntries,
+			listFileEntries: vi.fn(async () => []),
+			listFolderEntries: vi.fn(async () => []),
+			readFile: vi.fn(async () => new Uint8Array()),
+			writeFile: vi.fn(async () => ({})),
 		};
 
 		const resultPromise = pollRemoteChanges(remoteFileSystem, createState(), {});

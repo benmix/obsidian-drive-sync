@@ -1,11 +1,9 @@
+import type { AuthResponse, Session, TwoFAInfo } from "@contracts/provider/proton/auth-types";
+import { createProtonAuthError } from "@provider/providers/proton-drive/sdk/proton-auth/core/auth-errors";
 import type {
-	AuthResponse,
-	Session,
-	TwoFAInfo,
-} from "../../../../../../contracts/provider/proton/auth-types";
-
-import { createProtonAuthError } from "./auth-errors";
-import type { AuthenticatedSessions, AuthState } from "./auth-state";
+	AuthenticatedSessions,
+	AuthState,
+} from "@provider/providers/proton-drive/sdk/proton-auth/core/auth-state";
 
 export class ProtonAuthSessionStore {
 	private state: AuthState = { kind: "idle" };

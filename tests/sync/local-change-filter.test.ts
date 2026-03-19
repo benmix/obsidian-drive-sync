@@ -1,13 +1,12 @@
-import { describe, expect, test } from "vitest";
-
-import { filterLocalChanges } from "../../src/sync/planner/local-change-filter";
-import { hashBytes } from "../../src/sync/support/hash";
+import { filterLocalChanges } from "@sync/planner/local-change-filter";
+import { hashBytes } from "@sync/support/hash";
 import {
 	createEntry,
 	createLocalFileSystem,
 	createState,
 	textBytes,
-} from "../helpers/sync-fixtures";
+} from "@tests/helpers/sync-fixtures";
+import { describe, expect, test } from "vitest";
 
 describe("filterLocalChanges", () => {
 	test("drops unchanged file modify event when metadata matches tracked state", async () => {

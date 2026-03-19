@@ -1,24 +1,24 @@
-import { DEFAULT_SETTINGS } from "../contracts/plugin/default-settings";
-import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import type { DriveSyncSettings } from "../contracts/plugin/settings";
-import type { LocalProvider } from "../contracts/provider/local-provider";
+import { DEFAULT_SETTINGS } from "@contracts/plugin/default-settings";
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { DriveSyncSettings } from "@contracts/plugin/settings";
+import type { LocalProvider } from "@contracts/provider/local-provider";
 import {
 	DEFAULT_LOCAL_PROVIDER_ID,
 	DEFAULT_REMOTE_PROVIDER_ID,
-} from "../contracts/provider/provider-ids";
-import type { RemoteProviderCredentialsOf } from "../contracts/provider/remote-provider";
+} from "@contracts/provider/provider-ids";
+import type { RemoteProviderCredentialsOf } from "@contracts/provider/remote-provider";
 import {
 	loadPluginData,
 	mergePluginData,
 	savePluginData,
 	serializeSettings,
-} from "../data/plugin-data";
+} from "@data/plugin-data";
 import {
 	createLocalProviderRegistry,
 	createRemoteProviderRegistry,
 	type RegisteredRemoteProvider,
-} from "../provider/default-registry";
-import { LocalProviderRegistry, RemoteProviderRegistry } from "../provider/registry";
+} from "@provider/default-registry";
+import { LocalProviderRegistry, RemoteProviderRegistry } from "@provider/registry";
 
 export class PluginState {
 	private mutableSettings: DriveSyncSettings = { ...DEFAULT_SETTINGS };

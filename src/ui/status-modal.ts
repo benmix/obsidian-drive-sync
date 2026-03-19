@@ -1,13 +1,11 @@
+import type { DriveSyncErrorCode } from "@contracts/data/error-types";
+import type { SyncJob } from "@contracts/data/sync-schema";
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import { getDriveSyncErrorMessageForCode } from "@errors";
+import { tr, trAny } from "@i18n";
+import { formatBytes } from "@ui/format";
 import { Modal, Setting } from "obsidian";
 import type { App } from "obsidian";
-
-import type { DriveSyncErrorCode } from "../contracts/data/error-types";
-import type { SyncJob } from "../contracts/data/sync-schema";
-import type { ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import { getDriveSyncErrorMessageForCode } from "../errors";
-import { tr, trAny } from "../i18n";
-
-import { formatBytes } from "./format";
 
 export class SyncStatusModal extends Modal {
 	private plugin: ObsidianDriveSyncPluginApi;

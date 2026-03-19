@@ -1,8 +1,7 @@
+import type { CommandContext } from "@contracts/plugin/command-context";
+import { tr } from "@i18n";
+import { DriveSyncSettingTab } from "@ui/settings-tab";
 import { Notice } from "obsidian";
-
-import type { CommandContext } from "../contracts/plugin/command-context";
-import { tr } from "../i18n";
-import { DriveSyncSettingTab } from "../ui/settings-tab";
 
 export function registerDriveSyncOpenSettingsCommand(context: CommandContext) {
 	const { plugin } = context;

@@ -1,4 +1,4 @@
-import type { ProtonLogLevel } from "../../../../contracts/provider/proton/log-level";
+import type { ProtonLogLevel } from "@contracts/provider/proton/log-level";
 
 const order: Record<ProtonLogLevel, number> = {
 	debug: 10,

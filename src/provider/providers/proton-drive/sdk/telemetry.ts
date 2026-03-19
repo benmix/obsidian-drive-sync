@@ -1,6 +1,5 @@
 import type { Logger, MetricEvent, Telemetry } from "@protontech/drive-sdk";
-
-import { logger } from "./logger";
+import { logger } from "@provider/providers/proton-drive/sdk/logger";
 
 function sanitizeUrl(url: string): string {
 	const queryIndex = url.indexOf("?");

@@ -1,5 +1,3 @@
-import { describe, expect, test } from "vitest";
-
 import {
 	createDriveSyncError,
 	getDriveSyncErrorMessageForCode,
@@ -10,7 +8,8 @@ import {
 	shouldPauseAuthForError,
 	shouldRetryBlockedDriveSyncError,
 	translateDriveSyncErrorUserMessage,
-} from "../../src/errors";
+} from "@errors";
+import { describe, expect, test } from "vitest";
 
 describe("DriveSyncError", () => {
 	test("normalizes nested auth/session expiry messages", () => {

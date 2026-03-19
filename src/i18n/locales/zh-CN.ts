@@ -1,4 +1,4 @@
-import type { EN } from "./en-US";
+import type { EN } from "@i18n/locales/en-US";
 export const ZH: Record<keyof typeof EN, string> = {
 	"settings.language.name": "语言",
 	"settings.language.desc": "选择插件界面语言。",

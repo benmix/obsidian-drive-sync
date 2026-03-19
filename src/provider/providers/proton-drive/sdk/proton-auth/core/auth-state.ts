@@ -5,7 +5,7 @@ import type {
 	Session,
 	TwoFAInfo,
 	User,
-} from "../../../../../../contracts/provider/proton/auth-types";
+} from "@contracts/provider/proton/auth-types";
 
 export type ProtonBootstrapData = {
 	user: User;

@@ -1,8 +1,7 @@
+import type { CommandContext } from "@contracts/plugin/command-context";
+import { tr } from "@i18n";
+import { validateRemoteOperations } from "@runtime/use-cases/remote-validation";
 import { Notice } from "obsidian";
-
-import type { CommandContext } from "../contracts/plugin/command-context";
-import { tr } from "../i18n";
-import { validateRemoteOperations } from "../runtime/use-cases/remote-validation";
 
 export function registerDriveSyncValidateRemoteOpsCommand(context: CommandContext) {
 	const { runRemoteCommand, showCommandError } = context;

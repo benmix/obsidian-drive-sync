@@ -1,19 +1,9 @@
+import type {
+	HttpOptions,
+	PreparedBody,
+	ResponseType,
+} from "@contracts/provider/proton/transport-http";
 import { requestUrl } from "obsidian";
-
-type ResponseType = "json" | "text" | "arrayBuffer";
-
-type HttpOptions = {
-	method?: string;
-	headers?: Headers | Record<string, string> | [string, string][];
-	body?: BodyInit | null;
-	timeoutMs?: number;
-	signal?: AbortSignal;
-};
-
-type PreparedBody = {
-	body?: string | ArrayBuffer;
-	contentType?: string;
-};
 
 function normalizeHeaders(
 	headers?: Headers | Record<string, string> | [string, string][],

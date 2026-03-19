@@ -1,10 +1,9 @@
-import { type ObsidianDriveSyncPluginApi } from "../contracts/plugin/plugin-api";
-import type { AnyRemoteProvider } from "../contracts/provider/remote-provider";
-import { type SyncRunRequest } from "../contracts/sync/run-request";
-import { PluginDataStateStore } from "../sync/state/state-store";
-import { SyncRunner } from "../sync/use-cases/sync-runner";
-
-import type { SessionManager } from "./session-manager";
+import { type ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { AnyRemoteProvider } from "@contracts/provider/remote-provider";
+import { type SyncRunRequest } from "@contracts/sync/run-request";
+import type { SessionManager } from "@runtime/session-manager";
+import { PluginDataStateStore } from "@sync/state/state-store";
+import { SyncRunner } from "@sync/use-cases/sync-runner";
 
 export class SyncCoordinator<TProvider extends AnyRemoteProvider> {
 	private readonly syncRunner = new SyncRunner(new PluginDataStateStore());

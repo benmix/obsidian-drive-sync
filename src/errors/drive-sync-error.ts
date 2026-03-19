@@ -1,9 +1,5 @@
-import type {
-	DriveSyncErrorCode,
-	ErrorCategory,
-	ErrorSeverity,
-} from "../contracts/data/error-types";
-import type { TranslationParams, Translator } from "../contracts/i18n";
+import type { DriveSyncErrorCode, ErrorCategory, ErrorSeverity } from "@contracts/data/error-types";
+import type { TranslationParams, Translator } from "@contracts/i18n";
 
 export type { DriveSyncErrorCode, ErrorCategory, ErrorSeverity };
 

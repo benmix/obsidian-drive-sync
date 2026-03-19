@@ -1,7 +1,6 @@
+import { planLocalChanges } from "@sync/planner/local-change-planner";
+import { createEntry, createState, FIXED_NOW } from "@tests/helpers/sync-fixtures";
 import { afterEach, describe, expect, test, vi } from "vitest";
-
-import { planLocalChanges } from "../../src/sync/planner/local-change-planner";
-import { createEntry, createState, FIXED_NOW } from "../helpers/sync-fixtures";
 
 describe("planLocalChanges", () => {
 	afterEach(() => {

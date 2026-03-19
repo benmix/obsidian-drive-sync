@@ -1,18 +1,17 @@
-import { Plugin } from "obsidian";
-
-import { registerCommands } from "./commands";
-import type { ObsidianDriveSyncPluginApi } from "./contracts/plugin/plugin-api";
-import type { DriveSyncSettings } from "./contracts/plugin/settings";
-import type { LocalProvider } from "./contracts/provider/local-provider";
+import { registerCommands } from "@commands";
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { DriveSyncSettings } from "@contracts/plugin/settings";
+import type { LocalProvider } from "@contracts/provider/local-provider";
 import type {
 	RemoteProviderClient,
 	RemoteProviderCredentialsOf,
 	RemoteProviderSessionOf,
-} from "./contracts/provider/remote-provider";
-import { createDriveSyncError } from "./errors";
-import type { RegisteredRemoteProvider } from "./provider/default-registry";
-import { PluginRuntime } from "./runtime/plugin-runtime";
-import { PluginState } from "./runtime/plugin-state";
+} from "@contracts/provider/remote-provider";
+import { createDriveSyncError } from "@errors";
+import type { RegisteredRemoteProvider } from "@provider/default-registry";
+import { PluginRuntime } from "@runtime/plugin-runtime";
+import { PluginState } from "@runtime/plugin-state";
+import { Plugin } from "obsidian";
 
 export default class ObsidianDriveSyncPlugin
 	extends Plugin

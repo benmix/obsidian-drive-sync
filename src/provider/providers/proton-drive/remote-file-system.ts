@@ -1,141 +1,23 @@
-import mimeTypes from "mime-types";
-
 import type {
 	RemoteEntryChangeEvent,
 	RemoteFileEntry,
 	RemoteFileSystem,
-} from "../../../contracts/filesystem/file-system";
+} from "@contracts/filesystem/file-system";
+import type {
+	ProtonDriveMaybeNode,
+	ProtonDriveNodeEntity,
+	ProtonDriveSdkApi,
+	ProtonDriveSdkClient,
+} from "@contracts/provider/proton/drive-sdk";
 import {
 	createDriveSyncError,
 	type DriveSyncErrorCode,
 	type ErrorCategory,
 	isNotFoundDriveSyncError,
 	normalizeUnknownDriveSyncError,
-} from "../../../errors";
-import { basename, dirname, normalizePath, splitPath } from "../../../filesystem/path";
-
-type ProtonDriveSdkApi = {
-	getLatestEventId?: (eventScopeId: string) => string | null;
-	setLatestEventId?: (eventScopeId: string, eventId?: string) => void;
-	iterateFolderChildren?: (parentNodeUid: string) => AsyncIterable<unknown>;
-	getFileDownloader?: (
-		nodeUid: string,
-		signal?: AbortSignal,
-	) => Promise<{
-		downloadToStream: (
-			streamFactory: WritableStream,
-			onProgress?: (downloadedBytes: number) => void,
-		) => { completion: () => Promise<void> };
-	}>;
-	getFileUploader?: (
-		parentFolderUid: string,
-		name: string,
-		metadata: {
-			mediaType: string;
-			expectedSize: number;
-			modificationTime?: Date;
-		},
-		signal?: AbortSignal,
-	) => Promise<{
-		uploadFromFile: (
-			file: File,
-			thumbnails: [],
-			onProgress?: (uploadedBytes: number) => void,
-		) => Promise<{
-			completion: () => Promise<{
-				nodeUid: string;
-				nodeRevisionUid: string;
-			}>;
-		}>;
-		uploadFromStream: (
-			stream: ReadableStream,
-			thumbnails: [],
-			onProgress?: (uploadedBytes: number) => void,
-		) => Promise<{
-			resume?: () => void;
-			completion: () => Promise<{
-				nodeUid: string;
-				nodeRevisionUid: string;
-			}>;
-		}>;
-	}>;
-	getFileRevisionUploader?: (
-		nodeUid: string,
-		metadata: {
-			mediaType: string;
-			expectedSize: number;
-			modificationTime?: Date;
-		},
-		signal?: AbortSignal,
-	) => Promise<{
-		uploadFromFile: (
-			file: File,
-			thumbnails: [],
-			onProgress?: (uploadedBytes: number) => void,
-		) => Promise<{
-			completion: () => Promise<{
-				nodeUid: string;
-				nodeRevisionUid: string;
-			}>;
-		}>;
-		uploadFromStream: (
-			stream: ReadableStream,
-			thumbnails: [],
-			onProgress?: (uploadedBytes: number) => void,
-		) => Promise<{
-			resume?: () => void;
-			completion: () => Promise<{
-				nodeUid: string;
-				nodeRevisionUid: string;
-			}>;
-		}>;
-	}>;
-	createFolder?: (
-		parentNodeUid: string,
-		name: string,
-		modificationTime?: Date,
-	) => Promise<unknown>;
-	renameNode?: (nodeUid: string, newName: string) => Promise<unknown>;
-	moveNodes?: (
-		nodeUids: string[],
-		newParentNodeUid: string,
-		signal?: AbortSignal,
-	) => AsyncIterable<{ ok: boolean; uid: string; error?: unknown }>;
-	trashNodes?: (
-		nodeUids: string[],
-	) => AsyncIterable<{ ok: boolean; uid: string; error?: unknown }>;
-	deleteNodes?: (
-		nodeUids: string[],
-	) => AsyncIterable<{ ok: boolean; uid: string; error?: unknown }>;
-	iterateNodes?: (nodeUids: string[]) => AsyncIterable<unknown>;
-	getNode?: (nodeUid: string) => Promise<unknown>;
-	getMyFilesRootFolder?: () => Promise<unknown>;
-	subscribeToTreeEvents?: (
-		treeEventScopeId: string,
-		callback: (event: unknown) => Promise<void>,
-	) => Promise<{ dispose: () => void }>;
-};
-
-type ProtonDriveClient = ProtonDriveSdkApi & {
-	sdk?: ProtonDriveSdkApi;
-};
-
-type NodeEntity = {
-	uid: string;
-	parentUid?: string;
-	name: string;
-	type: "file" | "folder";
-	modificationTime?: Date;
-	totalStorageSize?: number;
-	activeRevision?: {
-		uid: string;
-		claimedModificationTime?: Date;
-		storageSize?: number;
-	};
-	treeEventScopeId?: string;
-};
-
-type MaybeNode = { ok: true; value: NodeEntity } | { ok: false; error: unknown };
+} from "@errors";
+import { basename, dirname, normalizePath, splitPath } from "@filesystem/path";
+import mimeTypes from "mime-types";
 
 const DEFAULT_MEDIA_TYPE = "application/octet-stream";
 
@@ -145,12 +27,12 @@ function inferMediaType(fileName: string): string {
 }
 
 export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
-	private client: ProtonDriveClient;
+	private client: ProtonDriveSdkClient;
 	private scopeRootId: string;
 	private folderPathCache = new Map<string, string>();
 	private folderIdCache = new Map<string, string>();
 
-	constructor(client: ProtonDriveClient, scopeRootId: string) {
+	constructor(client: ProtonDriveSdkClient, scopeRootId: string) {
 		this.client = client;
 		this.scopeRootId = scopeRootId;
 		this.primeScopeRootCache();
@@ -559,7 +441,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		return { id };
 	}
 
-	private iterateFolderChildren(parentId: string): AsyncIterable<NodeEntity> {
+	private iterateFolderChildren(parentId: string): AsyncIterable<ProtonDriveNodeEntity> {
 		if (!this.sdkClient.iterateFolderChildren) {
 			throw unsupportedRemoteOperationError("iterate folder children");
 		}
@@ -567,7 +449,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		return {
 			async *[Symbol.asyncIterator]() {
 				for await (const node of iterator) {
-					const maybe = node as MaybeNode;
+					const maybe = node as ProtonDriveMaybeNode;
 					if (!maybe.ok) {
 						throw mapRemoteOperationError(maybe.error, {
 							code: "REMOTE_WRITE_FAILED",
@@ -597,11 +479,11 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 			debugMessage?: string;
 			details?: Record<string, unknown>;
 		},
-	): Promise<NodeEntity | null> {
+	): Promise<ProtonDriveNodeEntity | null> {
 		if (!this.sdkClient.getNode) {
 			return null;
 		}
-		const result = (await this.sdkClient.getNode(nodeId)) as MaybeNode;
+		const result = (await this.sdkClient.getNode(nodeId)) as ProtonDriveMaybeNode;
 		if (result.ok) {
 			return result.value;
 		}
@@ -641,7 +523,10 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 			if (!this.sdkClient.createFolder) {
 				throw unsupportedRemoteOperationError("create folder");
 			}
-			const created = (await this.sdkClient.createFolder(parentId, part)) as MaybeNode;
+			const created = (await this.sdkClient.createFolder(
+				parentId,
+				part,
+			)) as ProtonDriveMaybeNode;
 			if (!created.ok) {
 				throw mapRemoteOperationError(created.error, {
 					code: "REMOTE_WRITE_FAILED",
@@ -731,7 +616,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	}
 
 	private async resolveScopedPath(
-		node: NodeEntity,
+		node: ProtonDriveNodeEntity,
 		visited = new Set<string>(),
 	): Promise<string | null> {
 		if (node.uid === this.scopeRootId) {
@@ -776,7 +661,7 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 	}
 
 	private createRemoteEntry(
-		node: NodeEntity,
+		node: ProtonDriveNodeEntity,
 		relPath: string,
 		parentId = node.parentUid,
 	): RemoteFileEntry {
@@ -999,7 +884,7 @@ function classifyProtonRemoteError(error: unknown):
 	return undefined;
 }
 
-function getNodeMtimeMs(node: NodeEntity): number | undefined {
+function getNodeMtimeMs(node: ProtonDriveNodeEntity): number | undefined {
 	return (
 		node.activeRevision?.claimedModificationTime?.getTime?.() ??
 		node.modificationTime?.getTime?.() ??

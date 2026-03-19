@@ -1,7 +1,6 @@
+import { isDriveSyncError } from "@errors";
+import { ProtonDriveRemoteFileSystem } from "@provider/providers/proton-drive/remote-file-system";
 import { describe, expect, test, vi } from "vitest";
-
-import { isDriveSyncError } from "../../src/errors";
-import { ProtonDriveRemoteFileSystem } from "../../src/provider/providers/proton-drive/remote-file-system";
 
 describe("ProtonDriveRemoteFileSystem", () => {
 	test("prefers claimed revision modification time for file entries", async () => {
@@ -372,9 +371,11 @@ describe("ProtonDriveRemoteFileSystem", () => {
 						},
 					};
 				},
-				iterateFolderChildren: async function* (parentNodeUid: string) {
+				iterateFolderChildren(parentNodeUid: string) {
 					if (parentNodeUid === "root" || parentNodeUid === "folder-archive") {
-						return;
+						return {
+							async *[Symbol.asyncIterator]() {},
+						};
 					}
 					throw new Error(`unexpected parent: ${parentNodeUid}`);
 				},

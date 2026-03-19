@@ -7,7 +7,22 @@ import ts from "typescript";
 
 const repoRoot = process.cwd();
 const srcRoot = path.resolve(repoRoot, "src");
-const contractsRoot = path.resolve(srcRoot, "contracts");
+const testsRoot = path.resolve(repoRoot, "tests");
+const contractsRoot = path.resolve(srcRoot, "types");
+const aliasRoots = new Map([
+	["@commands", path.resolve(srcRoot, "commands")],
+	["@config", path.resolve(srcRoot, "internal-config.ts")],
+	["@contracts", contractsRoot],
+	["@data", path.resolve(srcRoot, "data")],
+	["@errors", path.resolve(srcRoot, "errors")],
+	["@filesystem", path.resolve(srcRoot, "filesystem")],
+	["@i18n", path.resolve(srcRoot, "i18n")],
+	["@provider", path.resolve(srcRoot, "provider")],
+	["@runtime", path.resolve(srcRoot, "runtime")],
+	["@sync", path.resolve(srcRoot, "sync")],
+	["@tests", testsRoot],
+	["@ui", path.resolve(srcRoot, "ui")],
+]);
 
 const contractAllowedDependencies = new Map([
 	["plugin", new Set(["plugin", "provider", "sync"])],
@@ -152,7 +167,7 @@ async function validateScope({
 			}
 
 			const specifier = statement.moduleSpecifier.text;
-			if (!specifier.startsWith(".")) {
+			if (!specifier.startsWith(".") && !isSupportedAliasSpecifier(specifier)) {
 				continue;
 			}
 
@@ -222,7 +237,13 @@ async function listTypeScriptFiles(dir) {
 }
 
 async function resolveImport(fromFile, specifier) {
-	const basePath = path.resolve(path.dirname(fromFile), specifier);
+	const aliasedRoot = [...aliasRoots.entries()].find(
+		([alias]) => specifier === alias || specifier.startsWith(`${alias}/`),
+	);
+	const suffix = aliasedRoot ? specifier.slice(aliasedRoot[0].length + 1) : "";
+	const basePath = aliasedRoot
+		? path.resolve(aliasedRoot[1], suffix)
+		: path.resolve(path.dirname(fromFile), specifier);
 	const candidates = [basePath, `${basePath}.ts`, path.join(basePath, "index.ts")];
 	for (const candidate of candidates) {
 		if (await isFile(candidate)) {
@@ -230,6 +251,12 @@ async function resolveImport(fromFile, specifier) {
 		}
 	}
 	return null;
+}
+
+function isSupportedAliasSpecifier(specifier) {
+	return [...aliasRoots.keys()].some(
+		(alias) => specifier === alias || specifier.startsWith(`${alias}/`),
+	);
 }
 
 async function isFile(targetPath) {

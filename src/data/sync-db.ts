@@ -1,11 +1,5 @@
+import type { SyncEntryTable, SyncJobTable, SyncLog, SyncMeta } from "@contracts/data/sync-schema";
 import Dexie, { type Table } from "dexie";
-
-import type {
-	SyncEntryTable,
-	SyncJobTable,
-	SyncLog,
-	SyncMeta,
-} from "../contracts/data/sync-schema";
 
 export const SYNC_STATE_DB_NAME = "drive-sync-state";
 export const SYNC_STATE_DB_VERSION = 2;

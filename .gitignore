@@ -25,3 +25,5 @@ example_repo
 
 # output
 dist
+.tsbuild
+*.tsbuildinfo

@@ -1,6 +1,6 @@
-import type { CommandContext } from "../contracts/plugin/command-context";
-import { tr } from "../i18n";
-import { openRemoteLoginModal } from "../ui/auth-required-modal";
+import type { CommandContext } from "@contracts/plugin/command-context";
+import { tr } from "@i18n";
+import { openRemoteLoginModal } from "@ui/auth-required-modal";
 
 export function registerDriveSyncLoginCommand(context: CommandContext) {
 	const { plugin } = context;

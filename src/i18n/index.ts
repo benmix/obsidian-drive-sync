@@ -1,9 +1,7 @@
+import type { SupportedLocale, TranslationParams } from "@contracts/i18n";
+import { EN } from "@i18n/locales/en-US";
+import { ZH } from "@i18n/locales/zh-CN";
 import { getLanguage } from "obsidian";
-
-import type { SupportedLocale, TranslationParams } from "../contracts/i18n";
-
-import { EN } from "./locales/en-US";
-import { ZH } from "./locales/zh-CN";
 
 type TranslationKey = keyof typeof EN;
 

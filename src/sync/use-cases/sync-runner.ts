@@ -1,14 +1,14 @@
-import type { LocalFileSystem, RemoteFileSystem } from "../../contracts/filesystem/file-system";
-import { type SyncRunRequest } from "../../contracts/sync/run-request";
-import { type StateStore } from "../../contracts/sync/state-store";
-import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "../../contracts/sync/strategy";
-import type { DriveSyncError } from "../../errors";
-import { SyncEngine } from "../engine/sync-engine";
-import { isInitializationPhase } from "../planner/initialization";
-import { filterLocalChanges } from "../planner/local-change-filter";
-import { planLocalChanges } from "../planner/local-change-planner";
-import { pollRemoteChanges } from "../planner/remote-poller";
-import { now } from "../support/utils";
+import type { LocalFileSystem, RemoteFileSystem } from "@contracts/filesystem/file-system";
+import { type SyncRunRequest } from "@contracts/sync/run-request";
+import { type StateStore } from "@contracts/sync/state-store";
+import { DEFAULT_SYNC_STRATEGY, type SyncStrategy } from "@contracts/sync/strategy";
+import type { DriveSyncError } from "@errors";
+import { SyncEngine } from "@sync/engine/sync-engine";
+import { isInitializationPhase } from "@sync/planner/initialization";
+import { filterLocalChanges } from "@sync/planner/local-change-filter";
+import { planLocalChanges } from "@sync/planner/local-change-planner";
+import { pollRemoteChanges } from "@sync/planner/remote-poller";
+import { now } from "@sync/support/utils";
 
 const BACKGROUND_RECONCILE_INTERVAL_MS = 15 * 60 * 1000;
 

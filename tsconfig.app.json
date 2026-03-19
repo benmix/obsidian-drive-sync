@@ -1,0 +1,30 @@
+{
+	"extends": "./tsconfig.base.json",
+	"compilerOptions": {
+		"rootDir": ".",
+		"paths": {
+			"@commands": ["./src/commands/index.ts"],
+			"@commands/*": ["./src/commands/*"],
+			"@config": ["./src/internal-config.ts"],
+			"@contracts/*": ["./src/types/*"],
+			"@data/*": ["./src/data/*"],
+			"@errors": ["./src/errors/index.ts"],
+			"@errors/*": ["./src/errors/*"],
+			"@filesystem/*": ["./src/filesystem/*"],
+			"@i18n": ["./src/i18n/index.ts"],
+			"@i18n/*": ["./src/i18n/*"],
+			"@provider/*": ["./src/provider/*"],
+			"@runtime/*": ["./src/runtime/*"],
+			"@sync/*": ["./src/sync/*"],
+			"@ui/*": ["./src/ui/*"]
+		},
+		"lib": ["DOM", "ES2020"],
+		"composite": true,
+		"declaration": true,
+		"emitDeclarationOnly": true,
+		"outDir": "./.tsbuild/web",
+		"tsBuildInfoFile": "./.tsbuild/tsconfig.web.tsbuildinfo"
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": ["dist", ".tsbuild", "node_modules"]
+}

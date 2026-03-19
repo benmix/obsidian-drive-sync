@@ -1,6 +1,6 @@
-import type { CommandContext } from "../contracts/plugin/command-context";
-import { tr } from "../i18n";
-import { SyncStatusModal } from "../ui/status-modal";
+import type { CommandContext } from "@contracts/plugin/command-context";
+import { tr } from "@i18n";
+import { SyncStatusModal } from "@ui/status-modal";
 
 export function registerDriveSyncShowStatusCommand(context: CommandContext) {
 	const { plugin } = context;
