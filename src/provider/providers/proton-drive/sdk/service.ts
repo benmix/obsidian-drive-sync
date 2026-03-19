@@ -14,6 +14,7 @@ export class ProtonDriveService {
 
 	async connect(
 		session: ProtonSession,
+		getSession?: () => ProtonSession | null,
 		onTokenRefresh?: () => Promise<void>,
 	): Promise<ProtonDriveConnectedClient | null> {
 		if (this.client && this.sessionRef === session) {
@@ -27,7 +28,7 @@ export class ProtonDriveService {
 			return this.connecting;
 		}
 
-		this.connecting = this.createClient(session, onTokenRefresh).finally(() => {
+		this.connecting = this.createClient(session, getSession, onTokenRefresh).finally(() => {
 			this.connecting = null;
 		});
 
@@ -56,10 +57,11 @@ export class ProtonDriveService {
 
 	private async createClient(
 		session: ProtonSession,
+		getSession?: () => ProtonSession | null,
 		onTokenRefresh?: () => Promise<void>,
 	): Promise<ProtonDriveConnectedClient | null> {
 		const { httpClient, account, openPGPCryptoModule, srpModule, telemetry } =
-			await buildSdkSessionClient(session, onTokenRefresh);
+			await buildSdkSessionClient(session, onTokenRefresh, getSession);
 
 		const sdk = new ProtonDriveClient({
 			httpClient,

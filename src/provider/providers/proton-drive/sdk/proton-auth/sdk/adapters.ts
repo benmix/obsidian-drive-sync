@@ -13,21 +13,19 @@ import type {
 	AuthInfo,
 	Session,
 	SrpResult,
-} from "../../../../../contracts/provider/proton/auth-types";
+} from "../../../../../../contracts/provider/proton/auth-types";
 import {
 	API_BASE_URL,
 	APP_VERSION,
 	AUTH_VERSION,
 	SRP_LEN,
-} from "../../../../../contracts/provider/proton/auth-types";
-import type { OpenPGPCryptoInterface } from "../../../../../contracts/provider/proton/openpgp";
+} from "../../../../../../contracts/provider/proton/auth-types";
+import type { OpenPGPCryptoInterface } from "../../../../../../contracts/provider/proton/openpgp";
 import type {
 	SRPModuleInterface,
 	SRPVerifier,
-} from "../../../../../contracts/provider/proton/srp-module";
-import { wrapPrivateKey, wrapPublicKey } from "../openpgp-proxy";
-
-import { apiRequest } from "./api";
+} from "../../../../../../contracts/provider/proton/srp-module";
+import { wrapPrivateKey, wrapPublicKey } from "../../openpgp-proxy";
 import {
 	base64Encode,
 	bigIntToUint8ArrayLE,
@@ -36,9 +34,10 @@ import {
 	modExp,
 	uint8ArrayToBigIntLE,
 	uint8ArrayToBinaryString,
-} from "./crypto-utils";
-import { requestHttp } from "./http";
-import { getSrp, verifyAndGetModulus } from "./srp";
+} from "../crypto/crypto-utils";
+import { getSrp, verifyAndGetModulus } from "../crypto/srp";
+import { apiRequest } from "../transport/api";
+import { requestHttp } from "../transport/http";
 
 // ============================================================================
 // SDK Integration Helpers
@@ -48,30 +47,40 @@ type OwnAddress = ProtonDriveAccountAddress;
 type DrivePrivateKey = OwnAddress["keys"][number]["key"];
 type DrivePublicKey = Awaited<ReturnType<ProtonDriveAccount["getPublicKeys"]>>[number];
 
+function getRequiredSession(getSession: () => Session | null): Session {
+	const currentSession = getSession();
+	if (!currentSession) {
+		throw new Error("No session available");
+	}
+	return currentSession;
+}
+
 /**
  * Create an HTTP client for the Proton Drive SDK
  */
 export function createProtonHttpClient(
-	session: Session,
+	session: Session | (() => Session | null),
 	onTokenRefresh?: () => Promise<void>,
 ): ProtonDriveHTTPClient {
-	// Helper to build the full URL - handles both relative and absolute URLs
+	const getSession = (): Session | null => (typeof session === "function" ? session() : session);
+
 	const buildUrl = (url: string): string => {
-		// If URL is already absolute, use it as-is
 		if (url.startsWith("http://") || url.startsWith("https://")) {
 			return url;
 		}
-		// Otherwise, prepend the API base URL
 		return `${API_BASE_URL}/${url}`;
 	};
 
-	// Helper to update auth headers with current session tokens
 	const setAuthHeaders = (headers: Headers) => {
-		if (session.UID) {
-			headers.set("x-pm-uid", session.UID);
+		const currentSession = getSession();
+		if (!currentSession) {
+			return;
 		}
-		if (session.AccessToken) {
-			headers.set("Authorization", `Bearer ${session.AccessToken}`);
+		if (currentSession.UID) {
+			headers.set("x-pm-uid", currentSession.UID);
+		}
+		if (currentSession.AccessToken) {
+			headers.set("Authorization", `Bearer ${currentSession.AccessToken}`);
 		}
 		headers.set("x-pm-appversion", APP_VERSION);
 	};
@@ -80,102 +89,75 @@ export function createProtonHttpClient(
 		return body;
 	};
 
+	const executeAuthorizedRequest = async (
+		input: {
+			url: string;
+			method: string;
+			headers: Headers;
+			body?: BodyInit;
+			timeoutMs?: number;
+			signal?: AbortSignal;
+		},
+		responseType: "json" | "arrayBuffer",
+	): Promise<Response> => {
+		const fullUrl = buildUrl(input.url);
+		const requestOnce = async () =>
+			await requestHttp(
+				fullUrl,
+				{
+					method: input.method,
+					headers: input.headers,
+					body: normalizeBody(input.body),
+					timeoutMs: input.timeoutMs,
+					signal: input.signal,
+				},
+				responseType,
+			);
+
+		setAuthHeaders(input.headers);
+		const initialResponse = await requestOnce();
+		const currentSession = getSession();
+		if (initialResponse.status !== 401 || !currentSession?.RefreshToken || !onTokenRefresh) {
+			return initialResponse;
+		}
+		try {
+			await onTokenRefresh();
+			setAuthHeaders(input.headers);
+			return await requestOnce();
+		} catch {
+			return initialResponse;
+		}
+	};
+
 	return {
 		async fetchJson(request: ProtonDriveHTTPClientJsonRequest): Promise<Response> {
 			const { url, method, headers, json, timeoutMs, signal } = request;
-
-			// Add auth headers
-			setAuthHeaders(headers);
-
-			const fullUrl = buildUrl(url);
-			const controller = new AbortController();
-			const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-			try {
-				let response = await requestHttp(
-					fullUrl,
-					{
-						method,
-						headers,
-						body: normalizeBody(json ? JSON.stringify(json) : undefined),
-						signal: signal || controller.signal,
-					},
-					"json",
-				);
-
-				// Handle expired access token (401) - try to refresh and retry
-				if (response.status === 401 && session.RefreshToken && onTokenRefresh) {
-					try {
-						await onTokenRefresh();
-						// Update headers with new token and retry
-						setAuthHeaders(headers);
-						response = await requestHttp(
-							fullUrl,
-							{
-								method,
-								headers,
-								body: normalizeBody(json ? JSON.stringify(json) : undefined),
-								signal: signal || controller.signal,
-							},
-							"json",
-						);
-					} catch {
-						// Refresh failed, return original 401 response
-					}
-				}
-				return response;
-			} finally {
-				clearTimeout(timeout);
-			}
+			return await executeAuthorizedRequest(
+				{
+					url,
+					method,
+					headers,
+					body: json ? JSON.stringify(json) : undefined,
+					timeoutMs,
+					signal,
+				},
+				"json",
+			);
 		},
 
 		async fetchBlob(request: ProtonDriveHTTPClientBlobRequest): Promise<Response> {
 			const { url, method, headers, body, timeoutMs, signal } = request;
-
-			// Add auth headers
-			setAuthHeaders(headers);
-
-			const fullUrl = buildUrl(url);
-			const controller = new AbortController();
-			const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-			try {
-				let response = await requestHttp(
-					fullUrl,
-					{
-						method,
-						headers,
-						body: normalizeBody(body),
-						signal: signal || controller.signal,
-					},
-					"arrayBuffer",
-				);
-
-				// Handle expired access token (401) - try to refresh and retry
-				if (response.status === 401 && session.RefreshToken && onTokenRefresh) {
-					try {
-						await onTokenRefresh();
-						// Update headers with new token and retry
-						setAuthHeaders(headers);
-						response = await requestHttp(
-							fullUrl,
-							{
-								method,
-								headers,
-								body: normalizeBody(body),
-								signal: signal || controller.signal,
-							},
-							"arrayBuffer",
-						);
-					} catch {
-						// Refresh failed, return original 401 response
-					}
-				}
-
-				return response;
-			} finally {
-				clearTimeout(timeout);
-			}
+			return await executeAuthorizedRequest(
+				{
+					url,
+					method,
+					headers,
+					body,
+					timeoutMs,
+					signal,
+				},
+				"arrayBuffer",
+			);
 		},
 	};
 }
@@ -184,9 +166,11 @@ export function createProtonHttpClient(
  * Create a Proton account interface for the SDK
  */
 export function createProtonAccount(
-	session: Session,
+	session: Session | (() => Session | null),
 	cryptoModule: OpenPGPCryptoInterface,
 ): ProtonDriveAccount {
+	const getSession = (): Session | null => (typeof session === "function" ? session() : session);
+
 	// Cache for decrypted keys to avoid re-decrypting on each call
 	const decryptedKeysCache = new Map<string, openpgp.PrivateKey>();
 
@@ -207,7 +191,10 @@ export function createProtonAccount(
 
 	return {
 		async getOwnPrimaryAddress(): Promise<OwnAddress> {
-			const primaryAddress = session.addresses?.find((a) => a.Type === 1 && a.Status === 1);
+			const currentSession = getRequiredSession(getSession);
+			const primaryAddress = currentSession.addresses?.find(
+				(a) => a.Type === 1 && a.Status === 1,
+			);
 			if (!primaryAddress) {
 				throw new Error("No primary address found");
 			}
@@ -223,7 +210,8 @@ export function createProtonAccount(
 		},
 
 		async getOwnAddress(emailOrAddressId: string): Promise<OwnAddress> {
-			const address = session.addresses?.find(
+			const currentSession = getRequiredSession(getSession);
+			const address = currentSession.addresses?.find(
 				(a) => a.Email === emailOrAddressId || a.ID === emailOrAddressId,
 			);
 			if (!address) {
@@ -240,7 +228,8 @@ export function createProtonAccount(
 			};
 		},
 		async getOwnAddresses(): Promise<OwnAddress[]> {
-			const addresses = session.addresses ?? [];
+			const currentSession = getRequiredSession(getSession);
+			const addresses = currentSession.addresses ?? [];
 			if (addresses.length === 0) {
 				throw new Error("No addresses found");
 			}
@@ -260,13 +249,14 @@ export function createProtonAccount(
 		},
 
 		async hasProtonAccount(email: string): Promise<boolean> {
+			const currentSession = getRequiredSession(getSession);
 			// Query the key transparency endpoint to check if the email has a Proton account
 			try {
 				const response = await apiRequest<ApiResponse & { Keys?: unknown[] }>(
 					"GET",
 					`core/v4/keys?Email=${encodeURIComponent(email)}`,
 					null,
-					session,
+					currentSession,
 				);
 				return response.Keys !== undefined && response.Keys.length > 0;
 			} catch {
@@ -275,12 +265,13 @@ export function createProtonAccount(
 		},
 
 		async getPublicKeys(email: string): Promise<DrivePublicKey[]> {
+			const currentSession = getRequiredSession(getSession);
 			try {
 				const response = await apiRequest<ApiResponse & { Keys?: { PublicKey: string }[] }>(
 					"GET",
 					`core/v4/keys?Email=${encodeURIComponent(email)}`,
 					null,
-					session,
+					currentSession,
 				);
 
 				const keys: DrivePublicKey[] = [];

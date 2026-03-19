@@ -7,13 +7,17 @@ const fetchJsonMock = vi.hoisted(() =>
 	})),
 );
 
-vi.mock("../../src/provider/providers/proton-drive/sdk/proton-auth/sdk-helpers", () => ({
+vi.mock("../../src/provider/providers/proton-drive/sdk/proton-auth/sdk/adapters", () => ({
 	createProtonHttpClient: () => ({
 		fetchJson: fetchJsonMock,
 	}),
 }));
 
-vi.mock("../../src/provider/providers/proton-drive/sdk/proton-auth/core", () => ({
+vi.mock("../../src/provider/providers/proton-drive/sdk/proton-auth/core/auth-errors", () => ({
+	isProtonAuthError: () => false,
+}));
+
+vi.mock("../../src/provider/providers/proton-drive/sdk/proton-auth/core/client", () => ({
 	ProtonAuth: class {},
 }));
 
@@ -77,6 +81,71 @@ describe("ProtonDriveAuthService", () => {
 			code: "NETWORK_RATE_LIMITED",
 			category: "network",
 			retryable: true,
+		});
+	});
+
+	test("login normalizes mailbox password follow-up failures", async () => {
+		const service = new ProtonDriveAuthService() as ProtonDriveAuthService & {
+			authClient: {
+				login: () => Promise<never>;
+				submitMailboxPassword: () => Promise<never>;
+			};
+			validateSessionWithHttpClient: () => Promise<void>;
+		};
+
+		service.authClient = {
+			login: async () => {
+				const error = new Error("mailbox password required") as Error & {
+					requiresMailboxPassword?: boolean;
+				};
+				error.requiresMailboxPassword = true;
+				throw error;
+			},
+			submitMailboxPassword: async () => {
+				const error = new Error("too many requests") as Error & {
+					status?: number;
+				};
+				error.status = 429;
+				throw error;
+			},
+		};
+		service.validateSessionWithHttpClient = async () => {};
+
+		await expect(
+			service.login({
+				username: "user@example.com",
+				password: "password",
+				mailboxPassword: "mailbox-password",
+			}),
+		).rejects.toMatchObject({
+			code: "NETWORK_RATE_LIMITED",
+			category: "network",
+			retryable: true,
+		});
+	});
+
+	test("submitTwoFactor normalizes downstream auth failures", async () => {
+		const service = new ProtonDriveAuthService() as ProtonDriveAuthService & {
+			authClient: {
+				submit2FA: () => Promise<never>;
+			};
+			validateSessionWithHttpClient: () => Promise<void>;
+		};
+
+		service.authClient = {
+			submit2FA: async () => {
+				const error = new Error("unauthorized") as Error & {
+					status?: number;
+				};
+				error.status = 401;
+				throw error;
+			},
+		};
+		service.validateSessionWithHttpClient = async () => {};
+
+		await expect(service.submitTwoFactor("123456")).rejects.toMatchObject({
+			code: "AUTH_REAUTH_REQUIRED",
+			category: "auth",
 		});
 	});
 

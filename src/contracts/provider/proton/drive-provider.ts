@@ -31,6 +31,7 @@ export interface ProtonDriveAuthServiceContract {
 export interface ProtonDriveServiceContract {
 	connect(
 		session: ProtonSession,
+		getSession?: () => ProtonSession | null,
 		onTokenRefresh?: () => Promise<void>,
 	): Promise<ProtonDriveConnectedClient | null>;
 	disconnect(): void;

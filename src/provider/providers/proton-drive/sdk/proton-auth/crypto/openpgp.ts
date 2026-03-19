@@ -3,7 +3,7 @@ import * as openpgp from "openpgp";
 import type {
 	OpenPGPCryptoInterface,
 	SessionKey,
-} from "../../../../../contracts/provider/proton/openpgp";
+} from "../../../../../../contracts/provider/proton/openpgp";
 
 import { base64Encode } from "./crypto-utils";
 

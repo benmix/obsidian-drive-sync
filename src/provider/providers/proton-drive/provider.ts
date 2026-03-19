@@ -69,7 +69,11 @@ export class ProtonDriveRemoteProvider implements ProtonDriveProvider {
 		session: ProtonSession,
 		options?: RemoteProviderConnectOptions,
 	): Promise<ProtonDriveConnectedClient | null> {
-		return await this.driveService.connect(session, options?.onTokenRefresh);
+		return await this.driveService.connect(
+			session,
+			() => this.authService.getSession() ?? session,
+			options?.onTokenRefresh,
+		);
 	}
 
 	disconnect(): void {

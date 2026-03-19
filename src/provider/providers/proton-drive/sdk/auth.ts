@@ -8,9 +8,10 @@ import type {
 import { createDriveSyncError, normalizeUnknownDriveSyncError } from "../../../../errors";
 
 import { logger } from "./logger";
-import type { ProtonAuth } from "./proton-auth/core";
-import { ProtonAuth as ProtonAuthClient } from "./proton-auth/core";
-import { createProtonHttpClient } from "./proton-auth/sdk-helpers";
+import { isProtonAuthError } from "./proton-auth/core/auth-errors";
+import type { ProtonAuth } from "./proton-auth/core/client";
+import { ProtonAuth as ProtonAuthClient } from "./proton-auth/core/client";
+import { createProtonHttpClient } from "./proton-auth/sdk/adapters";
 
 export class ProtonDriveAuthService {
 	private authClient: ProtonAuth | null = null;
@@ -49,7 +50,13 @@ export class ProtonDriveAuthService {
 						cause: error,
 					});
 				}
-				await client.submitMailboxPassword(credentials.mailboxPassword);
+				try {
+					await client.submitMailboxPassword(credentials.mailboxPassword);
+				} catch (mailboxError) {
+					throw normalizeAuthError(mailboxError, {
+						userMessage: "Authentication failed. Check your credentials and try again.",
+					});
+				}
 			} else {
 				logger.warn("Authentication failed");
 				throw normalizeAuthError(error, {
@@ -81,7 +88,13 @@ export class ProtonDriveAuthService {
 	async submitTwoFactor(code: string): Promise<AuthSession> {
 		const client = this.getAuthClient();
 		logger.info("Submitting two-factor code");
-		await client.submit2FA(code);
+		try {
+			await client.submit2FA(code);
+		} catch (error) {
+			throw normalizeAuthError(error, {
+				userMessage: "Authentication failed. Check your credentials and try again.",
+			});
+		}
 		const session = client.getSession();
 		if (!session) {
 			logger.warn("Two-factor flow completed without a session");
@@ -164,11 +177,14 @@ export class ProtonDriveAuthService {
 	}
 
 	private async validateSessionWithHttpClient(session: Session): Promise<void> {
-		const httpClient = createProtonHttpClient(session, async () => {
-			if (this.authClient) {
-				await this.authClient.refreshTokenWithForkRecovery();
-			}
-		});
+		const httpClient = createProtonHttpClient(
+			() => this.authClient?.getSession() ?? session,
+			async () => {
+				if (this.authClient) {
+					await this.authClient.refreshTokenWithForkRecovery();
+				}
+			},
+		);
 		let response: Response;
 		try {
 			response = await httpClient.fetchJson({
@@ -259,6 +275,46 @@ function classifyProtonAuthError(error: unknown):
 	  }
 	| undefined {
 	const apiError = error as Partial<ApiError> | undefined;
+	if (isProtonAuthError(error)) {
+		switch (error.kind) {
+			case "two_factor_required":
+				return {
+					code: "AUTH_REAUTH_REQUIRED",
+					category: "auth",
+					userMessage: "Two-factor authentication is required.",
+					userMessageKey: "error.auth.twoFactorRequired",
+				};
+			case "mailbox_password_required":
+				return {
+					code: "AUTH_REAUTH_REQUIRED",
+					category: "auth",
+					userMessage: "Mailbox password is required for this account.",
+					userMessageKey: "error.auth.mailboxPasswordRequired",
+				};
+			case "invalid_credentials":
+				return {
+					code: "AUTH_INVALID_CREDENTIALS",
+					category: "auth",
+					userMessage: "Authentication failed. Check your credentials and try again.",
+					userMessageKey: "error.auth.invalidCredentials",
+				};
+			case "session_expired":
+				return {
+					code: "AUTH_SESSION_EXPIRED",
+					category: "auth",
+					userMessage: "Session expired. Sign in again to continue.",
+					userMessageKey: "error.auth.sessionExpired",
+				};
+			case "invalid_state":
+			default:
+				return {
+					code: "AUTH_REAUTH_REQUIRED",
+					category: "auth",
+					userMessage: "Authentication required. Sign in again to continue.",
+					userMessageKey: "error.auth.reauthRequired",
+				};
+		}
+	}
 	const status = typeof apiError?.status === "number" ? apiError.status : undefined;
 	const code =
 		typeof apiError?.code === "number"

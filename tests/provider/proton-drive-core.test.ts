@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { INVALID_REFRESH_TOKEN_CODE } from "../../src/contracts/provider/proton/auth-types";
+
 const requestHttpMock = vi.hoisted(() =>
 	vi.fn(async () => new Response(JSON.stringify({ Code: 1000 }), { status: 200 })),
 );
 
-vi.mock("../../src/provider/providers/proton-drive/sdk/proton-auth/http", () => ({
+vi.mock("../../src/provider/providers/proton-drive/sdk/proton-auth/transport/http", () => ({
 	requestHttp: requestHttpMock,
 }));
 
-import { ProtonAuth } from "../../src/provider/providers/proton-drive/sdk/proton-auth/core";
+import { ProtonAuth } from "../../src/provider/providers/proton-drive/sdk/proton-auth/core/client";
 
 describe("ProtonAuth", () => {
 	beforeEach(() => {
@@ -20,29 +22,36 @@ describe("ProtonAuth", () => {
 
 	test("logout revokes child and parent sessions and clears auth state", async () => {
 		const auth = new ProtonAuth() as ProtonAuth & {
-			session: {
-				UID: string;
-				AccessToken: string;
-				RefreshToken: string;
-			} | null;
+			store: {
+				setAuthenticated: (sessions: {
+					parentSession: {
+						UID: string;
+						AccessToken: string;
+						RefreshToken: string;
+					};
+					childSession: {
+						UID: string;
+						AccessToken: string;
+						RefreshToken: string;
+					};
+				}) => void;
+				getState: () => { kind: string };
+				getSession: () => unknown;
+				getParentSession: () => unknown;
+			};
+		};
+		auth.store.setAuthenticated({
+			childSession: {
+				UID: "child-uid",
+				AccessToken: "child-access",
+				RefreshToken: "child-refresh",
+			},
 			parentSession: {
-				UID: string;
-				AccessToken: string;
-				RefreshToken: string;
-			} | null;
-			pendingAuthResponse: { UID: string } | null;
-		};
-		auth.session = {
-			UID: "child-uid",
-			AccessToken: "child-access",
-			RefreshToken: "child-refresh",
-		};
-		auth.parentSession = {
-			UID: "parent-uid",
-			AccessToken: "parent-access",
-			RefreshToken: "parent-refresh",
-		};
-		auth.pendingAuthResponse = { UID: "pending" };
+				UID: "parent-uid",
+				AccessToken: "parent-access",
+				RefreshToken: "parent-refresh",
+			},
+		});
 
 		await auth.logout();
 
@@ -71,40 +80,175 @@ describe("ProtonAuth", () => {
 			}),
 			"json",
 		);
-		expect(auth.session).toBeNull();
-		expect(auth.parentSession).toBeNull();
-		expect(auth.pendingAuthResponse).toBeNull();
+		expect(auth.store.getState()).toEqual({ kind: "idle" });
+		expect(auth.store.getSession()).toBeNull();
+		expect(auth.store.getParentSession()).toBeNull();
 	});
 
 	test("logout still clears all session state when revoke requests fail", async () => {
 		const auth = new ProtonAuth() as ProtonAuth & {
-			session: {
-				UID: string;
-				AccessToken: string;
-				RefreshToken: string;
-			} | null;
+			store: {
+				setAuthenticated: (sessions: {
+					parentSession: {
+						UID: string;
+						AccessToken: string;
+						RefreshToken: string;
+					};
+					childSession: {
+						UID: string;
+						AccessToken: string;
+						RefreshToken: string;
+					};
+				}) => void;
+				getState: () => { kind: string };
+				getSession: () => unknown;
+				getParentSession: () => unknown;
+			};
+		};
+		auth.store.setAuthenticated({
+			childSession: {
+				UID: "child-uid",
+				AccessToken: "child-access",
+				RefreshToken: "child-refresh",
+			},
 			parentSession: {
-				UID: string;
-				AccessToken: string;
-				RefreshToken: string;
-			} | null;
-		};
-		auth.session = {
-			UID: "child-uid",
-			AccessToken: "child-access",
-			RefreshToken: "child-refresh",
-		};
-		auth.parentSession = {
-			UID: "parent-uid",
-			AccessToken: "parent-access",
-			RefreshToken: "parent-refresh",
-		};
+				UID: "parent-uid",
+				AccessToken: "parent-access",
+				RefreshToken: "parent-refresh",
+			},
+		});
 		requestHttpMock.mockRejectedValueOnce(new Error("network down"));
 		requestHttpMock.mockRejectedValueOnce(new Error("still down"));
 
 		await expect(auth.logout()).resolves.toBeUndefined();
 		expect(requestHttpMock).toHaveBeenCalledTimes(2);
-		expect(auth.session).toBeNull();
-		expect(auth.parentSession).toBeNull();
+		expect(auth.store.getState()).toEqual({ kind: "idle" });
+		expect(auth.store.getSession()).toBeNull();
+		expect(auth.store.getParentSession()).toBeNull();
+	});
+
+	test("submitMailboxPassword clears auth state when child fork fails", async () => {
+		const apiClient = {
+			getUser: vi.fn(async () => ({ ID: "user-1", Keys: [] })),
+			getKeySalts: vi.fn(async () => []),
+			getAddresses: vi.fn(async () => []),
+			refreshTokens: vi.fn(async () => {
+				const error = new Error("temporary outage") as Error & {
+					status?: number;
+				};
+				error.status = 503;
+				throw error;
+			}),
+		};
+		const keyService = {
+			hydrateSessionFromPassword: vi.fn(async (session: Record<string, unknown>) => ({
+				...session,
+				keyPassword: "salted-key-pass",
+			})),
+		};
+		const auth = new ProtonAuth(apiClient as never, keyService as never) as ProtonAuth & {
+			store: {
+				beginMailboxPasswordChallenge: (parentSession: {
+					UID: string;
+					AccessToken: string;
+					RefreshToken: string;
+				}) => void;
+				getState: () => { kind: string };
+				getSession: () => unknown;
+				getParentSession: () => unknown;
+			};
+		};
+
+		auth.store.beginMailboxPasswordChallenge({
+			UID: "parent-uid",
+			AccessToken: "parent-access",
+			RefreshToken: "parent-refresh",
+		});
+
+		await expect(auth.submitMailboxPassword("mailbox-pass")).rejects.toMatchObject({
+			status: 503,
+		});
+		expect(auth.store.getState()).toEqual({ kind: "idle" });
+		expect(auth.store.getSession()).toBeNull();
+		expect(auth.store.getParentSession()).toBeNull();
+	});
+
+	test("refreshToken forks a new child without refreshing the parent twice", async () => {
+		const refreshTokens = vi
+			.fn()
+			.mockImplementationOnce(async () => {
+				const error = new Error("invalid refresh token") as Error & {
+					code?: number;
+					status?: number;
+				};
+				error.code = INVALID_REFRESH_TOKEN_CODE;
+				error.status = 401;
+				throw error;
+			})
+			.mockImplementationOnce(async () => ({
+				accessToken: "parent-access-2",
+				refreshToken: "parent-refresh-2",
+			}));
+		const apiClient = {
+			refreshTokens,
+			pushForkSession: vi.fn(async () => ({
+				Code: 1000,
+				Selector: "selector-1",
+			})),
+			pullForkSession: vi.fn(async () => ({
+				Code: 1000,
+				UID: "child-uid-2",
+				AccessToken: "child-access-2",
+				RefreshToken: "child-refresh-2",
+				UserID: "user-1",
+			})),
+		};
+		const auth = new ProtonAuth(apiClient as never) as ProtonAuth & {
+			store: {
+				setAuthenticated: (sessions: {
+					parentSession: {
+						UID: string;
+						AccessToken: string;
+						RefreshToken: string;
+						keyPassword: string;
+						UserID: string;
+					};
+					childSession: {
+						UID: string;
+						AccessToken: string;
+						RefreshToken: string;
+						keyPassword: string;
+						UserID: string;
+					};
+				}) => void;
+			};
+		};
+		auth.store.setAuthenticated({
+			parentSession: {
+				UID: "parent-uid",
+				AccessToken: "parent-access-1",
+				RefreshToken: "parent-refresh-1",
+				keyPassword: "salted-key-pass",
+				UserID: "user-1",
+			},
+			childSession: {
+				UID: "child-uid-1",
+				AccessToken: "child-access-1",
+				RefreshToken: "child-refresh-1",
+				keyPassword: "salted-key-pass",
+				UserID: "user-1",
+			},
+		});
+
+		const session = await auth.refreshToken();
+
+		expect(session).toMatchObject({
+			UID: "child-uid-2",
+			AccessToken: "child-access-2",
+			RefreshToken: "child-refresh-2",
+		});
+		expect(refreshTokens).toHaveBeenCalledTimes(2);
+		expect(refreshTokens).toHaveBeenNthCalledWith(1, "child-uid-1", "child-refresh-1");
+		expect(refreshTokens).toHaveBeenNthCalledWith(2, "parent-uid", "parent-refresh-1");
 	});
 });

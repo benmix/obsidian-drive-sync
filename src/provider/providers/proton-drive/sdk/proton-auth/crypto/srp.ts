@@ -5,8 +5,8 @@ import type {
 	Credentials,
 	SrpProofs,
 	SrpResult,
-} from "../../../../../contracts/provider/proton/auth-types";
-import { SRP_LEN, SRP_MODULUS_KEY } from "../../../../../contracts/provider/proton/auth-types";
+} from "../../../../../../contracts/provider/proton/auth-types";
+import { SRP_LEN, SRP_MODULUS_KEY } from "../../../../../../contracts/provider/proton/auth-types";
 
 import {
 	base64Decode,
