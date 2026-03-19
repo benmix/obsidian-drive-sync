@@ -1,4 +1,4 @@
-import { ProtonAuthSessionStore } from "@provider/providers/proton-drive/sdk/proton-auth/core/session-store";
+import { ProtonAuthSessionStore } from "@provider/providers/proton-drive/sdk/auth-session-store";
 import { describe, expect, test } from "vitest";
 
 describe("ProtonAuthSessionStore", () => {

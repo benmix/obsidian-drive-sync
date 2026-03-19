@@ -16,8 +16,8 @@ import type {
 } from "@contracts/provider/remote-provider";
 import { createDriveSyncError } from "@errors";
 import { ProtonDriveRemoteFileSystem } from "@provider/providers/proton-drive/remote-file-system";
-import { ProtonDriveAuthService } from "@provider/providers/proton-drive/sdk/auth";
-import { ProtonDriveService } from "@provider/providers/proton-drive/sdk/service";
+import { ProtonDriveAuthService } from "@provider/providers/proton-drive/sdk/auth-service";
+import { ProtonDriveService } from "@provider/providers/proton-drive/sdk/drive-service";
 
 export class ProtonDriveRemoteProvider implements ProtonDriveProvider {
 	readonly id = "proton-drive";

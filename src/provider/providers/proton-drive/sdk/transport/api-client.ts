@@ -16,11 +16,8 @@ import {
 	CHILD_CLIENT_ID,
 	INVALID_REFRESH_TOKEN_CODE,
 } from "@contracts/provider/proton/auth-types";
-import {
-	apiRequest,
-	createHeaders,
-} from "@provider/providers/proton-drive/sdk/proton-auth/transport/api";
-import { requestHttp } from "@provider/providers/proton-drive/sdk/proton-auth/transport/http";
+import { apiRequest, createHeaders } from "@provider/providers/proton-drive/sdk/transport/api";
+import { requestHttp } from "@provider/providers/proton-drive/sdk/transport/http";
 
 export class ProtonAuthApiClient {
 	async getAuthInfo(username: string): Promise<AuthInfo & ApiResponse> {

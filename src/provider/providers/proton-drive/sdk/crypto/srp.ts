@@ -17,7 +17,7 @@ import {
 	modExp,
 	uint8ArrayToBigIntLE,
 	uint8ArrayToBinaryString,
-} from "@provider/providers/proton-drive/sdk/proton-auth/crypto/crypto-utils";
+} from "@provider/providers/proton-drive/sdk/crypto/crypto-utils";
 import { readCleartextMessage, readKey, verify } from "openpgp";
 
 // ============================================================================

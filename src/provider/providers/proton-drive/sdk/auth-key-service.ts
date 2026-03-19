@@ -6,8 +6,8 @@ import type {
 	Session,
 	User,
 } from "@contracts/provider/proton/auth-types";
+import { computeKeyPassword } from "@provider/providers/proton-drive/sdk/crypto/crypto-utils";
 import { logger } from "@provider/providers/proton-drive/sdk/logger";
-import { computeKeyPassword } from "@provider/providers/proton-drive/sdk/proton-auth/crypto/crypto-utils";
 import { decrypt, decryptKey, type PrivateKey, readMessage, readPrivateKey } from "openpgp";
 
 export class ProtonAuthKeyService {

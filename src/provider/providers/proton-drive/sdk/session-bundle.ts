@@ -1,15 +1,15 @@
 import type { ProtonSession, SdkSessionBundle } from "@contracts/provider/proton/sdk-session";
 import { OpenPGPCryptoWithCryptoProxy } from "@protontech/drive-sdk";
-import { createOpenPGPCryptoProxy } from "@provider/providers/proton-drive/sdk/openpgp-proxy";
-import {
-	createOpenPGPCrypto,
-	initCrypto,
-} from "@provider/providers/proton-drive/sdk/proton-auth/crypto/openpgp";
 import {
 	createProtonAccount,
 	createProtonHttpClient,
 	createSrpModule,
-} from "@provider/providers/proton-drive/sdk/proton-auth/sdk/adapters";
+} from "@provider/providers/proton-drive/sdk/auth-adapters";
+import {
+	createOpenPGPCrypto,
+	initCrypto,
+} from "@provider/providers/proton-drive/sdk/crypto/openpgp";
+import { createOpenPGPCryptoProxy } from "@provider/providers/proton-drive/sdk/openpgp-proxy";
 import { createSdkTelemetry } from "@provider/providers/proton-drive/sdk/telemetry";
 
 export async function buildSdkSessionClient(

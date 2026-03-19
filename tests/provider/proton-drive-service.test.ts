@@ -11,7 +11,7 @@ vi.mock("@protontech/drive-sdk", () => ({
 	},
 }));
 
-vi.mock("@provider/providers/proton-drive/sdk/sdk-session", () => ({
+vi.mock("@provider/providers/proton-drive/sdk/session-bundle", () => ({
 	buildSdkSessionClient: async () => ({
 		httpClient: {
 			fetchJson: async () => new Response(null, { status: 200 }),
@@ -38,7 +38,7 @@ vi.mock("@provider/providers/proton-drive/sdk/sdk-session", () => ({
 	}),
 }));
 
-import { ProtonDriveService } from "@provider/providers/proton-drive/sdk/service";
+import { ProtonDriveService } from "@provider/providers/proton-drive/sdk/drive-service";
 
 describe("ProtonDriveService", () => {
 	beforeEach(() => {

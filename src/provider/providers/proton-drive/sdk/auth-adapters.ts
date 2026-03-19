@@ -24,7 +24,6 @@ import type {
 	ProtonDriveHTTPClientBlobRequest,
 	ProtonDriveHTTPClientJsonRequest,
 } from "@protontech/drive-sdk";
-import { wrapPrivateKey, wrapPublicKey } from "@provider/providers/proton-drive/sdk/openpgp-proxy";
 import {
 	base64Encode,
 	bigIntToUint8ArrayLE,
@@ -33,13 +32,11 @@ import {
 	modExp,
 	uint8ArrayToBigIntLE,
 	uint8ArrayToBinaryString,
-} from "@provider/providers/proton-drive/sdk/proton-auth/crypto/crypto-utils";
-import {
-	getSrp,
-	verifyAndGetModulus,
-} from "@provider/providers/proton-drive/sdk/proton-auth/crypto/srp";
-import { apiRequest } from "@provider/providers/proton-drive/sdk/proton-auth/transport/api";
-import { requestHttp } from "@provider/providers/proton-drive/sdk/proton-auth/transport/http";
+} from "@provider/providers/proton-drive/sdk/crypto/crypto-utils";
+import { getSrp, verifyAndGetModulus } from "@provider/providers/proton-drive/sdk/crypto/srp";
+import { wrapPrivateKey, wrapPublicKey } from "@provider/providers/proton-drive/sdk/openpgp-proxy";
+import { apiRequest } from "@provider/providers/proton-drive/sdk/transport/api";
+import { requestHttp } from "@provider/providers/proton-drive/sdk/transport/http";
 import { type PrivateKey, readKey } from "openpgp";
 
 // ============================================================================

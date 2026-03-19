@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const requestHttpMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@provider/providers/proton-drive/sdk/proton-auth/transport/http", () => ({
+vi.mock("@provider/providers/proton-drive/sdk/transport/http", () => ({
 	requestHttp: requestHttpMock,
 }));
 
 import {
 	createProtonAccount,
 	createProtonHttpClient,
-} from "@provider/providers/proton-drive/sdk/proton-auth/sdk/adapters";
+} from "@provider/providers/proton-drive/sdk/auth-adapters";
 
 describe("createProtonHttpClient", () => {
 	beforeEach(() => {
