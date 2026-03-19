@@ -169,12 +169,17 @@ export class ProtonDriveAuthService {
 				await this.authClient.refreshTokenWithForkRecovery();
 			}
 		});
-		const response = await httpClient.fetchJson({
-			url: "core/v4/users",
-			method: "GET",
-			headers: new Headers(),
-			timeoutMs: 15000,
-		});
+		let response: Response;
+		try {
+			response = await httpClient.fetchJson({
+				url: "core/v4/users",
+				method: "GET",
+				headers: new Headers(),
+				timeoutMs: 15000,
+			});
+		} catch (error) {
+			throw normalizeSessionValidationTransportError(error);
+		}
 		if (!response.ok) {
 			throw createDriveSyncError(
 				response.status === 401 || response.status === 403
@@ -215,6 +220,26 @@ function normalizeAuthError(
 		userMessage: classified?.userMessage ?? mapping.userMessage,
 		userMessageKey: classified?.userMessageKey,
 		retryable: classified?.retryable,
+	});
+}
+
+function normalizeSessionValidationTransportError(error: unknown) {
+	const classified = classifyProtonAuthError(error);
+	if (classified) {
+		return normalizeUnknownDriveSyncError(error, {
+			code: classified.code,
+			category: classified.category,
+			userMessage: classified.userMessage,
+			userMessageKey: classified.userMessageKey,
+			retryable: classified.retryable,
+		});
+	}
+	return normalizeUnknownDriveSyncError(error, {
+		code: "NETWORK_TEMPORARY_FAILURE",
+		category: "network",
+		retryable: true,
+		userMessage: "Temporary network failure. The sync will retry automatically.",
+		userMessageKey: "error.network.temporaryFailure",
 	});
 }
 
@@ -352,7 +377,12 @@ function classifyProtonAuthError(error: unknown):
 		};
 	}
 
-	if (message.includes("timeout")) {
+	if (
+		(error instanceof Error && error.name === "AbortError") ||
+		message.includes("timed out") ||
+		message.includes("timeout") ||
+		message.includes("aborted")
+	) {
 		return {
 			code: "NETWORK_TIMEOUT",
 			category: "network",

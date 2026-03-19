@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { isDriveSyncError } from "../../src/errors";
 import { ProtonDriveRemoteFileSystem } from "../../src/provider/providers/proton-drive/remote-file-system";
@@ -97,6 +97,49 @@ describe("ProtonDriveRemoteFileSystem", () => {
 		expect(caught).toMatchObject({
 			code: "REMOTE_UNSUPPORTED",
 			category: "provider",
+		});
+	});
+
+	test("maps readFile auth failures to DriveSyncError", async () => {
+		const fileSystem = new ProtonDriveRemoteFileSystem(
+			{
+				getFileDownloader: async () => ({
+					downloadToStream: () => ({
+						completion: async () => {
+							throw { status: 401 };
+						},
+					}),
+				}),
+			},
+			"root",
+		);
+
+		await expect(fileSystem.readFile("file-a")).rejects.toMatchObject({
+			code: "AUTH_REAUTH_REQUIRED",
+			category: "auth",
+		});
+	});
+
+	test("maps readFile aborts to retryable network timeouts", async () => {
+		const fileSystem = new ProtonDriveRemoteFileSystem(
+			{
+				getFileDownloader: async () => ({
+					downloadToStream: () => ({
+						completion: async () => {
+							const error = new Error("Request timed out after 15000ms.");
+							error.name = "AbortError";
+							throw error;
+						},
+					}),
+				}),
+			},
+			"root",
+		);
+
+		await expect(fileSystem.readFile("file-a")).rejects.toMatchObject({
+			code: "NETWORK_TIMEOUT",
+			category: "network",
+			retryable: true,
 		});
 	});
 
@@ -306,5 +349,121 @@ describe("ProtonDriveRemoteFileSystem", () => {
 			category: "network",
 			retryable: true,
 		});
+	});
+
+	test("rolls back the parent move when rename fails during remote move", async () => {
+		const movedParents: string[] = [];
+		const renameNode = vi.fn(async () => {
+			throw { status: 429 };
+		});
+		const fileSystem = new ProtonDriveRemoteFileSystem(
+			{
+				getNode: async (nodeUid: string) => {
+					if (nodeUid !== "file-a") {
+						throw new Error(`unexpected node: ${nodeUid}`);
+					}
+					return {
+						ok: true,
+						value: {
+							uid: "file-a",
+							parentUid: "root",
+							name: "old.md",
+							type: "file",
+						},
+					};
+				},
+				iterateFolderChildren: async function* (parentNodeUid: string) {
+					if (parentNodeUid === "root" || parentNodeUid === "folder-archive") {
+						return;
+					}
+					throw new Error(`unexpected parent: ${parentNodeUid}`);
+				},
+				createFolder: async () => ({
+					ok: true,
+					value: {
+						uid: "folder-archive",
+						parentUid: "root",
+						name: "archive",
+						type: "folder",
+					},
+				}),
+				moveNodes: async function* (_nodeUids: string[], newParentNodeUid: string) {
+					movedParents.push(newParentNodeUid);
+					yield { ok: true, uid: "file-a" };
+				},
+				renameNode,
+			},
+			"root",
+		);
+
+		await expect(fileSystem.moveEntry("file-a", "archive/new.md")).rejects.toMatchObject({
+			code: "NETWORK_RATE_LIMITED",
+			category: "network",
+			retryable: true,
+		});
+		expect(renameNode).toHaveBeenCalledWith("file-a", "new.md");
+		expect(movedParents).toEqual(["folder-archive", "root"]);
+	});
+
+	test("detects remote move path conflicts before mutating the node", async () => {
+		const moveNodes = vi.fn(async function* () {
+			yield { ok: true, uid: "file-a" };
+		});
+		const renameNode = vi.fn(async () => {});
+		const fileSystem = new ProtonDriveRemoteFileSystem(
+			{
+				getNode: async (nodeUid: string) => {
+					if (nodeUid !== "file-a") {
+						throw new Error(`unexpected node: ${nodeUid}`);
+					}
+					return {
+						ok: true,
+						value: {
+							uid: "file-a",
+							parentUid: "root",
+							name: "old.md",
+							type: "file",
+						},
+					};
+				},
+				iterateFolderChildren: async function* (parentNodeUid: string) {
+					if (parentNodeUid === "root") {
+						yield {
+							ok: true,
+							value: {
+								uid: "folder-archive",
+								parentUid: "root",
+								name: "archive",
+								type: "folder",
+							},
+						};
+						return;
+					}
+					if (parentNodeUid === "folder-archive") {
+						yield {
+							ok: true,
+							value: {
+								uid: "file-existing",
+								parentUid: "folder-archive",
+								name: "conflict.md",
+								type: "file",
+							},
+						};
+						return;
+					}
+					throw new Error(`unexpected parent: ${parentNodeUid}`);
+				},
+				moveNodes,
+				renameNode,
+			},
+			"root",
+		);
+
+		await expect(fileSystem.moveEntry("file-a", "archive/conflict.md")).rejects.toMatchObject({
+			code: "REMOTE_PATH_CONFLICT",
+			category: "remote_fs",
+		});
+		expect(moveNodes).not.toHaveBeenCalled();
+		expect(renameNode).not.toHaveBeenCalled();
 	});
 });

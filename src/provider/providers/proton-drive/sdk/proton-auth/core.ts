@@ -916,23 +916,32 @@ export class ProtonAuth {
 	 * Logout and revoke the session
 	 */
 	async logout(): Promise<void> {
-		if (!this.session?.UID) {
-			return;
-		}
-
-		try {
-			await requestHttp(
-				`${API_BASE_URL}/core/v4/auth`,
-				{
-					method: "DELETE",
-					headers: createHeaders(this.session),
-				},
-				"json",
-			);
-		} catch {
-			// Ignore logout errors
+		const sessions = [this.session, this.parentSession].filter((session): session is Session =>
+			Boolean(session?.UID && session?.AccessToken),
+		);
+		const revoked = new Set<string>();
+		for (const session of sessions) {
+			const key = `${session.UID}:${session.AccessToken}`;
+			if (revoked.has(key)) {
+				continue;
+			}
+			revoked.add(key);
+			try {
+				await requestHttp(
+					`${API_BASE_URL}/core/v4/auth`,
+					{
+						method: "DELETE",
+						headers: createHeaders(session),
+					},
+					"json",
+				);
+			} catch {
+				// Ignore logout errors.
+			}
 		}
 
 		this.session = null;
+		this.parentSession = null;
+		this.pendingAuthResponse = null;
 	}
 }

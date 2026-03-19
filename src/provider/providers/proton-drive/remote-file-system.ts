@@ -403,23 +403,33 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		if (!this.sdkClient.getFileDownloader) {
 			throw unsupportedRemoteOperationError("file read");
 		}
-		const downloader = await this.sdkClient.getFileDownloader(id);
-		const chunks: Uint8Array[] = [];
-		const stream = new WritableStream<Uint8Array>({
-			write(chunk) {
-				chunks.push(chunk);
-			},
-		});
-		const controller = downloader.downloadToStream(stream);
-		await controller.completion();
-		const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-		const combined = new Uint8Array(total);
-		let offset = 0;
-		for (const chunk of chunks) {
-			combined.set(chunk, offset);
-			offset += chunk.byteLength;
+		try {
+			const downloader = await this.sdkClient.getFileDownloader(id);
+			const chunks: Uint8Array[] = [];
+			const stream = new WritableStream<Uint8Array>({
+				write(chunk) {
+					chunks.push(chunk);
+				},
+			});
+			const controller = downloader.downloadToStream(stream);
+			await controller.completion();
+			const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+			const combined = new Uint8Array(total);
+			let offset = 0;
+			for (const chunk of chunks) {
+				combined.set(chunk, offset);
+				offset += chunk.byteLength;
+			}
+			return combined;
+		} catch (error) {
+			throw mapRemoteOperationError(error, {
+				code: "REMOTE_WRITE_FAILED",
+				category: "remote_fs",
+				userMessage: "Failed to read remote file.",
+				debugMessage: "Failed to download remote file.",
+				details: { nodeId: id },
+			});
 		}
-		return combined;
 	}
 
 	async deleteEntry(id: string): Promise<void> {
@@ -458,22 +468,86 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 		if (!this.sdkClient.renameNode || !this.sdkClient.moveNodes) {
 			throw unsupportedRemoteOperationError("move");
 		}
+		const node = await this.getNodeEntity(id, {
+			code: "REMOTE_WRITE_FAILED",
+			category: "remote_fs",
+			userMessage: "Remote move failed.",
+			debugMessage: "Failed to load remote node before move.",
+			details: { nodeId: id, path: newPath },
+		});
+		if (!node) {
+			throw createDriveSyncError("REMOTE_NOT_FOUND", {
+				category: "remote_fs",
+				userMessage: "Remote item not found.",
+				details: { nodeId: id, path: newPath },
+			});
+		}
 		const normalized = normalizePath(newPath);
 		const targetParentPath = dirname(normalized);
 		const targetName = basename(normalized);
 		const parentId = await this.ensureRemoteFolder(targetParentPath);
-		for await (const result of this.sdkClient.moveNodes([id], parentId)) {
-			if (!result.ok) {
-				throw mapRemoteOperationError(result.error, {
-					code: "REMOTE_WRITE_FAILED",
-					category: "remote_fs",
-					userMessage: "Remote move failed.",
-					debugMessage: "Failed to move remote node.",
-					details: { nodeId: id, path: normalized, parentId },
-				});
-			}
+		const originalParentId = node.parentUid ?? this.scopeRootId;
+		const needsMove = originalParentId !== parentId;
+		const needsRename = node.name !== targetName;
+		if (!needsMove && !needsRename) {
+			return;
 		}
-		await this.sdkClient.renameNode(id, targetName);
+
+		const conflict = await this.findConflictingChildId(parentId, targetName, id);
+		if (conflict) {
+			throw createDriveSyncError("REMOTE_PATH_CONFLICT", {
+				category: "remote_fs",
+				userMessage: "Remote path conflict detected.",
+				details: { nodeId: id, path: normalized, conflictId: conflict },
+			});
+		}
+
+		if (needsMove) {
+			await this.moveNode(id, parentId, {
+				path: normalized,
+				parentId,
+				originalParentId,
+			});
+		}
+		if (!needsRename) {
+			return;
+		}
+
+		try {
+			await this.sdkClient.renameNode(id, targetName);
+		} catch (error) {
+			if (needsMove) {
+				const rollbackError = await this.rollbackMovedNode(id, originalParentId, node.name);
+				if (rollbackError) {
+					throw createDriveSyncError("REMOTE_WRITE_FAILED", {
+						category: "remote_fs",
+						userMessage: "Remote move failed.",
+						debugMessage:
+							"Failed to rename remote node after move, and rollback was unsuccessful.",
+						details: {
+							nodeId: id,
+							path: normalized,
+							parentId,
+							originalParentId,
+							rollbackError: extractErrorMessage(rollbackError),
+						},
+						cause: error,
+					});
+				}
+			}
+			throw mapRemoteOperationError(error, {
+				code: "REMOTE_WRITE_FAILED",
+				category: "remote_fs",
+				userMessage: "Remote move failed.",
+				debugMessage: "Failed to rename remote node after move.",
+				details: {
+					nodeId: id,
+					path: normalized,
+					parentId,
+					originalParentId,
+				},
+			});
+		}
 	}
 
 	async ensureFolder(path: string): Promise<{ id?: string }> {
@@ -595,6 +669,65 @@ export class ProtonDriveRemoteFileSystem implements RemoteFileSystem {
 			}
 		}
 		return null;
+	}
+
+	private async findConflictingChildId(
+		parentId: string,
+		name: string,
+		nodeId: string,
+	): Promise<string | null> {
+		const fileMatch = await this.findChildByName(parentId, name, "file");
+		if (fileMatch?.id && fileMatch.id !== nodeId) {
+			return fileMatch.id;
+		}
+		const folderMatch = await this.findChildByName(parentId, name, "folder");
+		if (folderMatch?.id && folderMatch.id !== nodeId) {
+			return folderMatch.id;
+		}
+		return null;
+	}
+
+	private async moveNode(
+		nodeId: string,
+		parentId: string,
+		context: {
+			path: string;
+			parentId: string;
+			originalParentId?: string;
+		},
+	): Promise<void> {
+		for await (const result of this.sdkClient.moveNodes?.([nodeId], parentId) ?? []) {
+			if (!result.ok) {
+				throw mapRemoteOperationError(result.error, {
+					code: "REMOTE_WRITE_FAILED",
+					category: "remote_fs",
+					userMessage: "Remote move failed.",
+					debugMessage: "Failed to move remote node.",
+					details: {
+						nodeId,
+						path: context.path,
+						parentId: context.parentId,
+						originalParentId: context.originalParentId,
+					},
+				});
+			}
+		}
+	}
+
+	private async rollbackMovedNode(
+		nodeId: string,
+		originalParentId: string,
+		_originalName: string,
+	): Promise<unknown | null> {
+		try {
+			await this.moveNode(nodeId, originalParentId, {
+				path: "",
+				parentId: originalParentId,
+			});
+			return null;
+		} catch (error) {
+			return error;
+		}
 	}
 
 	private async resolveScopedPath(
@@ -725,6 +858,14 @@ function classifyProtonRemoteError(error: unknown):
 	  }
 	| undefined {
 	const status = extractStatus(error);
+	if (status === 401 || status === 403) {
+		return {
+			code: "AUTH_REAUTH_REQUIRED",
+			category: "auth",
+			userMessage: "Authentication required. Sign in again to continue.",
+			userMessageKey: "error.auth.reauthRequired",
+		};
+	}
 	if (status === 404) {
 		return {
 			code: "REMOTE_NOT_FOUND",
@@ -759,6 +900,15 @@ function classifyProtonRemoteError(error: unknown):
 			retryable: true,
 			userMessage: "Temporary network failure. The sync will retry automatically.",
 			userMessageKey: "error.network.temporaryFailure",
+		};
+	}
+	if (error instanceof Error && error.name === "AbortError") {
+		return {
+			code: "NETWORK_TIMEOUT",
+			category: "network",
+			retryable: true,
+			userMessage: "Network request timed out. The sync will retry automatically.",
+			userMessageKey: "error.network.timeout",
 		};
 	}
 
@@ -816,7 +966,11 @@ function classifyProtonRemoteError(error: unknown):
 		};
 	}
 
-	if (normalized.includes("timeout")) {
+	if (
+		normalized.includes("timed out") ||
+		normalized.includes("timeout") ||
+		normalized.includes("aborted")
+	) {
 		return {
 			code: "NETWORK_TIMEOUT",
 			category: "network",
