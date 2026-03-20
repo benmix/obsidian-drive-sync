@@ -59,7 +59,53 @@ const implementationAllowedDependencies = new Map([
 	["errors", new Set(["errors", "config"])],
 	["filesystem", new Set(["filesystem", "config"])],
 	["i18n", new Set(["i18n", "config"])],
-	["provider", new Set(["provider", "filesystem", "errors", "config"])],
+	[
+		"provider",
+		new Set(["provider", "provider/proton-drive/root", "filesystem", "errors", "config"]),
+	],
+	[
+		"provider/proton-drive/root",
+		new Set([
+			"provider/proton-drive/root",
+			"provider/proton-drive/auth",
+			"provider/proton-drive/sdk",
+			"provider/proton-drive/remote",
+			"provider/proton-drive/shared",
+			"errors",
+		]),
+	],
+	[
+		"provider/proton-drive/auth",
+		new Set([
+			"provider/proton-drive/auth",
+			"provider/proton-drive/sdk",
+			"provider/proton-drive/transport",
+			"provider/proton-drive/crypto",
+			"provider/proton-drive/shared",
+			"errors",
+		]),
+	],
+	[
+		"provider/proton-drive/sdk",
+		new Set([
+			"provider/proton-drive/sdk",
+			"provider/proton-drive/transport",
+			"provider/proton-drive/crypto",
+			"provider/proton-drive/shared",
+		]),
+	],
+	[
+		"provider/proton-drive/remote",
+		new Set([
+			"provider/proton-drive/remote",
+			"provider/proton-drive/shared",
+			"errors",
+			"filesystem",
+		]),
+	],
+	["provider/proton-drive/transport", new Set(["provider/proton-drive/transport"])],
+	["provider/proton-drive/crypto", new Set(["provider/proton-drive/crypto"])],
+	["provider/proton-drive/shared", new Set(["provider/proton-drive/shared"])],
 	[
 		"runtime",
 		new Set(["runtime", "provider", "data", "filesystem", "sync", "errors", "i18n", "config"]),
@@ -283,6 +329,12 @@ function classifyContractFile(file) {
 function classifyImplementationFile(file) {
 	const relativePath = toPosix(path.relative(srcRoot, file));
 	const segments = relativePath.split("/");
+
+	const protonDriveLayer = classifyProtonDriveImplementationFile(relativePath);
+	if (protonDriveLayer) {
+		return protonDriveLayer;
+	}
+
 	if (segments.length === 1) {
 		if (relativePath === "main.ts" || relativePath === "settings.ts") {
 			return "app";
@@ -298,6 +350,37 @@ function classifyImplementationFile(file) {
 		return null;
 	}
 	return topLevel;
+}
+
+function classifyProtonDriveImplementationFile(relativePath) {
+	const protonDrivePrefix = "provider/providers/proton-drive/";
+	if (!relativePath.startsWith(protonDrivePrefix)) {
+		return null;
+	}
+
+	const protonDrivePath = relativePath.slice(protonDrivePrefix.length);
+	if (protonDrivePath === "provider.ts") {
+		return "provider/proton-drive/root";
+	}
+	if (protonDrivePath === "logger.ts") {
+		return "provider/proton-drive/shared";
+	}
+
+	const [topLevel] = protonDrivePath.split("/");
+	switch (topLevel) {
+		case "auth":
+			return "provider/proton-drive/auth";
+		case "sdk":
+			return "provider/proton-drive/sdk";
+		case "remote":
+			return "provider/proton-drive/remote";
+		case "transport":
+			return "provider/proton-drive/transport";
+		case "crypto":
+			return "provider/proton-drive/crypto";
+		default:
+			return "provider/proton-drive/root";
+	}
 }
 
 function detectCycles(graphMap) {

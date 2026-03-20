@@ -15,8 +15,8 @@ import type {
 	RemoteScopeRoot,
 } from "@contracts/provider/remote-provider";
 import { createDriveSyncError } from "@errors";
-import { ProtonDriveRemoteFileSystem } from "@provider/providers/proton-drive/remote-file-system";
-import { ProtonDriveAuthService } from "@provider/providers/proton-drive/sdk/auth-service";
+import { ProtonDriveAuthService } from "@provider/providers/proton-drive/auth/service";
+import { ProtonDriveRemoteFileSystem } from "@provider/providers/proton-drive/remote/file-system";
 import { ProtonDriveService } from "@provider/providers/proton-drive/sdk/drive-service";
 
 export class ProtonDriveRemoteProvider implements ProtonDriveProvider {

@@ -11,7 +11,7 @@ vi.mock("@protontech/drive-sdk", () => ({
 	},
 }));
 
-vi.mock("@provider/providers/proton-drive/sdk/session-bundle", () => ({
+vi.mock("@provider/providers/proton-drive/sdk/client-factory", () => ({
 	buildSdkSessionClient: async () => ({
 		httpClient: {
 			fetchJson: async () => new Response(null, { status: 200 }),

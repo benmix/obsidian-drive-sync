@@ -1,5 +1,5 @@
 import type { OpenPGPCryptoInterface, SessionKey } from "@contracts/provider/proton/openpgp";
-import { base64Encode } from "@provider/providers/proton-drive/sdk/crypto/crypto-utils";
+import { base64Encode } from "@provider/providers/proton-drive/crypto/crypto-utils";
 import {
 	config,
 	createMessage,

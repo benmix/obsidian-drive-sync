@@ -10,17 +10,17 @@ import { INVALID_REFRESH_TOKEN_CODE } from "@contracts/provider/proton/auth-type
 import {
 	createProtonAuthError,
 	isProtonAuthError,
-} from "@provider/providers/proton-drive/sdk/auth-errors";
-import { ProtonAuthKeyService } from "@provider/providers/proton-drive/sdk/auth-key-service";
-import { ProtonAuthSessionStore } from "@provider/providers/proton-drive/sdk/auth-session-store";
-import type { ProtonBootstrapData } from "@provider/providers/proton-drive/sdk/auth-state";
+} from "@provider/providers/proton-drive/auth/errors";
+import { ProtonAuthKeyService } from "@provider/providers/proton-drive/auth/key-service";
+import { ProtonAuthSessionStore } from "@provider/providers/proton-drive/auth/session-store";
+import type { ProtonBootstrapData } from "@provider/providers/proton-drive/auth/state";
 import {
 	createForkEncryptedBlob,
 	decryptForkEncryptedBlob,
-} from "@provider/providers/proton-drive/sdk/crypto/crypto-utils";
-import { getSrp } from "@provider/providers/proton-drive/sdk/crypto/srp";
-import { logger } from "@provider/providers/proton-drive/sdk/logger";
-import { ProtonAuthApiClient } from "@provider/providers/proton-drive/sdk/transport/api-client";
+} from "@provider/providers/proton-drive/crypto/crypto-utils";
+import { getSrp } from "@provider/providers/proton-drive/crypto/srp";
+import { logger } from "@provider/providers/proton-drive/logger";
+import { ProtonAuthApiClient } from "@provider/providers/proton-drive/transport/api-client";
 
 export class ProtonAuth {
 	private readonly store = new ProtonAuthSessionStore();

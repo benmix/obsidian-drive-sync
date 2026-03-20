@@ -33,21 +33,21 @@ const fetchJsonMock = vi.hoisted(() =>
 	})),
 );
 
-vi.mock("@provider/providers/proton-drive/sdk/auth-adapters", () => ({
+vi.mock("@provider/providers/proton-drive/sdk/http-client", () => ({
 	createProtonHttpClient: () => ({
 		fetchJson: fetchJsonMock,
 	}),
 }));
 
-vi.mock("@provider/providers/proton-drive/sdk/auth-errors", () => ({
+vi.mock("@provider/providers/proton-drive/auth/errors", () => ({
 	isProtonAuthError: () => false,
 }));
 
-vi.mock("@provider/providers/proton-drive/sdk/auth-client", () => ({
+vi.mock("@provider/providers/proton-drive/auth/client", () => ({
 	ProtonAuth: class {},
 }));
 
-import { ProtonDriveAuthService } from "@provider/providers/proton-drive/sdk/auth-service";
+import { ProtonDriveAuthService } from "@provider/providers/proton-drive/auth/service";
 
 describe("ProtonDriveAuthService", () => {
 	beforeEach(() => {

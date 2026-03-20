@@ -11,11 +11,11 @@ const requestHttpMock = vi.hoisted(() =>
 	vi.fn(async () => new Response(JSON.stringify({ Code: 1000 }), { status: 200 })),
 );
 
-vi.mock("@provider/providers/proton-drive/sdk/transport/http", () => ({
+vi.mock("@provider/providers/proton-drive/transport/http", () => ({
 	requestHttp: requestHttpMock,
 }));
 
-import { ProtonAuth } from "@provider/providers/proton-drive/sdk/auth-client";
+import { ProtonAuth } from "@provider/providers/proton-drive/auth/client";
 
 describe("ProtonAuth", () => {
 	beforeEach(() => {

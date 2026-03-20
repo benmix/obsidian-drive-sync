@@ -1,5 +1,5 @@
 import { isDriveSyncError } from "@errors";
-import { ProtonDriveRemoteFileSystem } from "@provider/providers/proton-drive/remote-file-system";
+import { ProtonDriveRemoteFileSystem } from "@provider/providers/proton-drive/remote/file-system";
 import { describe, expect, test, vi } from "vitest";
 
 describe("ProtonDriveRemoteFileSystem", () => {
