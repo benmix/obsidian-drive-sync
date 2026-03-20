@@ -61,8 +61,21 @@ const implementationAllowedDependencies = new Map([
 	["i18n", new Set(["i18n", "config"])],
 	[
 		"provider",
-		new Set(["provider", "provider/proton-drive/root", "filesystem", "errors", "config"]),
+		new Set([
+			"provider",
+			"provider/obsidian/root",
+			"provider/proton-drive/root",
+			"filesystem",
+			"errors",
+			"config",
+		]),
 	],
+	[
+		"provider/obsidian/root",
+		new Set(["provider/obsidian/root", "provider/obsidian/fs", "provider/obsidian/watcher"]),
+	],
+	["provider/obsidian/fs", new Set(["provider/obsidian/fs", "filesystem", "errors"])],
+	["provider/obsidian/watcher", new Set(["provider/obsidian/watcher", "filesystem"])],
 	[
 		"provider/proton-drive/root",
 		new Set([
@@ -335,6 +348,11 @@ function classifyImplementationFile(file) {
 		return protonDriveLayer;
 	}
 
+	const obsidianLayer = classifyObsidianImplementationFile(relativePath);
+	if (obsidianLayer) {
+		return obsidianLayer;
+	}
+
 	if (segments.length === 1) {
 		if (relativePath === "main.ts" || relativePath === "settings.ts") {
 			return "app";
@@ -380,6 +398,25 @@ function classifyProtonDriveImplementationFile(relativePath) {
 			return "provider/proton-drive/crypto";
 		default:
 			return "provider/proton-drive/root";
+	}
+}
+
+function classifyObsidianImplementationFile(relativePath) {
+	const obsidianPrefix = "provider/providers/obsidian/";
+	if (!relativePath.startsWith(obsidianPrefix)) {
+		return null;
+	}
+
+	const obsidianPath = relativePath.slice(obsidianPrefix.length);
+	switch (obsidianPath) {
+		case "provider.ts":
+			return "provider/obsidian/root";
+		case "file-system.ts":
+			return "provider/obsidian/fs";
+		case "watcher.ts":
+			return "provider/obsidian/watcher";
+		default:
+			return "provider/obsidian/root";
 	}
 }
 
