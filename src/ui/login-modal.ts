@@ -1,5 +1,4 @@
 import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
-import type { RemoteProvider } from "@contracts/provider/remote-provider";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
 import { tr, trAny } from "@i18n";
 import { shouldPreventTwoFactorKeydown } from "@ui/login-modal-helpers";
@@ -36,13 +35,13 @@ export class RemoteProviderLoginModal extends Modal {
 	) {
 		super(app);
 		this.plugin = plugin;
-		this.providerId = options.providerId ?? plugin.getRemoteConnectionState().providerId;
+		this.providerId = options.providerId ?? plugin.getRemoteConnectionView().providerId;
 		this.onCancel = options.onCancel;
 		this.onSuccess = options.onSuccess;
 	}
 
 	onOpen() {
-		const remoteState = this.plugin.getRemoteConnectionState();
+		const remoteState = this.plugin.getRemoteConnectionView();
 		this.username = this.providerId === remoteState.providerId ? remoteState.accountEmail : "";
 		this.password = "";
 		this.mailboxPassword = "";
@@ -334,8 +333,7 @@ export class RemoteProviderLoginModal extends Modal {
 		this.isSubmitting = true;
 		this.render();
 		try {
-			const provider = this.getTargetProvider();
-			const result = await provider.login({
+			const result = await this.plugin.loginRemote(this.providerId, {
 				username: normalizedUsername,
 				password: this.password,
 				twoFactorCode: this.requiresTwoFactor ? twoFactorCode : undefined,
@@ -344,20 +342,9 @@ export class RemoteProviderLoginModal extends Modal {
 					: undefined,
 			});
 
-			if (this.providerId !== this.plugin.getRemoteConnectionState().providerId) {
-				this.plugin.setRemoteProviderId(this.providerId);
-			}
-			this.plugin.updateRemoteConnectionState({
-				credentials: result.credentials,
-				accountEmail: result.userEmail ?? normalizedUsername,
-				hasAuthSession: true,
-			});
-			await this.plugin.saveSettings();
-			this.plugin.handleAuthRecovered();
-
 			new Notice(
 				tr("login.signedInToProvider", {
-					provider: provider.label,
+					provider: result.providerLabel,
 				}),
 			);
 			this.loginCompleted = true;
@@ -368,9 +355,6 @@ export class RemoteProviderLoginModal extends Modal {
 				category: "auth",
 				userMessage: tr("login.unableToSignIn"),
 				userMessageKey: "login.unableToSignIn",
-			});
-			this.plugin.updateRemoteConnectionState({
-				hasAuthSession: false,
 			});
 
 			if (normalized.code === "AUTH_2FA_REQUIRED") {
@@ -422,9 +406,9 @@ export class RemoteProviderLoginModal extends Modal {
 		input.select();
 	}
 
-	private getTargetProvider(): RemoteProvider {
+	private getTargetProvider(): { id: string; label: string } {
 		const provider = this.plugin
-			.listRemoteProviders()
+			.listRemoteProviderOptions()
 			.find((item) => item.id === this.providerId);
 		if (!provider) {
 			throw new Error(`Remote provider not found: ${this.providerId}`);

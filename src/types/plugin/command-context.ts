@@ -1,4 +1,4 @@
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-api";
 import type { LocalProvider } from "@contracts/provider/local-provider";
 import type { AnyRemoteProvider, RemoteProviderClient } from "@contracts/provider/remote-provider";
 
@@ -20,7 +20,7 @@ export type CommandErrorOptions = {
 };
 
 export type CommandContext<TProvider extends AnyRemoteProvider = AnyRemoteProvider> = {
-	plugin: ObsidianDriveSyncPluginApi<TProvider>;
+	plugin: ObsidianDriveSyncPluginRuntimeApi<TProvider>;
 	localProvider: LocalProvider;
 	requireScopeId: () => string | null;
 	requireConnectedRemoteClient: () => Promise<ConnectedRemoteClient<TProvider> | null>;

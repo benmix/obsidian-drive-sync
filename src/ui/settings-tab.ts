@@ -21,8 +21,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 
 		containerEl.empty();
-		const remoteState = this.plugin.getRemoteConnectionState();
-		const provider = remoteState.provider;
+		const remoteState = this.plugin.getRemoteConnectionView();
 		const hasAuthSession = remoteState.hasAuthSession;
 
 		const accountSetting = new Setting(containerEl)
@@ -38,10 +37,10 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			const providerChip = accountSetting.nameEl.createSpan({
 				cls: "drive-sync-account-chip drive-sync-account-provider",
 			});
-			renderProviderIcon(providerChip, provider.id, provider.label);
+			renderProviderIcon(providerChip, remoteState.providerId, remoteState.providerLabel);
 			providerChip.createSpan({
 				cls: "drive-sync-account-provider-label",
-				text: provider.label,
+				text: remoteState.providerLabel,
 			});
 			const accountEmail = remoteState.accountEmail;
 			if (accountEmail) {
@@ -69,11 +68,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			accountSetting.addButton((button) => {
 				button.setButtonText(tr("settings.signOut"));
 				button.onClick(async () => {
-					const provider = this.plugin.getRemoteConnectionState().provider;
-					await provider.logout();
-					this.plugin.clearStoredRemoteSession();
-					provider.disconnect();
-					await this.plugin.saveSettings();
+					await this.plugin.logoutRemote();
 					this.display();
 				});
 			});
@@ -159,9 +154,8 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 	}
 
 	private getAuthStatusText(): string {
-		const remoteState = this.plugin.getRemoteConnectionState();
-		const provider = remoteState.provider;
-		if (remoteState.hasAuthSession && !provider.isSessionValidated()) {
+		const remoteState = this.plugin.getRemoteConnectionView();
+		if (remoteState.hasAuthSession && !remoteState.isSessionValidated) {
 			return tr("settings.authStatus.pendingValidation");
 		}
 		if (remoteState.hasAuthSession) {
@@ -172,14 +166,14 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 				this.plugin.getLastAuthError() ?? tr("settings.authStatus.needsAttentionCommand")
 			);
 		}
-		if (remoteState.credentials) {
+		if (remoteState.hasStoredCredentials) {
 			return tr("settings.authStatus.needsAttention");
 		}
 		return tr("settings.authStatus.signInHint");
 	}
 
 	private renderProviderLoginOptions(containerEl: HTMLElement): void {
-		const providers = this.plugin.listRemoteProviders();
+		const providers = this.plugin.listRemoteProviderOptions();
 		const optionGrid = containerEl.createDiv({
 			cls: "drive-sync-settings-provider-grid",
 		});
@@ -213,9 +207,8 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 	}
 
 	private async openRemoteFolderPicker(): Promise<void> {
-		const remoteState = this.plugin.getRemoteConnectionState();
-		const provider = remoteState.provider;
-		if (!remoteState.credentials && !provider.getSession()) {
+		const remoteState = this.plugin.getRemoteConnectionView();
+		if (!remoteState.hasStoredCredentials && !remoteState.hasAuthSession) {
 			openRemoteLoginModal(this.plugin, {
 				onCancel: () => {
 					this.display();
@@ -255,25 +248,23 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		ok: boolean;
 		message: string;
 	}> {
-		const remoteState = this.plugin.getRemoteConnectionState();
+		const remoteState = this.plugin.getRemoteConnectionView();
 		const scopeId = remoteState.scopeId;
-		const provider = remoteState.provider;
 		if (!scopeId) {
 			return {
 				ok: false,
 				message: tr("settings.validation.selectFolderFirst"),
 			};
 		}
-		if (!remoteState.credentials && !provider.getSession()) {
+		if (!remoteState.hasStoredCredentials && !remoteState.hasAuthSession) {
 			return {
 				ok: false,
 				message: tr("error.auth.signInFirst"),
 			};
 		}
 
-		let client: unknown;
 		try {
-			client = await this.plugin.connectRemoteClient();
+			return await this.plugin.validateRemoteScope(scopeId);
 		} catch (error) {
 			const normalized = normalizeUnknownDriveSyncError(error, {
 				category: "provider",
@@ -285,6 +276,5 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 				message: translateDriveSyncErrorUserMessage(normalized, trAny),
 			};
 		}
-		return await provider.validateScope(client, scopeId);
 	}
 }

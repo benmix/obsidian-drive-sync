@@ -1,6 +1,11 @@
 import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "@config";
-import { type ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
-import type { AnyRemoteProvider, RemoteProviderClient } from "@contracts/provider/remote-provider";
+import { type ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-api";
+import type { RemoteProviderId } from "@contracts/provider/provider-ids";
+import type {
+	AnyRemoteProvider,
+	RemoteProviderClient,
+	RemoteProviderLoginInput,
+} from "@contracts/provider/remote-provider";
 import { type SyncRunRequest } from "@contracts/sync/run-request";
 import {
 	createDriveSyncError,
@@ -25,7 +30,7 @@ export class PluginRuntime<TProvider extends AnyRemoteProvider> {
 	private readonly triggerScheduler: TriggerScheduler;
 	private readonly networkPolicy: NetworkPolicy;
 
-	constructor(private readonly plugin: ObsidianDriveSyncPluginApi<TProvider>) {
+	constructor(private readonly plugin: ObsidianDriveSyncPluginRuntimeApi<TProvider>) {
 		this.sessionManager = new SessionManager(plugin);
 		this.syncCoordinator = new SyncCoordinator(plugin, this.sessionManager);
 		this.networkPolicy = new NetworkPolicy(() => ({
@@ -59,6 +64,35 @@ export class PluginRuntime<TProvider extends AnyRemoteProvider> {
 
 	async connectRemoteClient(): Promise<RemoteProviderClient<TProvider>> {
 		return await this.sessionManager.connectClient();
+	}
+
+	async loginRemote(
+		providerId: RemoteProviderId,
+		input: RemoteProviderLoginInput,
+	): Promise<{ providerLabel: string; accountEmail: string }> {
+		return await this.sessionManager.login(providerId, input);
+	}
+
+	async logoutRemote(): Promise<{ providerLabel: string }> {
+		return await this.sessionManager.logout();
+	}
+
+	resetRemoteConnection(): { providerLabel: string } {
+		return this.sessionManager.resetConnection();
+	}
+
+	async validateRemoteScope(scopeId: string): Promise<{ ok: boolean; message: string }> {
+		return await this.sessionManager.validateRemoteScope(scopeId);
+	}
+
+	async openRemoteScopeFileSystem() {
+		return await this.sessionManager.openRemoteScopeFileSystem();
+	}
+
+	async refreshRemoteScopeFileSystem() {
+		return await this.sessionManager.openRemoteScopeFileSystem({
+			forceRefresh: true,
+		});
 	}
 
 	refreshAutoSync(): void {
@@ -124,6 +158,14 @@ export class PluginRuntime<TProvider extends AnyRemoteProvider> {
 		state.entries[path] = entry;
 		await stateStore.save(state);
 		return true;
+	}
+
+	async setRemoteScope(scopeId: string, scopePath: string): Promise<void> {
+		this.plugin.updateRemoteConnectionState({
+			scopeId,
+			scopePath,
+		});
+		await this.plugin.saveSettings();
 	}
 
 	teardown(): void {

@@ -34,15 +34,11 @@ export function registerAuthCommands(context: CommandContext): void {
 		id: "drive-sync-logout",
 		name: tr("commands.logout.name"),
 		callback: async () => {
-			const { provider } = plugin.getRemoteConnectionState();
 			try {
-				await provider.logout();
-				plugin.clearStoredRemoteSession();
-				await plugin.saveSettings();
-				provider.disconnect();
+				const { providerLabel } = await plugin.logoutRemote();
 				new Notice(
 					tr("notice.signedOutOfProvider", {
-						provider: provider.label,
+						provider: providerLabel,
 					}),
 				);
 			} catch (error) {
@@ -58,11 +54,10 @@ export function registerAuthCommands(context: CommandContext): void {
 		id: "drive-sync-reset-connection",
 		name: tr("commands.resetConnection.name"),
 		callback: () => {
-			const { provider } = plugin.getRemoteConnectionState();
-			provider.disconnect();
+			const { providerLabel } = plugin.resetRemoteConnection();
 			new Notice(
 				tr("notice.providerConnectionReset", {
-					provider: provider.label,
+					provider: providerLabel,
 				}),
 			);
 		},

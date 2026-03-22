@@ -1,12 +1,18 @@
 import { registerCommands } from "@commands";
 import type {
-	ObsidianDriveSyncPluginApi,
-	RemoteConnectionState,
+	ObsidianDriveSyncPluginRuntimeApi,
 	RemoteConnectionStatePatch,
+	RemoteConnectionView,
+	RemoteProviderOption,
 } from "@contracts/plugin/plugin-api";
 import type { DriveSyncSettings } from "@contracts/plugin/settings";
 import type { LocalProvider } from "@contracts/provider/local-provider";
-import type { RemoteProviderClient } from "@contracts/provider/remote-provider";
+import type { RemoteProviderId } from "@contracts/provider/provider-ids";
+import type {
+	RemoteProviderClient,
+	RemoteProviderCredentialsOf,
+	RemoteProviderLoginInput,
+} from "@contracts/provider/remote-provider";
 import { createDriveSyncError } from "@errors";
 import type { RegisteredRemoteProvider } from "@provider/default-registry";
 import { PluginRuntime } from "@runtime/plugin-runtime";
@@ -15,7 +21,7 @@ import { Plugin } from "obsidian";
 
 export default class ObsidianDriveSyncPlugin
 	extends Plugin
-	implements ObsidianDriveSyncPluginApi<RegisteredRemoteProvider>
+	implements ObsidianDriveSyncPluginRuntimeApi<RegisteredRemoteProvider>
 {
 	private state: PluginState | null = null;
 	private runtime: PluginRuntime<RegisteredRemoteProvider> | null = null;
@@ -34,11 +40,17 @@ export default class ObsidianDriveSyncPlugin
 		this.runtime?.teardown();
 	}
 
-	listRemoteProviders(): RegisteredRemoteProvider[] {
-		return this.getState().listRemoteProviders();
+	listRemoteProviderOptions(): RemoteProviderOption[] {
+		return this.getState().listRemoteProviderOptions();
 	}
 
-	setRemoteProviderId(providerId: string): void {
+	listRemoteProviders(): RegisteredRemoteProvider[] {
+		return this.getState()
+			.listRemoteProviderOptions()
+			.map(({ id }) => this.getRemoteProvider(id));
+	}
+
+	setRemoteProviderId(providerId: RemoteProviderId): void {
 		this.getState().setRemoteProviderId(providerId);
 	}
 
@@ -46,8 +58,18 @@ export default class ObsidianDriveSyncPlugin
 		return this.getState().getLocalProvider();
 	}
 
-	getRemoteConnectionState(): RemoteConnectionState<RegisteredRemoteProvider> {
-		return this.getState().getRemoteConnectionState();
+	getRemoteConnectionView(): RemoteConnectionView {
+		return this.getState().getRemoteConnectionView();
+	}
+
+	getRemoteProvider(providerId?: RemoteProviderId): RegisteredRemoteProvider {
+		return this.getState().getRemoteProvider(providerId);
+	}
+
+	getStoredRemoteCredentials():
+		| RemoteProviderCredentialsOf<RegisteredRemoteProvider>
+		| undefined {
+		return this.getState().getStoredRemoteCredentials();
 	}
 
 	updateRemoteConnectionState(patch: RemoteConnectionStatePatch<RegisteredRemoteProvider>): void {
@@ -130,6 +152,34 @@ export default class ObsidianDriveSyncPlugin
 
 	async clearConflictMarker(path: string) {
 		return await this.getRuntime().clearConflictMarker(path);
+	}
+
+	async setRemoteScope(scopeId: string, scopePath: string) {
+		await this.getRuntime().setRemoteScope(scopeId, scopePath);
+	}
+
+	async loginRemote(providerId: RemoteProviderId, input: RemoteProviderLoginInput) {
+		return await this.getRuntime().loginRemote(providerId, input);
+	}
+
+	async logoutRemote() {
+		return await this.getRuntime().logoutRemote();
+	}
+
+	resetRemoteConnection() {
+		return this.getRuntime().resetRemoteConnection();
+	}
+
+	async validateRemoteScope(scopeId: string) {
+		return await this.getRuntime().validateRemoteScope(scopeId);
+	}
+
+	async openRemoteScopeFileSystem() {
+		return await this.getRuntime().openRemoteScopeFileSystem();
+	}
+
+	async refreshRemoteScopeFileSystem() {
+		return await this.getRuntime().refreshRemoteScopeFileSystem();
 	}
 
 	private getRuntime(): PluginRuntime<RegisteredRemoteProvider> {

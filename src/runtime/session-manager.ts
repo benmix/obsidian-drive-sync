@@ -1,10 +1,16 @@
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type {
+	ObsidianDriveSyncPluginRuntimeApi,
+	RemoteFolderBrowser,
+} from "@contracts/plugin/plugin-api";
+import type { RemoteProviderId } from "@contracts/provider/provider-ids";
 import type {
 	AnyRemoteProvider,
 	RemoteProvider,
 	RemoteProviderClient,
 	RemoteProviderCredentialsOf,
+	RemoteProviderLoginInput,
 	RemoteProviderSessionOf,
+	RemoteScopeRoot,
 } from "@contracts/provider/remote-provider";
 import {
 	createDriveSyncError,
@@ -36,12 +42,11 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	private authPaused = false;
 	private lastAuthError: string | undefined;
 
-	constructor(private readonly plugin: ObsidianDriveSyncPluginApi<TProvider>) {}
+	constructor(private readonly plugin: ObsidianDriveSyncPluginRuntimeApi<TProvider>) {}
 
 	async restoreSession(): Promise<void> {
-		const remoteState = this.plugin.getRemoteConnectionState();
-		const provider = bindRemoteProvider(remoteState.provider);
-		const credentials = remoteState.credentials;
+		const provider = this.getCurrentProvider();
+		const credentials = this.plugin.getStoredRemoteCredentials();
 		if (!credentials) {
 			this.plugin.updateRemoteConnectionState({
 				hasAuthSession: false,
@@ -74,9 +79,8 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	}
 
 	async buildActiveRemoteSession(): Promise<RemoteProviderSessionOf<TProvider> | null> {
-		const remoteState = this.plugin.getRemoteConnectionState();
-		const provider = bindRemoteProvider(remoteState.provider);
-		const credentials = remoteState.credentials;
+		const provider = this.getCurrentProvider();
+		const credentials = this.plugin.getStoredRemoteCredentials();
 		let session = provider.getSession();
 
 		if (!session && credentials) {
@@ -93,7 +97,7 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	}
 
 	async connectClient(): Promise<RemoteProviderClient<TProvider>> {
-		const provider = bindRemoteProvider(this.plugin.getRemoteConnectionState().provider);
+		const provider = this.getCurrentProvider();
 		const session = await this.buildActiveRemoteSession();
 		if (!session) {
 			throw createDriveSyncError("AUTH_SIGN_IN_REQUIRED", {
@@ -122,8 +126,79 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 		return client;
 	}
 
+	async login(
+		providerId: RemoteProviderId,
+		input: RemoteProviderLoginInput,
+	): Promise<{ providerLabel: string; accountEmail: string }> {
+		const provider = this.getProvider(providerId);
+		try {
+			const result = await provider.login(input);
+			if (providerId !== this.plugin.getRemoteConnectionView().providerId) {
+				this.plugin.setRemoteProviderId(providerId);
+			}
+			const accountEmail = result.userEmail ?? input.username.trim();
+			this.plugin.updateRemoteConnectionState({
+				credentials: result.credentials,
+				accountEmail,
+				hasAuthSession: true,
+			});
+			await this.plugin.saveSettings();
+			this.handleAuthRecovered();
+			return {
+				providerLabel: provider.label,
+				accountEmail,
+			};
+		} catch (error) {
+			const normalized = this.normalizeAuthError(error);
+			this.plugin.updateRemoteConnectionState({
+				hasAuthSession: false,
+			});
+			throw normalized;
+		}
+	}
+
+	async logout(): Promise<{ providerLabel: string }> {
+		const provider = this.getCurrentProvider();
+		await provider.logout();
+		this.plugin.clearStoredRemoteSession();
+		provider.disconnect();
+		await this.plugin.saveSettings();
+		this.handleAuthRecovered();
+		return { providerLabel: provider.label };
+	}
+
+	resetConnection(): { providerLabel: string } {
+		const provider = this.getCurrentProvider();
+		provider.disconnect();
+		return { providerLabel: provider.label };
+	}
+
+	async validateRemoteScope(scopeId: string): Promise<{ ok: boolean; message: string }> {
+		const provider = this.getCurrentProvider();
+		const client = await this.connectClient();
+		return await provider.validateScope(client, scopeId);
+	}
+
+	async openRemoteScopeFileSystem(options?: { forceRefresh?: boolean }): Promise<{
+		providerLabel: string;
+		rootScope: RemoteScopeRoot;
+		browser: RemoteFolderBrowser;
+	}> {
+		const provider = this.getCurrentProvider();
+		if (options?.forceRefresh) {
+			provider.disconnect();
+		}
+		const client = await this.connectClient();
+		const rootScope = await provider.getRootScope(client);
+		return {
+			providerLabel: provider.label,
+			rootScope,
+			browser: provider.createRemoteFileSystem(client, rootScope.id),
+		};
+	}
+
 	private async refreshAndPersistSession(): Promise<void> {
-		const provider = bindRemoteProvider(this.plugin.getRemoteConnectionState().provider);
+		const provider = this.getCurrentProvider();
 		try {
 			await provider.refreshToken();
 			await this.persistRecoveredSession(provider, {
@@ -247,5 +322,13 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 			lastErrorRetryable: summary.retryable,
 			logs,
 		});
+	}
+
+	private getCurrentProvider() {
+		return this.getProvider();
+	}
+
+	private getProvider(providerId?: RemoteProviderId) {
+		return bindRemoteProvider(this.plugin.getRemoteProvider(providerId));
 	}
 }

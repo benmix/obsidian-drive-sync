@@ -3,7 +3,7 @@ import type {
 	CommandErrorOptions,
 	ConnectedRemoteClient,
 } from "@contracts/plugin/command-context";
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-api";
 import type { AnyRemoteProvider } from "@contracts/provider/remote-provider";
 import type { DriveSyncErrorCode, ErrorCategory } from "@errors";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
@@ -12,12 +12,12 @@ import { RemoteAuthRequiredModal } from "@ui/auth-required-modal";
 import { Notice } from "obsidian";
 
 export function createCommandContext<TProvider extends AnyRemoteProvider>(
-	plugin: ObsidianDriveSyncPluginApi<TProvider>,
+	plugin: ObsidianDriveSyncPluginRuntimeApi<TProvider>,
 ): CommandContext<TProvider> {
 	const localProvider = plugin.getLocalProvider();
 
 	const requireScopeId = (): string | null => {
-		const { scopeId } = plugin.getRemoteConnectionState();
+		const { scopeId } = plugin.getRemoteConnectionView();
 		if (!scopeId) {
 			new Notice(tr("notice.selectRemoteFolderFirst"));
 			return null;
@@ -31,12 +31,12 @@ export function createCommandContext<TProvider extends AnyRemoteProvider>(
 			if (!scopeId) {
 				return null;
 			}
-			const remoteState = plugin.getRemoteConnectionState();
-			const provider = remoteState.provider;
-			if (!remoteState.credentials && !provider.getSession()) {
+			const remoteState = plugin.getRemoteConnectionView();
+			if (!remoteState.hasStoredCredentials && !remoteState.hasAuthSession) {
 				new RemoteAuthRequiredModal(plugin.app, plugin).open();
 				return null;
 			}
+			const provider = plugin.getRemoteProvider();
 
 			let client;
 			try {

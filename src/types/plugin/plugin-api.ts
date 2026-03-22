@@ -1,22 +1,30 @@
 import type { DriveSyncSettings } from "@contracts/plugin/settings";
 import type { LocalProvider } from "@contracts/provider/local-provider";
+import type { RemoteProviderId } from "@contracts/provider/provider-ids";
 import type {
 	AnyRemoteProvider,
 	RemoteProvider,
 	RemoteProviderClient,
 	RemoteProviderCredentialsOf,
+	RemoteProviderLoginInput,
 } from "@contracts/provider/remote-provider";
 import type { SyncState } from "@contracts/sync/state";
 import type { App, Plugin } from "obsidian";
 
-export type RemoteConnectionState<TProvider extends AnyRemoteProvider = AnyRemoteProvider> = {
-	providerId: string;
-	provider: TProvider;
+export type RemoteProviderOption = {
+	id: RemoteProviderId;
+	label: string;
+};
+
+export type RemoteConnectionView = {
+	providerId: RemoteProviderId;
+	providerLabel: string;
 	scopeId: string;
 	scopePath: string;
-	credentials: RemoteProviderCredentialsOf<TProvider> | undefined;
 	accountEmail: string;
 	hasAuthSession: boolean;
+	hasStoredCredentials: boolean;
+	isSessionValidated: boolean;
 };
 
 export type RemoteConnectionStatePatch<TProvider extends AnyRemoteProvider = AnyRemoteProvider> = {
@@ -27,6 +35,19 @@ export type RemoteConnectionStatePatch<TProvider extends AnyRemoteProvider = Any
 	hasAuthSession?: boolean;
 };
 
+export type RemoteFolderEntry = {
+	id: string;
+	name: string;
+	path?: string;
+	type: "folder" | "file";
+};
+
+export type RemoteFolderBrowser = {
+	listFolderEntries(): Promise<RemoteFolderEntry[]>;
+	listChildFolderEntries?(): Promise<RemoteFolderEntry[]>;
+	ensureFolder?(path: string): Promise<{ id?: string }>;
+};
+
 export interface ObsidianDriveSyncPluginApi<
 	TProvider extends AnyRemoteProvider = RemoteProvider,
 > extends Plugin {
@@ -34,12 +55,9 @@ export interface ObsidianDriveSyncPluginApi<
 	readonly settings: Readonly<DriveSyncSettings>;
 	updateSettings(patch: Partial<DriveSyncSettings>): void;
 
-	listRemoteProviders(): TProvider[];
-	setRemoteProviderId(providerId: string): void;
+	listRemoteProviderOptions(): RemoteProviderOption[];
 	getLocalProvider(): LocalProvider;
-	getRemoteConnectionState(): RemoteConnectionState<TProvider>;
-	updateRemoteConnectionState(patch: RemoteConnectionStatePatch<TProvider>): void;
-	clearStoredRemoteSession(): void;
+	getRemoteConnectionView(): RemoteConnectionView;
 
 	saveSettings(): Promise<void>;
 
@@ -57,4 +75,33 @@ export interface ObsidianDriveSyncPluginApi<
 	getBuiltInExcludePatterns(): readonly string[];
 	loadSyncState(): Promise<SyncState>;
 	clearConflictMarker(path: string): Promise<boolean>;
+	setRemoteScope(scopeId: string, scopePath: string): Promise<void>;
+	loginRemote(
+		providerId: RemoteProviderId,
+		input: RemoteProviderLoginInput,
+	): Promise<{ providerLabel: string; accountEmail: string }>;
+	logoutRemote(): Promise<{ providerLabel: string }>;
+	resetRemoteConnection(): { providerLabel: string };
+	validateRemoteScope(scopeId: string): Promise<{ ok: boolean; message: string }>;
+	openRemoteScopeFileSystem(): Promise<{
+		providerLabel: string;
+		rootScope: { id: string; label: string };
+		browser: RemoteFolderBrowser;
+	}>;
+	refreshRemoteScopeFileSystem(): Promise<{
+		providerLabel: string;
+		rootScope: { id: string; label: string };
+		browser: RemoteFolderBrowser;
+	}>;
+}
+
+export interface ObsidianDriveSyncPluginRuntimeApi<
+	TProvider extends AnyRemoteProvider = RemoteProvider,
+> extends ObsidianDriveSyncPluginApi<TProvider> {
+	listRemoteProviders(): TProvider[];
+	setRemoteProviderId(providerId: RemoteProviderId): void;
+	getRemoteProvider(providerId?: RemoteProviderId): TProvider;
+	getStoredRemoteCredentials(): RemoteProviderCredentialsOf<TProvider> | undefined;
+	updateRemoteConnectionState(patch: RemoteConnectionStatePatch<TProvider>): void;
+	clearStoredRemoteSession(): void;
 }

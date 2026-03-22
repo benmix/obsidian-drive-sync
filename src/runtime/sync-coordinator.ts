@@ -1,4 +1,4 @@
-import { type ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import { type ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-api";
 import type { AnyRemoteProvider } from "@contracts/provider/remote-provider";
 import { type SyncRunRequest } from "@contracts/sync/run-request";
 import type { SessionManager } from "@runtime/session-manager";
@@ -9,12 +9,12 @@ export class SyncCoordinator<TProvider extends AnyRemoteProvider> {
 	private readonly syncRunner = new SyncRunner(new PluginDataStateStore());
 
 	constructor(
-		private readonly plugin: ObsidianDriveSyncPluginApi<TProvider>,
+		private readonly plugin: ObsidianDriveSyncPluginRuntimeApi<TProvider>,
 		private readonly sessionManager: SessionManager<TProvider>,
 	) {}
 
 	async run(request: SyncRunRequest): Promise<void> {
-		const remoteState = this.plugin.getRemoteConnectionState();
+		const remoteState = this.plugin.getRemoteConnectionView();
 		const scopeId = remoteState.scopeId;
 		if (!scopeId) {
 			return;
@@ -22,7 +22,9 @@ export class SyncCoordinator<TProvider extends AnyRemoteProvider> {
 		const client = await this.sessionManager.connectClient();
 		const localProvider = this.plugin.getLocalProvider();
 		const localFileSystem = localProvider.createLocalFileSystem(this.plugin.app);
-		const remoteFileSystem = remoteState.provider.createRemoteFileSystem(client, scopeId);
+		const remoteFileSystem = this.plugin
+			.getRemoteProvider()
+			.createRemoteFileSystem(client, scopeId);
 
 		await this.syncRunner.run(request, {
 			localFileSystem,

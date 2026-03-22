@@ -1,14 +1,16 @@
 import { DEFAULT_SETTINGS } from "@contracts/plugin/default-settings";
 import type {
-	ObsidianDriveSyncPluginApi,
-	RemoteConnectionState,
+	ObsidianDriveSyncPluginRuntimeApi,
 	RemoteConnectionStatePatch,
+	RemoteConnectionView,
+	RemoteProviderOption,
 } from "@contracts/plugin/plugin-api";
 import type { DriveSyncSettings } from "@contracts/plugin/settings";
 import type { LocalProvider } from "@contracts/provider/local-provider";
 import {
 	DEFAULT_LOCAL_PROVIDER_ID,
 	DEFAULT_REMOTE_PROVIDER_ID,
+	type RemoteProviderId,
 } from "@contracts/provider/provider-ids";
 import type { RemoteProviderCredentialsOf } from "@contracts/provider/remote-provider";
 import {
@@ -30,7 +32,9 @@ export class PluginState {
 	private remoteProviderRegistry: RemoteProviderRegistry<RegisteredRemoteProvider> =
 		new RemoteProviderRegistry<RegisteredRemoteProvider>();
 
-	constructor(private readonly plugin: ObsidianDriveSyncPluginApi<RegisteredRemoteProvider>) {}
+	constructor(
+		private readonly plugin: ObsidianDriveSyncPluginRuntimeApi<RegisteredRemoteProvider>,
+	) {}
 
 	async initializeFromStorage(): Promise<void> {
 		const data = await loadPluginData(this.plugin);
@@ -56,12 +60,15 @@ export class PluginState {
 		return providerId || DEFAULT_REMOTE_PROVIDER_ID;
 	}
 
-	listRemoteProviders(): RegisteredRemoteProvider[] {
-		return this.remoteProviderRegistry.list();
+	listRemoteProviderOptions(): RemoteProviderOption[] {
+		return this.remoteProviderRegistry.list().map((provider) => ({
+			id: provider.id,
+			label: provider.label,
+		}));
 	}
 
-	private getRemoteProvider(): RegisteredRemoteProvider {
-		return this.remoteProviderRegistry.get(this.getRemoteProviderId());
+	getRemoteProvider(providerId?: RemoteProviderId): RegisteredRemoteProvider {
+		return this.remoteProviderRegistry.get(providerId ?? this.getRemoteProviderId());
 	}
 
 	setRemoteProviderId(providerId: string): void {
@@ -91,7 +98,7 @@ export class PluginState {
 		return this.localProviderRegistry.get(this.getLocalProviderId());
 	}
 
-	private getStoredProviderCredentials():
+	getStoredRemoteCredentials():
 		| RemoteProviderCredentialsOf<RegisteredRemoteProvider>
 		| undefined {
 		return this.mutableSettings.remoteProviderCredentials as
@@ -99,15 +106,17 @@ export class PluginState {
 			| undefined;
 	}
 
-	getRemoteConnectionState(): RemoteConnectionState<RegisteredRemoteProvider> {
+	getRemoteConnectionView(): RemoteConnectionView {
+		const provider = this.getRemoteProvider();
 		return {
 			providerId: this.getRemoteProviderId(),
-			provider: this.getRemoteProvider(),
+			providerLabel: provider.label,
 			scopeId: this.mutableSettings.remoteScopeId.trim(),
 			scopePath: this.mutableSettings.remoteScopePath.trim(),
-			credentials: this.getStoredProviderCredentials(),
 			accountEmail: this.mutableSettings.remoteAccountEmail,
 			hasAuthSession: this.mutableSettings.remoteHasAuthSession,
+			hasStoredCredentials: Boolean(this.getStoredRemoteCredentials()),
+			isSessionValidated: provider.isSessionValidated(),
 		};
 	}
 
