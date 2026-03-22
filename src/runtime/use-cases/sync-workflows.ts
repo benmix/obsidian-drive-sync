@@ -31,15 +31,14 @@ export async function syncVaultToRemote<TProvider extends AnyRemoteProvider>(
 	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
 ): Promise<{ uploaded: number }> {
-	return await withSyncFileSystems(
+	const { localFileSystem, remoteFileSystem } = createSyncFileSystems(
 		app,
 		localProvider,
 		remoteProvider,
 		client,
 		scopeId,
-		async ({ localFileSystem, remoteFileSystem }) =>
-			await syncLocalToRemote(localFileSystem, remoteFileSystem),
 	);
+	return await syncLocalToRemote(localFileSystem, remoteFileSystem);
 }
 
 export async function restoreVaultFromRemote<TProvider extends AnyRemoteProvider>(
@@ -49,15 +48,14 @@ export async function restoreVaultFromRemote<TProvider extends AnyRemoteProvider
 	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
 ): Promise<{ downloaded: number }> {
-	return await withSyncFileSystems(
+	const { localFileSystem, remoteFileSystem } = createSyncFileSystems(
 		app,
 		localProvider,
 		remoteProvider,
 		client,
 		scopeId,
-		async ({ localFileSystem, remoteFileSystem }) =>
-			await syncRemoteToLocal(localFileSystem, remoteFileSystem),
 	);
+	return await syncRemoteToLocal(localFileSystem, remoteFileSystem);
 }
 
 export async function planSync<TProvider extends AnyRemoteProvider>(
@@ -68,15 +66,15 @@ export async function planSync<TProvider extends AnyRemoteProvider>(
 	scopeId: string,
 	settings?: SyncWorkflowSettings,
 ): Promise<{ jobsPlanned: number; entries: number }> {
-	return await withLoadedSyncEngine(
+	const { engine, preferRemoteSeed } = await createLoadedSyncContext(
 		app,
 		localProvider,
 		remoteProvider,
 		client,
 		scopeId,
 		settings,
-		async ({ engine, preferRemoteSeed }) => await engine.plan({ preferRemoteSeed }),
 	);
+	return await engine.plan({ preferRemoteSeed });
 }
 
 export async function runPlannedSync<TProvider extends AnyRemoteProvider>(
@@ -87,15 +85,15 @@ export async function runPlannedSync<TProvider extends AnyRemoteProvider>(
 	scopeId: string,
 	settings?: SyncWorkflowSettings,
 ): Promise<{ jobsExecuted: number; entriesUpdated: number }> {
-	return await withLoadedSyncEngine(
+	const { engine } = await createLoadedSyncContext(
 		app,
 		localProvider,
 		remoteProvider,
 		client,
 		scopeId,
 		settings,
-		async ({ engine }) => await engine.runOnce(),
 	);
+	return await engine.runOnce();
 }
 
 export async function rebuildSyncIndex<TProvider extends AnyRemoteProvider>(
@@ -106,17 +104,15 @@ export async function rebuildSyncIndex<TProvider extends AnyRemoteProvider>(
 	scopeId: string,
 	settings?: SyncWorkflowSettings,
 ): Promise<void> {
-	await withLoadedSyncEngine(
+	const { engine } = await createLoadedSyncContext(
 		app,
 		localProvider,
 		remoteProvider,
 		client,
 		scopeId,
 		settings,
-		async ({ engine }) => {
-			await engine.rebuildIndex();
-		},
 	);
+	await engine.rebuildIndex();
 }
 
 export async function pollRemoteSync<TProvider extends AnyRemoteProvider>(
@@ -127,30 +123,28 @@ export async function pollRemoteSync<TProvider extends AnyRemoteProvider>(
 	scopeId: string,
 	settings?: SyncWorkflowSettings,
 ): Promise<{ jobsPlanned: number; entries: number }> {
-	return await withLoadedSyncEngine(
+	const { remoteFileSystem, engine, preferRemoteSeed } = await createLoadedSyncContext(
 		app,
 		localProvider,
 		remoteProvider,
 		client,
 		scopeId,
 		settings,
-		async ({ remoteFileSystem, engine, preferRemoteSeed }) => {
-			const result = await pollRemoteChanges(remoteFileSystem, engine.getStateSnapshot(), {
-				syncStrategy: settings?.syncStrategy,
-				preferRemoteSeed,
-			});
-			engine.applyEntries(result.snapshot);
-			engine.removeEntries(result.removedPaths);
-			for (const job of result.jobs) {
-				engine.enqueue(job);
-			}
-			await engine.save({ remoteEventCursor: result.remoteEventCursor });
-			return {
-				jobsPlanned: result.jobs.length,
-				entries: result.snapshot.length,
-			};
-		},
 	);
+	const result = await pollRemoteChanges(remoteFileSystem, engine.getStateSnapshot(), {
+		syncStrategy: settings?.syncStrategy,
+		preferRemoteSeed,
+	});
+	engine.applyEntries(result.snapshot);
+	engine.removeEntries(result.removedPaths);
+	for (const job of result.jobs) {
+		engine.enqueue(job);
+	}
+	await engine.save({ remoteEventCursor: result.remoteEventCursor });
+	return {
+		jobsPlanned: result.jobs.length,
+		entries: result.snapshot.length,
+	};
 }
 
 export async function estimateSyncPlan<TProvider extends AnyRemoteProvider>(
@@ -166,94 +160,89 @@ export async function estimateSyncPlan<TProvider extends AnyRemoteProvider>(
 	uploadBytes: number;
 	downloadBytes: number;
 }> {
-	return await withLoadedSyncEngine(
-		app,
-		localProvider,
-		remoteProvider,
-		client,
-		scopeId,
-		settings,
-		async ({ localFileSystem, remoteFileSystem, stateStore, engine, preferRemoteSeed }) => {
-			const originalState = await stateStore.load();
-			try {
-				const plan = await engine.plan({ preferRemoteSeed });
-				const jobs = engine.listJobs();
+	const { localFileSystem, remoteFileSystem, stateStore, engine, preferRemoteSeed } =
+		await createLoadedSyncContext(
+			app,
+			localProvider,
+			remoteProvider,
+			client,
+			scopeId,
+			settings,
+		);
+	const originalState = await stateStore.load();
+	try {
+		const plan = await engine.plan({ preferRemoteSeed });
+		const jobs = engine.listJobs();
 
-				let uploadBytes = 0;
-				let downloadBytes = 0;
-				const localEntries = await localFileSystem.listEntries();
-				const localByPath = new Map(localEntries.map((entry) => [entry.path, entry]));
-				for (const job of jobs) {
-					if (job.op === "upload") {
-						const entry = localByPath.get(job.path);
-						if (entry?.size) {
-							uploadBytes += entry.size;
-						}
-					}
-					if (job.op === "download" && job.remoteId && remoteFileSystem.getEntry) {
-						const node = await remoteFileSystem.getEntry(job.remoteId);
-						if (node?.size) {
-							downloadBytes += node.size;
-						}
-					}
+		let uploadBytes = 0;
+		let downloadBytes = 0;
+		const localEntries = await localFileSystem.listEntries();
+		const localByPath = new Map(localEntries.map((entry) => [entry.path, entry]));
+		for (const job of jobs) {
+			if (job.op === "upload") {
+				const entry = localByPath.get(job.path);
+				if (entry?.size) {
+					uploadBytes += entry.size;
 				}
-
-				return {
-					jobsPlanned: plan.jobsPlanned,
-					entries: plan.entries,
-					uploadBytes,
-					downloadBytes,
-				};
-			} finally {
-				await stateStore.save(originalState);
 			}
-		},
-	);
+			if (job.op === "download" && job.remoteId && remoteFileSystem.getEntry) {
+				const node = await remoteFileSystem.getEntry(job.remoteId);
+				if (node?.size) {
+					downloadBytes += node.size;
+				}
+			}
+		}
+
+		return {
+			jobsPlanned: plan.jobsPlanned,
+			entries: plan.entries,
+			uploadBytes,
+			downloadBytes,
+		};
+	} finally {
+		await stateStore.save(originalState);
+	}
 }
 
-async function withSyncFileSystems<TProvider extends AnyRemoteProvider, TResult>(
+function createSyncFileSystems<TProvider extends AnyRemoteProvider>(
 	app: App,
 	localProvider: LocalProvider,
 	remoteProvider: TProvider,
 	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
-	run: (fileSystems: SyncFileSystems) => Promise<TResult>,
-): Promise<TResult> {
+): SyncFileSystems {
 	const localFileSystem = localProvider.createLocalFileSystem(app);
 	const remoteFileSystem = remoteProvider.createRemoteFileSystem(client, scopeId);
-	return await run({ localFileSystem, remoteFileSystem });
+	return { localFileSystem, remoteFileSystem };
 }
 
-async function withLoadedSyncEngine<TProvider extends AnyRemoteProvider, TResult>(
+async function createLoadedSyncContext<TProvider extends AnyRemoteProvider>(
 	app: App,
 	localProvider: LocalProvider,
 	remoteProvider: TProvider,
 	client: RemoteProviderClient<TProvider>,
 	scopeId: string,
 	settings: SyncWorkflowSettings | undefined,
-	run: (context: LoadedSyncEngineContext) => Promise<TResult>,
-): Promise<TResult> {
-	return await withSyncFileSystems(
+): Promise<LoadedSyncEngineContext> {
+	const { localFileSystem, remoteFileSystem } = createSyncFileSystems(
 		app,
 		localProvider,
 		remoteProvider,
 		client,
 		scopeId,
-		async ({ localFileSystem, remoteFileSystem }) => {
-			const stateStore = new PluginDataStateStore();
-			const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
-				syncStrategy: settings?.syncStrategy,
-			});
-			await engine.load();
-			return await run({
-				localFileSystem,
-				remoteFileSystem,
-				stateStore,
-				engine,
-				preferRemoteSeed: await shouldPreferRemoteSeed(engine, localFileSystem),
-			});
-		},
 	);
+	const stateStore = new PluginDataStateStore();
+	const engine = new SyncEngine(localFileSystem, remoteFileSystem, stateStore, {
+		syncStrategy: settings?.syncStrategy,
+	});
+	await engine.load();
+	return {
+		localFileSystem,
+		remoteFileSystem,
+		stateStore,
+		engine,
+		preferRemoteSeed: await shouldPreferRemoteSeed(engine, localFileSystem),
+	};
 }
 
 async function shouldPreferRemoteSeed(
