@@ -17,10 +17,6 @@ import { NetworkPolicy } from "@runtime/network-policy";
 import { SessionManager } from "@runtime/session-manager";
 import { SyncCoordinator } from "@runtime/sync-coordinator";
 import { TriggerScheduler } from "@runtime/trigger-scheduler";
-import {
-	clearConflictMarker as clearConflictMarkerUseCase,
-	loadSyncState as loadSyncStateUseCase,
-} from "@runtime/use-cases/sync-state";
 import { getBuiltInExcludePatterns as getBuiltInExcludePatternsUseCase } from "@sync/planner/exclude";
 import { PluginDataStateStore } from "@sync/state/state-store";
 import { now } from "@sync/support/utils";
@@ -121,11 +117,21 @@ export class PluginRuntime<TProvider extends AnyRemoteProvider> {
 	}
 
 	async loadSyncState() {
-		return await loadSyncStateUseCase();
+		return await new PluginDataStateStore().load();
 	}
 
 	async clearConflictMarker(path: string) {
-		return await clearConflictMarkerUseCase(path);
+		const stateStore = new PluginDataStateStore();
+		const state = await stateStore.load();
+		const entry = state.entries[path];
+		if (!entry) {
+			return false;
+		}
+		entry.conflict = undefined;
+		entry.conflictPending = undefined;
+		state.entries[path] = entry;
+		await stateStore.save(state);
+		return true;
 	}
 
 	teardown(): void {
