@@ -8,6 +8,7 @@ import type {
 } from "@contracts/provider/remote-provider";
 import {
 	createDriveSyncError,
+	type DriveSyncError,
 	normalizeUnknownDriveSyncError,
 	shouldPauseAuthForError,
 	toDriveSyncErrorSummary,
@@ -45,24 +46,9 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 			return;
 		}
 
-		try {
-			await provider.restore(credentials);
-			this.plugin.setStoredProviderCredentials(provider.getReusableCredentials());
-			this.plugin.setRemoteAuthSession(true);
-			this.handleAuthRecovered();
-		} catch (error) {
-			const normalized = normalizeUnknownDriveSyncError(error, {
-				category: "auth",
-				userMessage: "Authentication required. Sign in again to continue.",
-				userMessageKey: "error.auth.reauthRequired",
-			});
-			console.warn("Failed to restore remote session.", error);
-			this.plugin.clearStoredRemoteSession();
-			await this.plugin.saveSettings();
-			this.authPaused = shouldPauseAuthForError(normalized);
-			this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
-			await this.recordAuthError(normalized, "Remote session restore failed");
-		}
+		await this.restoreStoredSession(provider, credentials, {
+			persistSettings: false,
+		});
 	}
 
 	isAuthPaused(): boolean {
@@ -79,13 +65,8 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	}
 
 	pauseAuth(error: unknown): void {
-		const normalized = normalizeUnknownDriveSyncError(error, {
-			category: "auth",
-			userMessage: "Authentication required. Sign in again to continue.",
-			userMessageKey: "error.auth.reauthRequired",
-		});
-		this.authPaused = true;
-		this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
+		const normalized = this.normalizeAuthError(error);
+		this.applyAuthFailureState(normalized);
 		void this.recordAuthError(normalized, "Auth paused");
 	}
 
@@ -95,26 +76,9 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 		let session = provider.getSession();
 
 		if (!session && credentials) {
-			try {
-				session = await provider.restore(credentials);
-				this.plugin.setStoredProviderCredentials(provider.getReusableCredentials());
-				this.plugin.setRemoteAuthSession(true);
-				await this.plugin.saveSettings();
-				this.handleAuthRecovered();
-			} catch (error) {
-				const normalized = normalizeUnknownDriveSyncError(error, {
-					category: "auth",
-					userMessage: "Authentication required. Sign in again to continue.",
-					userMessageKey: "error.auth.reauthRequired",
-				});
-				console.warn("Failed to restore remote session.", error);
-				this.plugin.clearStoredRemoteSession();
-				await this.plugin.saveSettings();
-				this.authPaused = shouldPauseAuthForError(normalized);
-				this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
-				await this.recordAuthError(normalized, "Remote session restore failed");
-				return null;
-			}
+			session = await this.restoreStoredSession(provider, credentials, {
+				persistSettings: true,
+			});
 		}
 
 		if (!session) {
@@ -158,24 +122,98 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 		const provider = bindRemoteProvider(this.plugin.getRemoteProvider());
 		try {
 			await provider.refreshToken();
-			this.plugin.setStoredProviderCredentials(provider.getReusableCredentials());
-			this.plugin.setRemoteAuthSession(true);
-			await this.plugin.saveSettings();
-			this.handleAuthRecovered();
-		} catch (refreshError) {
-			const normalized = normalizeUnknownDriveSyncError(refreshError, {
-				category: "auth",
-				userMessage: "Authentication required. Sign in again to continue.",
-				userMessageKey: "error.auth.reauthRequired",
+			await this.persistRecoveredSession(provider, {
+				persistSettings: true,
 			});
-			console.warn("Failed to refresh remote session.", refreshError);
-			this.plugin.setRemoteAuthSession(false);
-			this.authPaused = shouldPauseAuthForError(normalized);
-			this.lastAuthError = translateDriveSyncErrorUserMessage(normalized, trAny);
-			await this.plugin.saveSettings();
-			await this.recordAuthError(normalized, "Remote session refresh failed");
+		} catch (refreshError) {
+			const normalized = await this.handleAuthFailure(refreshError, {
+				warnMessage: "Failed to refresh remote session.",
+				logMessage: "Remote session refresh failed",
+				clearStoredSession: false,
+				hasRemoteAuthSession: false,
+				persistSettings: true,
+			});
 			throw normalized;
 		}
+	}
+
+	private normalizeAuthError(error: unknown): DriveSyncError {
+		return normalizeUnknownDriveSyncError(error, {
+			category: "auth",
+			userMessage: "Authentication required. Sign in again to continue.",
+			userMessageKey: "error.auth.reauthRequired",
+		});
+	}
+
+	private applyAuthFailureState(error: DriveSyncError): void {
+		this.authPaused = shouldPauseAuthForError(error);
+		this.lastAuthError = translateDriveSyncErrorUserMessage(error, trAny);
+	}
+
+	private async persistRecoveredSession(
+		provider: RemoteProvider<
+			RemoteProviderClient<TProvider>,
+			RemoteProviderSessionOf<TProvider>,
+			RemoteProviderCredentialsOf<TProvider>
+		>,
+		options: { persistSettings: boolean },
+	): Promise<void> {
+		this.plugin.setStoredProviderCredentials(provider.getReusableCredentials());
+		this.plugin.setRemoteAuthSession(true);
+		if (options.persistSettings) {
+			await this.plugin.saveSettings();
+		}
+		this.handleAuthRecovered();
+	}
+
+	private async restoreStoredSession(
+		provider: RemoteProvider<
+			RemoteProviderClient<TProvider>,
+			RemoteProviderSessionOf<TProvider>,
+			RemoteProviderCredentialsOf<TProvider>
+		>,
+		credentials: RemoteProviderCredentialsOf<TProvider>,
+		options: { persistSettings: boolean },
+	): Promise<RemoteProviderSessionOf<TProvider> | null> {
+		try {
+			const session = await provider.restore(credentials);
+			await this.persistRecoveredSession(provider, options);
+			return session;
+		} catch (error) {
+			await this.handleAuthFailure(error, {
+				warnMessage: "Failed to restore remote session.",
+				logMessage: "Remote session restore failed",
+				clearStoredSession: true,
+				persistSettings: true,
+			});
+			return null;
+		}
+	}
+
+	private async handleAuthFailure(
+		error: unknown,
+		options: {
+			warnMessage: string;
+			logMessage: string;
+			clearStoredSession?: boolean;
+			hasRemoteAuthSession?: boolean;
+			persistSettings: boolean;
+		},
+	): Promise<DriveSyncError> {
+		const normalized = this.normalizeAuthError(error);
+		console.warn(options.warnMessage, error);
+		if (options.clearStoredSession) {
+			this.plugin.clearStoredRemoteSession();
+		}
+		if (typeof options.hasRemoteAuthSession === "boolean") {
+			this.plugin.setRemoteAuthSession(options.hasRemoteAuthSession);
+		}
+		if (options.persistSettings) {
+			await this.plugin.saveSettings();
+		}
+		this.applyAuthFailureState(normalized);
+		await this.recordAuthError(normalized, options.logMessage);
+		return normalized;
 	}
 
 	private async recordAuthError(error: unknown, message: string): Promise<void> {

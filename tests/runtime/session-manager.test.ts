@@ -88,4 +88,74 @@ describe("SessionManager", () => {
 			]),
 		);
 	});
+
+	test("restores and persists a stored session when no active session is loaded", async () => {
+		const session = { accessToken: "token" };
+		const reusableCredentials = { token: "next-secret" };
+		const plugin = {
+			getRemoteProvider: () => ({
+				getSession: () => null,
+				restore: vi.fn(async () => session),
+				getReusableCredentials: () => reusableCredentials,
+			}),
+			getStoredProviderCredentials: () => ({ token: "secret" }),
+			setStoredProviderCredentials: vi.fn(),
+			setRemoteAuthSession: vi.fn(),
+			clearStoredRemoteSession: vi.fn(),
+			saveSettings: vi.fn(async () => {}),
+		};
+		const manager = new SessionManager(plugin as never);
+
+		await expect(manager.buildActiveRemoteSession()).resolves.toBe(session);
+		expect(plugin.setStoredProviderCredentials).toHaveBeenCalledWith(reusableCredentials);
+		expect(plugin.setRemoteAuthSession).toHaveBeenCalledWith(true);
+		expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+		expect(manager.isAuthPaused()).toBe(false);
+	});
+
+	test("pauses auth and persists diagnostics when token refresh fails during connect", async () => {
+		const refreshError = createDriveSyncError("AUTH_SESSION_EXPIRED", {
+			category: "auth",
+		});
+		let refreshCallback: (() => Promise<void>) | undefined;
+		const plugin = {
+			getRemoteProvider: () => ({
+				id: "proton-drive",
+				label: "Proton Drive",
+				getSession: () => ({ accessToken: "token" }),
+				connect: vi.fn(async (_session, options) => {
+					refreshCallback = options?.onTokenRefresh;
+					return { connected: true };
+				}),
+				refreshToken: vi.fn(async () => {
+					throw refreshError;
+				}),
+				getReusableCredentials: () => ({ token: "secret" }),
+			}),
+			getStoredProviderCredentials: () => ({ token: "secret" }),
+			setStoredProviderCredentials: vi.fn(),
+			setRemoteAuthSession: vi.fn(),
+			clearStoredRemoteSession: vi.fn(),
+			saveSettings: vi.fn(async () => {}),
+		};
+		const manager = new SessionManager(plugin as never);
+
+		await expect(manager.connectClient()).resolves.toEqual({
+			connected: true,
+		});
+		await expect(refreshCallback?.()).rejects.toMatchObject({
+			code: "AUTH_SESSION_EXPIRED",
+		});
+		expect(plugin.setRemoteAuthSession).toHaveBeenCalledWith(false);
+		expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+		expect(manager.isAuthPaused()).toBe(true);
+		expect(stateHarness.state.logs).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					message: "Remote session refresh failed",
+					code: "AUTH_SESSION_EXPIRED",
+				}),
+			]),
+		);
+	});
 });
