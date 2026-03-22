@@ -2,7 +2,6 @@ import type { ProtonDriveConnectedClient } from "@contracts/provider/proton/driv
 import type { ProtonSession } from "@contracts/provider/proton/sdk-session";
 import { MemoryCache, ProtonDriveClient } from "@protontech/drive-sdk";
 import { buildSdkSessionClient } from "@provider/providers/proton-drive/sdk/client-factory";
-import { Notice } from "obsidian";
 
 export class ProtonDriveService {
 	private client: ProtonDriveConnectedClient | null = null;
@@ -36,7 +35,6 @@ export class ProtonDriveService {
 			return this.client;
 		} catch (error) {
 			console.warn("Failed to connect to Proton Drive.", error);
-			new Notice("Unable to connect to Proton Drive.");
 			this.client = null;
 			this.sessionRef = null;
 			return null;
