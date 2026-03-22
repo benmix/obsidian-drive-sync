@@ -47,12 +47,6 @@ export default class ObsidianDriveSyncPlugin
 		return this.getState().listRemoteProviderOptions();
 	}
 
-	listRemoteProviders(): RegisteredRemoteProvider[] {
-		return this.getState()
-			.listRemoteProviderOptions()
-			.map(({ id }) => this.getRemoteProvider(id));
-	}
-
 	setRemoteProviderId(providerId: RemoteProviderId): void {
 		this.getState().setRemoteProviderId(providerId);
 	}

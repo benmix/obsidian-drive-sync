@@ -25,7 +25,6 @@ export type BoundRemoteProvider<TProvider extends AnyRemoteProvider> = RemotePro
 export interface ObsidianDriveSyncPluginRuntimeApi<
 	TProvider extends AnyRemoteProvider = RemoteProvider,
 > extends ObsidianDriveSyncPluginApi<TProvider> {
-	listRemoteProviders(): BoundRemoteProvider<TProvider>[];
 	setRemoteProviderId(providerId: RemoteProviderId): void;
 	getRemoteProvider(providerId?: RemoteProviderId): BoundRemoteProvider<TProvider>;
 	getStoredRemoteCredentials(): RemoteProviderCredentialsOf<TProvider> | undefined;
