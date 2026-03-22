@@ -1,9 +1,9 @@
 import type { PluginPreSyncModalPort } from "@contracts/plugin/plugin-ui-port";
 import type { PreSyncEstimate } from "@contracts/ui/pre-sync";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
-import { tr, trAny } from "@i18n";
+import { tr } from "@i18n";
+import { showDriveSyncErrorNotice } from "@ui/error-notice";
 import { formatBytes } from "@ui/format";
-import { Modal, Notice, Setting } from "obsidian";
+import { Modal, Setting } from "obsidian";
 import type { App } from "obsidian";
 
 export class SyncPreflightModal extends Modal {
@@ -66,13 +66,12 @@ export class SyncPreflightModal extends Modal {
 			await this.onConfirm();
 			this.close();
 		} catch (error) {
-			const normalized = normalizeUnknownDriveSyncError(error, {
+			showDriveSyncErrorNotice(error, {
+				logMessage: "Pre-sync confirmation failed.",
 				category: "sync",
 				userMessage: tr("preSync.confirmFailed"),
 				userMessageKey: "preSync.confirmFailed",
 			});
-			console.warn("Pre-sync confirmation failed.", error);
-			new Notice(translateDriveSyncErrorUserMessage(normalized, trAny));
 			this.running = false;
 		}
 	}

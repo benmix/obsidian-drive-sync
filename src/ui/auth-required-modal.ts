@@ -1,9 +1,9 @@
 import type { PluginRemoteLoginPort } from "@contracts/plugin/plugin-ui-port";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
-import { tr, trAny } from "@i18n";
+import { tr } from "@i18n";
+import { showDriveSyncErrorNotice } from "@ui/error-notice";
 import { RemoteProviderLoginModal } from "@ui/login-modal";
 import { renderProviderIcon } from "@ui/provider-icon";
-import { Modal, Notice } from "obsidian";
+import { Modal } from "obsidian";
 import type { App } from "obsidian";
 
 type RemoteLoginFlowOptions = {
@@ -80,12 +80,11 @@ export async function openProviderLoginModal(
 	try {
 		openSelectedProviderLoginModal(plugin, providerId, loginFlow);
 	} catch (error) {
-		const normalized = normalizeUnknownDriveSyncError(error, {
+		showDriveSyncErrorNotice(error, {
 			category: "config",
 			userMessage: tr("error.config.providerMissing"),
 			userMessageKey: "error.config.providerMissing",
 		});
-		new Notice(translateDriveSyncErrorUserMessage(normalized, trAny));
 	}
 }
 
@@ -147,12 +146,11 @@ async function selectProviderAndOpenLogin(
 			},
 		});
 	} catch (error) {
-		const normalized = normalizeUnknownDriveSyncError(error, {
+		showDriveSyncErrorNotice(error, {
 			category: "config",
 			userMessage: tr("error.config.providerMissing"),
 			userMessageKey: "error.config.providerMissing",
 		});
-		new Notice(translateDriveSyncErrorUserMessage(normalized, trAny));
 	}
 }
 

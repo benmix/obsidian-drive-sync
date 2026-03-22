@@ -3,13 +3,10 @@ import type {
 	RemoteFolderBrowser,
 	RemoteFolderEntry,
 } from "@contracts/plugin/remote-connection-view";
-import {
-	createDriveSyncError,
-	normalizeUnknownDriveSyncError,
-	translateDriveSyncErrorUserMessage,
-} from "@errors";
+import { createDriveSyncError } from "@errors";
 import { normalizePath } from "@filesystem/path";
-import { tr, trAny } from "@i18n";
+import { tr } from "@i18n";
+import { prepareDriveSyncErrorNotice } from "@ui/error-notice";
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
 
@@ -65,7 +62,7 @@ export class RemoteFolderPickerModal extends Modal {
 			this.rootFolderId = result.rootScope.id;
 			this.remoteFileSystem = result.browser;
 		} catch (error) {
-			const normalized = normalizeUnknownDriveSyncError(error, {
+			const prepared = prepareDriveSyncErrorNotice(error, {
 				category: "provider",
 				userMessage: tr("notice.unableToConnectProvider", {
 					provider: remoteState.providerLabel,
@@ -73,7 +70,7 @@ export class RemoteFolderPickerModal extends Modal {
 				userMessageKey: "error.provider.unableToConnectNamed",
 				userMessageParams: { provider: remoteState.providerLabel },
 			});
-			this.error = translateDriveSyncErrorUserMessage(normalized, trAny);
+			this.error = prepared.message;
 			this.loading = false;
 			this.render();
 			return;
@@ -318,13 +315,13 @@ export class RemoteFolderPickerModal extends Modal {
 			}
 			await this.selectFolder(result.id, folderPath);
 		} catch (error) {
-			const normalized = normalizeUnknownDriveSyncError(error, {
+			const prepared = prepareDriveSyncErrorNotice(error, {
+				logMessage: "Failed to create remote folder.",
 				category: "remote_fs",
 				userMessage: tr("remoteFolder.createFailed"),
 			});
-			console.warn("Failed to create remote folder.", error);
 			this.creating = false;
-			this.createError = translateDriveSyncErrorUserMessage(normalized, trAny);
+			this.createError = prepared.message;
 			this.render();
 		}
 	}

@@ -1,6 +1,6 @@
 import type { PluginRemoteLoginPort } from "@contracts/plugin/plugin-ui-port";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
-import { tr, trAny } from "@i18n";
+import { tr } from "@i18n";
+import { prepareDriveSyncErrorNotice } from "@ui/error-notice";
 import { shouldPreventTwoFactorKeydown } from "@ui/login-modal-helpers";
 import { renderProviderIcon } from "@ui/provider-icon";
 import { Modal, Notice, Setting } from "obsidian";
@@ -351,7 +351,7 @@ export class RemoteProviderLoginModal extends Modal {
 			this.close();
 			this.onSuccess?.();
 		} catch (error) {
-			const normalized = normalizeUnknownDriveSyncError(error, {
+			const { normalized, message } = prepareDriveSyncErrorNotice(error, {
 				category: "auth",
 				userMessage: tr("login.unableToSignIn"),
 				userMessageKey: "login.unableToSignIn",
@@ -365,14 +365,14 @@ export class RemoteProviderLoginModal extends Modal {
 				this.isSubmitting = false;
 				this.render();
 				this.focusTwoFactorInput(0);
-				new Notice(translateDriveSyncErrorUserMessage(normalized, trAny));
+				new Notice(message);
 				return;
 			}
 			if (normalized.code === "AUTH_MAILBOX_PASSWORD_REQUIRED") {
 				this.requiresMailboxPassword = true;
 				this.isSubmitting = false;
 				this.render();
-				new Notice(translateDriveSyncErrorUserMessage(normalized, trAny));
+				new Notice(message);
 				return;
 			}
 			if (this.requiresTwoFactor) {
@@ -384,7 +384,7 @@ export class RemoteProviderLoginModal extends Modal {
 			if (this.requiresTwoFactor) {
 				this.focusTwoFactorInput(0);
 			}
-			new Notice(translateDriveSyncErrorUserMessage(normalized, trAny));
+			new Notice(message);
 		}
 	}
 

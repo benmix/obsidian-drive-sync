@@ -1,8 +1,8 @@
 import type { PluginSettingsPanelPort } from "@contracts/plugin/plugin-ui-port";
 import type { DriveSyncSettings } from "@contracts/plugin/settings";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
-import { tr, trAny } from "@i18n";
+import { tr } from "@i18n";
 import { openProviderLoginModal, openRemoteLoginModal } from "@ui/auth-required-modal";
+import { prepareDriveSyncErrorNotice } from "@ui/error-notice";
 import { renderProviderIcon } from "@ui/provider-icon";
 import { RemoteFolderPickerModal } from "@ui/remote-root-modal";
 import { PluginSettingTab, Setting } from "obsidian";
@@ -264,14 +264,14 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		try {
 			return await this.plugin.validateRemoteScope(scopeId);
 		} catch (error) {
-			const normalized = normalizeUnknownDriveSyncError(error, {
+			const prepared = prepareDriveSyncErrorNotice(error, {
 				category: "provider",
 				userMessage: tr("error.provider.unableToConnect"),
 				userMessageKey: "error.provider.unableToConnect",
 			});
 			return {
 				ok: false,
-				message: translateDriveSyncErrorUserMessage(normalized, trAny),
+				message: prepared.message,
 			};
 		}
 	}

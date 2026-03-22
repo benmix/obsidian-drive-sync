@@ -5,10 +5,9 @@ import type {
 } from "@contracts/plugin/command-context";
 import type { ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-runtime-port";
 import type { AnyRemoteProvider } from "@contracts/provider/remote-provider";
-import type { DriveSyncErrorCode, ErrorCategory } from "@errors";
-import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
 import { tr, trAny } from "@i18n";
 import { RemoteAuthRequiredModal } from "@ui/auth-required-modal";
+import { showDriveSyncErrorNotice } from "@ui/error-notice";
 import { Notice } from "obsidian";
 
 export function createCommandContext<TProvider extends AnyRemoteProvider>(
@@ -70,15 +69,16 @@ export function createCommandContext<TProvider extends AnyRemoteProvider>(
 	};
 
 	const showCommandError = (error: unknown, options: CommandErrorOptions): void => {
-		const normalized = normalizeUnknownDriveSyncError(error, {
-			code: options.code as DriveSyncErrorCode | undefined,
-			category: options.category as ErrorCategory | undefined,
+		showDriveSyncErrorNotice(error, {
+			logMessage: options.logMessage,
+			noticeKey: options.noticeKey,
+			noticeParams: options.noticeParams,
+			code: options.code,
+			category: options.category,
 			retryable: options.retryable,
 			userMessage: options.userMessage ?? trAny(options.noticeKey, options.noticeParams),
 			userMessageKey: options.userMessageKey ?? options.noticeKey,
 		});
-		console.warn(options.logMessage, error);
-		new Notice(translateDriveSyncErrorUserMessage(normalized, trAny));
 	};
 
 	return {
