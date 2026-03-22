@@ -1,4 +1,4 @@
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
+import type { PluginPreSyncModalPort } from "@contracts/plugin/plugin-ui-port";
 import type { PreSyncEstimate } from "@contracts/ui/pre-sync";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
 import { tr, trAny } from "@i18n";
@@ -7,14 +7,14 @@ import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
 
 export class SyncPreflightModal extends Modal {
-	private plugin: ObsidianDriveSyncPluginApi;
+	private plugin: PluginPreSyncModalPort;
 	private estimate: PreSyncEstimate;
 	private onConfirm: () => Promise<void>;
 	private running = false;
 
 	constructor(
 		app: App,
-		plugin: ObsidianDriveSyncPluginApi,
+		plugin: PluginPreSyncModalPort,
 		estimate: PreSyncEstimate,
 		onConfirm: () => Promise<void>,
 	) {

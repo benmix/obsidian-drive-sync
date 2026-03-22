@@ -1,4 +1,4 @@
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
+import type { PluginRemoteFolderPort } from "@contracts/plugin/plugin-ui-port";
 import type {
 	RemoteFolderBrowser,
 	RemoteFolderEntry,
@@ -14,7 +14,7 @@ import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
 
 export class RemoteFolderPickerModal extends Modal {
-	private plugin: ObsidianDriveSyncPluginApi;
+	private plugin: PluginRemoteFolderPort;
 	private folders: RemoteFolderEntry[] = [];
 	private createPath = "";
 	private selectedFolderId = "";
@@ -27,7 +27,7 @@ export class RemoteFolderPickerModal extends Modal {
 	private rootFolderId = "";
 	private remoteFileSystem: RemoteFolderBrowser | null = null;
 
-	constructor(app: App, plugin: ObsidianDriveSyncPluginApi) {
+	constructor(app: App, plugin: PluginRemoteFolderPort) {
 		super(app);
 		this.plugin = plugin;
 	}

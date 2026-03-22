@@ -1,6 +1,6 @@
 import type { DriveSyncErrorCode } from "@contracts/data/error-types";
 import type { SyncJob } from "@contracts/data/sync-schema";
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
+import type { PluginStatusModalPort } from "@contracts/plugin/plugin-ui-port";
 import type { RemoteAuthStatus } from "@contracts/plugin/remote-connection-view";
 import { getDriveSyncErrorMessageForCode } from "@errors";
 import { tr, trAny } from "@i18n";
@@ -9,9 +9,9 @@ import { Modal, Setting } from "obsidian";
 import type { App } from "obsidian";
 
 export class SyncStatusModal extends Modal {
-	private plugin: ObsidianDriveSyncPluginApi;
+	private plugin: PluginStatusModalPort;
 
-	constructor(app: App, plugin: ObsidianDriveSyncPluginApi) {
+	constructor(app: App, plugin: PluginStatusModalPort) {
 		super(app);
 		this.plugin = plugin;
 	}

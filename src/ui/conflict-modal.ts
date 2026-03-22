@@ -1,4 +1,4 @@
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
+import type { PluginConflictModalPort } from "@contracts/plugin/plugin-ui-port";
 import { tr } from "@i18n";
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
@@ -10,12 +10,12 @@ type ConflictItem = {
 };
 
 export class SyncConflictModal extends Modal {
-	private plugin: ObsidianDriveSyncPluginApi;
+	private plugin: PluginConflictModalPort;
 	private conflicts: ConflictItem[] = [];
 	private loading = false;
 	private error: string | null = null;
 
-	constructor(app: App, plugin: ObsidianDriveSyncPluginApi) {
+	constructor(app: App, plugin: PluginConflictModalPort) {
 		super(app);
 		this.plugin = plugin;
 	}

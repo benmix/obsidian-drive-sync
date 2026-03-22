@@ -1,4 +1,4 @@
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
+import type { PluginSettingsPanelPort } from "@contracts/plugin/plugin-ui-port";
 import type { DriveSyncSettings } from "@contracts/plugin/settings";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
 import { tr, trAny } from "@i18n";
@@ -9,10 +9,10 @@ import { PluginSettingTab, Setting } from "obsidian";
 import type { App } from "obsidian";
 
 export class DriveSyncSettingTab extends PluginSettingTab {
-	plugin: ObsidianDriveSyncPluginApi;
+	plugin: PluginSettingsPanelPort;
 	private remoteValidationSequence = 0;
 
-	constructor(app: App, plugin: ObsidianDriveSyncPluginApi) {
+	constructor(app: App, plugin: PluginSettingsPanelPort) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}

@@ -1,4 +1,4 @@
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
+import type { PluginRemoteLoginPort } from "@contracts/plugin/plugin-ui-port";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
 import { tr, trAny } from "@i18n";
 import { RemoteProviderLoginModal } from "@ui/login-modal";
@@ -19,9 +19,9 @@ type RemoteProviderPickerOptions = {
 };
 
 export class RemoteAuthRequiredModal extends Modal {
-	private plugin: ObsidianDriveSyncPluginApi;
+	private plugin: PluginRemoteLoginPort;
 
-	constructor(app: App, plugin: ObsidianDriveSyncPluginApi, _message?: string) {
+	constructor(app: App, plugin: PluginRemoteLoginPort, _message?: string) {
 		super(app);
 		this.plugin = plugin;
 	}
@@ -41,10 +41,10 @@ export class RemoteAuthRequiredModal extends Modal {
 }
 
 export class RemoteProviderPickerModal extends Modal {
-	private plugin: ObsidianDriveSyncPluginApi;
+	private plugin: PluginRemoteLoginPort;
 	private loginFlow?: RemoteLoginFlowOptions;
 
-	constructor(app: App, plugin: ObsidianDriveSyncPluginApi, loginFlow?: RemoteLoginFlowOptions) {
+	constructor(app: App, plugin: PluginRemoteLoginPort, loginFlow?: RemoteLoginFlowOptions) {
 		super(app);
 		this.plugin = plugin;
 		this.loginFlow = loginFlow;
@@ -65,7 +65,7 @@ export class RemoteProviderPickerModal extends Modal {
 	}
 }
 export function openRemoteLoginModal(
-	plugin: ObsidianDriveSyncPluginApi,
+	plugin: PluginRemoteLoginPort,
 	loginFlow?: RemoteLoginFlowOptions,
 ): void {
 	const modal = new RemoteProviderPickerModal(plugin.app, plugin, loginFlow);
@@ -73,7 +73,7 @@ export function openRemoteLoginModal(
 }
 
 export async function openProviderLoginModal(
-	plugin: ObsidianDriveSyncPluginApi,
+	plugin: PluginRemoteLoginPort,
 	providerId: string,
 	loginFlow?: RemoteLoginFlowOptions,
 ): Promise<void> {
@@ -91,7 +91,7 @@ export async function openProviderLoginModal(
 
 export function renderRemoteProviderPickerCard(
 	containerEl: HTMLElement,
-	plugin: ObsidianDriveSyncPluginApi,
+	plugin: PluginRemoteLoginPort,
 	options: RemoteProviderPickerOptions = {},
 ): void {
 	const prompt = containerEl.createDiv({
@@ -128,7 +128,7 @@ export function renderRemoteProviderPickerCard(
 }
 
 async function selectProviderAndOpenLogin(
-	plugin: ObsidianDriveSyncPluginApi,
+	plugin: PluginRemoteLoginPort,
 	providerId: string,
 	options: RemoteProviderPickerOptions,
 ): Promise<void> {
@@ -157,7 +157,7 @@ async function selectProviderAndOpenLogin(
 }
 
 function openSelectedProviderLoginModal(
-	plugin: ObsidianDriveSyncPluginApi,
+	plugin: PluginRemoteLoginPort,
 	providerId: string,
 	loginFlow?: RemoteLoginFlowOptions,
 ): void {

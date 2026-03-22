@@ -16,41 +16,54 @@ import type {
 import type { SyncState } from "@contracts/sync/state";
 import type { App, Plugin } from "obsidian";
 
-export interface ObsidianDriveSyncPluginApi<
-	TProvider extends AnyRemoteProvider = RemoteProvider,
-> extends Plugin {
+export interface PluginAppPort extends Plugin {
 	readonly app: App;
-	readonly settings: Readonly<DriveSyncSettings>;
-	updateSettings(patch: Partial<DriveSyncSettings>): void;
+}
 
+export interface PluginSettingsReadPort {
+	readonly settings: Readonly<DriveSyncSettings>;
+}
+
+export interface PluginSettingsWritePort {
+	updateSettings(patch: Partial<DriveSyncSettings>): void;
+	saveSettings(): Promise<void>;
+}
+
+export interface PluginRemoteViewPort {
 	listRemoteProviderOptions(): RemoteProviderOption[];
-	getLocalProvider(): LocalProvider;
 	getRemoteConnectionView(): RemoteConnectionView;
 	getRemoteAuthView(): RemoteAuthView;
+}
 
-	saveSettings(): Promise<void>;
+export interface PluginLocalProviderPort {
+	getLocalProvider(): LocalProvider;
+}
 
+export interface PluginAutoSyncPort {
 	refreshAutoSync(): void;
 	pauseAutoSync(): void;
 	resumeAutoSync(): void;
 	isAutoSyncPaused(): boolean;
+}
 
-	isAuthPaused(): boolean;
-	getLastAuthError(): string | undefined;
+export interface PluginSyncStatusPort {
+	isSyncRunning(): boolean;
+}
+
+export interface PluginSyncActionPort<TProvider extends AnyRemoteProvider = RemoteProvider> {
 	connectRemoteClient(): Promise<RemoteProviderClient<TProvider>>;
 	runAutoSync(force?: boolean): Promise<void>;
-	isSyncRunning(): boolean;
 	handleAuthRecovered(scheduleSync?: boolean): void;
+}
+
+export interface PluginDiagnosticsPort {
 	getBuiltInExcludePatterns(): readonly string[];
 	loadSyncState(): Promise<SyncState>;
 	clearConflictMarker(path: string): Promise<boolean>;
+}
+
+export interface PluginRemoteScopePort {
 	setRemoteScope(scopeId: string, scopePath: string): Promise<void>;
-	loginRemote(
-		providerId: RemoteProviderId,
-		input: RemoteProviderLoginInput,
-	): Promise<{ providerLabel: string; accountEmail: string }>;
-	logoutRemote(): Promise<{ providerLabel: string }>;
-	resetRemoteConnection(): { providerLabel: string };
 	validateRemoteScope(scopeId: string): Promise<{ ok: boolean; message: string }>;
 	openRemoteScopeFileSystem(): Promise<{
 		providerLabel: string;
@@ -63,3 +76,51 @@ export interface ObsidianDriveSyncPluginApi<
 		browser: RemoteFolderBrowser;
 	}>;
 }
+
+export interface PluginAuthActionPort {
+	loginRemote(
+		providerId: RemoteProviderId,
+		input: RemoteProviderLoginInput,
+	): Promise<{ providerLabel: string; accountEmail: string }>;
+	logoutRemote(): Promise<{ providerLabel: string }>;
+	resetRemoteConnection(): { providerLabel: string };
+}
+
+export interface ObsidianDriveSyncPluginApi<TProvider extends AnyRemoteProvider = RemoteProvider>
+	extends
+		PluginAppPort,
+		PluginSettingsReadPort,
+		PluginSettingsWritePort,
+		PluginRemoteViewPort,
+		PluginLocalProviderPort,
+		PluginAutoSyncPort,
+		PluginSyncStatusPort,
+		PluginSyncActionPort<TProvider>,
+		PluginDiagnosticsPort,
+		PluginRemoteScopePort,
+		PluginAuthActionPort {}
+
+export type PluginSettingsPanelPort = PluginAppPort &
+	PluginSettingsReadPort &
+	PluginSettingsWritePort &
+	PluginRemoteViewPort &
+	PluginAutoSyncPort &
+	PluginDiagnosticsPort &
+	PluginRemoteScopePort &
+	PluginAuthActionPort;
+
+export type PluginStatusModalPort = PluginSettingsReadPort &
+	PluginAutoSyncPort &
+	PluginSyncStatusPort &
+	PluginDiagnosticsPort &
+	PluginRemoteViewPort;
+
+export type PluginConflictModalPort = PluginSettingsReadPort &
+	PluginAutoSyncPort &
+	PluginDiagnosticsPort;
+
+export type PluginRemoteLoginPort = PluginAppPort & PluginRemoteViewPort & PluginAuthActionPort;
+
+export type PluginRemoteFolderPort = PluginAppPort & PluginRemoteViewPort & PluginRemoteScopePort;
+
+export type PluginPreSyncModalPort = PluginAppPort;

@@ -1,4 +1,4 @@
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
+import type { PluginRemoteLoginPort } from "@contracts/plugin/plugin-ui-port";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
 import { tr, trAny } from "@i18n";
 import { shouldPreventTwoFactorKeydown } from "@ui/login-modal-helpers";
@@ -13,7 +13,7 @@ type RemoteProviderLoginModalOptions = {
 };
 
 export class RemoteProviderLoginModal extends Modal {
-	private plugin: ObsidianDriveSyncPluginApi;
+	private plugin: PluginRemoteLoginPort;
 	private providerId: string;
 	private onCancel?: () => void;
 	private onSuccess?: () => void;
@@ -30,7 +30,7 @@ export class RemoteProviderLoginModal extends Modal {
 
 	constructor(
 		app: App,
-		plugin: ObsidianDriveSyncPluginApi,
+		plugin: PluginRemoteLoginPort,
 		options: RemoteProviderLoginModalOptions = {},
 	) {
 		super(app);
