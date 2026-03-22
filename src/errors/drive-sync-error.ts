@@ -73,6 +73,20 @@ type NormalizeOptions = Partial<
 	code?: DriveSyncErrorCode;
 };
 
+function hasNormalizeOverrides(options: NormalizeOptions): boolean {
+	return (
+		options.code !== undefined ||
+		options.category !== undefined ||
+		options.severity !== undefined ||
+		options.retryable !== undefined ||
+		options.userMessage !== undefined ||
+		options.userMessageKey !== undefined ||
+		options.userMessageParams !== undefined ||
+		options.debugMessage !== undefined ||
+		options.details !== undefined
+	);
+}
+
 export function createDriveSyncError(
 	code: DriveSyncErrorCode,
 	init: DriveSyncErrorInit,
@@ -89,6 +103,9 @@ export function normalizeUnknownDriveSyncError(
 	options: NormalizeOptions = {},
 ): DriveSyncError {
 	if (isDriveSyncError(error)) {
+		if (!hasNormalizeOverrides(options)) {
+			return error;
+		}
 		return new DriveSyncError(options.code ?? error.code, {
 			category: options.category ?? error.category,
 			severity: options.severity ?? error.severity,

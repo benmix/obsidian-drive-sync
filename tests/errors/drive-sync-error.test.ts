@@ -101,4 +101,13 @@ describe("DriveSyncError", () => {
 		expect(normalized.code).toBe("AUTH_REAUTH_REQUIRED");
 		expect(normalized.category).toBe("auth");
 	});
+
+	test("returns the original DriveSyncError when no overrides are provided", () => {
+		const original = createDriveSyncError("AUTH_REAUTH_REQUIRED", {
+			category: "auth",
+			userMessage: "Authentication required. Sign in again to continue.",
+		});
+
+		expect(normalizeUnknownDriveSyncError(original)).toBe(original);
+	});
 });
