@@ -23,6 +23,7 @@ import {
 import { normalizePath } from "@filesystem/path";
 import { executeJobs } from "@sync/engine/executor";
 import { SyncJobQueue } from "@sync/engine/job-queue";
+import { isExecutableJob } from "@sync/engine/job-validation";
 import { getBuiltInExcludeRules } from "@sync/planner/exclude";
 import { reconcileSnapshot } from "@sync/planner/reconciler";
 import { SyncIndexStore } from "@sync/state/index-store";
@@ -629,22 +630,7 @@ export class SyncEngine {
 	}
 
 	private isJobValid(job: SyncJob): boolean {
-		if (job.op === "download" && !job.remoteId) {
-			return false;
-		}
-		if (job.op === "delete-remote" && !job.remoteId) {
-			return false;
-		}
-		if (job.op === "move-local" && (!job.fromPath || !job.toPath)) {
-			return false;
-		}
-		if (job.op === "copy-local" && (!job.fromPath || !job.toPath)) {
-			return false;
-		}
-		if (job.op === "move-remote" && (!job.remoteId || !job.toPath)) {
-			return false;
-		}
-		return true;
+		return isExecutableJob(job);
 	}
 }
 

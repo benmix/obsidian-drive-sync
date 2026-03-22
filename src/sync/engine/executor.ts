@@ -2,6 +2,7 @@ import type { SyncEntry, SyncJob } from "@contracts/data/sync-schema";
 import type { LocalFileSystem, RemoteFileSystem } from "@contracts/filesystem/file-system";
 import type { ExecuteResult } from "@contracts/sync/execution";
 import { createDriveSyncError } from "@errors";
+import { assertExecutableJob } from "@sync/engine/job-validation";
 import { hashBytes } from "@sync/support/hash";
 import { now } from "@sync/support/utils";
 
@@ -16,17 +17,18 @@ export async function executeJobs(
 	let downloadBytes = 0;
 
 	for (const job of jobs) {
-		if (job.op === "upload") {
-			const data = await localFileSystem.readFile(job.path);
+		const executableJob = assertExecutableJob(job);
+		if (executableJob.op === "upload") {
+			const data = await localFileSystem.readFile(executableJob.path);
 			const stats = await localFileSystem.getEntry(job.path);
 			const size = stats?.size ?? data.byteLength;
-			const uploaded = await remoteFileSystem.writeFile(job.path, data, {
+			const uploaded = await remoteFileSystem.writeFile(executableJob.path, data, {
 				mtimeMs: stats?.mtimeMs,
 				size,
 			});
 			const localHash = await hashBytes(data);
 			entries.push({
-				relPath: job.path,
+				relPath: executableJob.path,
 				type: "file",
 				localMtimeMs: stats?.mtimeMs,
 				localSize: stats?.size ?? data.byteLength,
@@ -42,33 +44,21 @@ export async function executeJobs(
 			});
 			jobsExecuted += 1;
 			uploadBytes += size;
-		} else if (job.op === "download") {
-			if (!job.remoteId) {
-				throw createDriveSyncError("SYNC_JOB_INVALID", {
-					category: "sync",
-					userMessage: "Sync job is invalid.",
-					details: {
-						jobId: job.id,
-						op: job.op,
-						path: job.path,
-						missing: "remoteId",
-					},
-				});
-			}
-			const data = await remoteFileSystem.readFile(job.remoteId);
-			await localFileSystem.writeFile(job.path, data);
-			const stats = await localFileSystem.getEntry(job.path);
+		} else if (executableJob.op === "download") {
+			const data = await remoteFileSystem.readFile(executableJob.remoteId);
+			await localFileSystem.writeFile(executableJob.path, data);
+			const stats = await localFileSystem.getEntry(executableJob.path);
 			const localHash = await hashBytes(data);
 			entries.push({
-				relPath: job.path,
+				relPath: executableJob.path,
 				type: "file",
 				localMtimeMs: stats?.mtimeMs,
 				localSize: stats?.size ?? data.byteLength,
 				localHash,
 				syncedLocalHash: localHash,
-				remoteId: job.remoteId,
-				remoteRev: job.remoteRev,
-				syncedRemoteRev: job.remoteRev,
+				remoteId: executableJob.remoteId,
+				remoteRev: executableJob.remoteRev,
+				syncedRemoteRev: executableJob.remoteRev,
 				tombstone: false,
 				conflict: undefined,
 				conflictPending: undefined,
@@ -76,25 +66,13 @@ export async function executeJobs(
 			});
 			jobsExecuted += 1;
 			downloadBytes += data.byteLength;
-		} else if (job.op === "copy-local") {
-			if (!job.fromPath || !job.toPath) {
-				throw createDriveSyncError("SYNC_JOB_INVALID", {
-					category: "sync",
-					userMessage: "Sync job is invalid.",
-					details: {
-						jobId: job.id,
-						op: job.op,
-						path: job.path,
-						missing: "copyPaths",
-					},
-				});
-			}
-			const data = await localFileSystem.readFile(job.fromPath);
-			await localFileSystem.writeFile(job.toPath, data);
-			const stats = await localFileSystem.getEntry(job.toPath);
+		} else if (executableJob.op === "copy-local") {
+			const data = await localFileSystem.readFile(executableJob.fromPath);
+			await localFileSystem.writeFile(executableJob.toPath, data);
+			const stats = await localFileSystem.getEntry(executableJob.toPath);
 			const localHash = await hashBytes(data);
 			entries.push({
-				relPath: job.toPath,
+				relPath: executableJob.toPath,
 				type: "file",
 				localMtimeMs: stats?.mtimeMs,
 				localSize: stats?.size ?? data.byteLength,
@@ -109,11 +87,11 @@ export async function executeJobs(
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
-		} else if (job.op === "delete-local") {
-			await localFileSystem.deleteEntry(job.path);
+		} else if (executableJob.op === "delete-local") {
+			await localFileSystem.deleteEntry(executableJob.path);
 			entries.push({
-				relPath: job.path,
-				type: job.entryType ?? "file",
+				relPath: executableJob.path,
+				type: executableJob.entryType ?? "file",
 				tombstone: true,
 				localMtimeMs: undefined,
 				localSize: undefined,
@@ -127,30 +105,25 @@ export async function executeJobs(
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
-		} else if (job.op === "delete-remote") {
-			if (!job.remoteId || !remoteFileSystem.deleteEntry) {
-				throw createDriveSyncError(
-					job.remoteId ? "REMOTE_UNSUPPORTED" : "SYNC_JOB_INVALID",
-					{
-						category: job.remoteId ? "provider" : "sync",
-						userMessage: job.remoteId
-							? "This remote operation is not supported."
-							: "Sync job is invalid.",
-						details: {
-							jobId: job.id,
-							op: job.op,
-							path: job.path,
-							missing: job.remoteId ? "deleteEntry" : "remoteId",
-						},
+		} else if (executableJob.op === "delete-remote") {
+			if (!remoteFileSystem.deleteEntry) {
+				throw createDriveSyncError("REMOTE_UNSUPPORTED", {
+					category: "provider",
+					userMessage: "This remote operation is not supported.",
+					details: {
+						jobId: executableJob.id,
+						op: executableJob.op,
+						path: executableJob.path,
+						missing: "deleteEntry",
 					},
-				);
+				});
 			}
-			await remoteFileSystem.deleteEntry(job.remoteId);
+			await remoteFileSystem.deleteEntry(executableJob.remoteId);
 			entries.push({
-				relPath: job.path,
-				type: job.entryType ?? "file",
+				relPath: executableJob.path,
+				type: executableJob.entryType ?? "file",
 				tombstone: true,
-				remoteId: job.remoteId,
+				remoteId: executableJob.remoteId,
 				remoteRev: undefined,
 				syncedRemoteRev: undefined,
 				localMtimeMs: undefined,
@@ -162,23 +135,11 @@ export async function executeJobs(
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
-		} else if (job.op === "move-local") {
-			if (!job.fromPath || !job.toPath) {
-				throw createDriveSyncError("SYNC_JOB_INVALID", {
-					category: "sync",
-					userMessage: "Sync job is invalid.",
-					details: {
-						jobId: job.id,
-						op: job.op,
-						path: job.path,
-						missing: "movePaths",
-					},
-				});
-			}
-			await localFileSystem.moveEntry(job.fromPath, job.toPath);
+		} else if (executableJob.op === "move-local") {
+			await localFileSystem.moveEntry(executableJob.fromPath, executableJob.toPath);
 			entries.push({
-				relPath: job.fromPath,
-				type: job.entryType ?? "file",
+				relPath: executableJob.fromPath,
+				type: executableJob.entryType ?? "file",
 				tombstone: true,
 				localMtimeMs: undefined,
 				localSize: undefined,
@@ -189,11 +150,11 @@ export async function executeJobs(
 				lastSyncAt: now(),
 			});
 			entries.push({
-				relPath: job.toPath,
-				type: job.entryType ?? "file",
-				remoteId: job.remoteId,
-				remoteRev: job.remoteRev,
-				syncedRemoteRev: job.remoteRev,
+				relPath: executableJob.toPath,
+				type: executableJob.entryType ?? "file",
+				remoteId: executableJob.remoteId,
+				remoteRev: executableJob.remoteRev,
+				syncedRemoteRev: executableJob.remoteRev,
 				localMtimeMs: undefined,
 				localSize: undefined,
 				localHash: undefined,
@@ -204,33 +165,24 @@ export async function executeJobs(
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
-		} else if (job.op === "move-remote") {
-			if (!job.remoteId || !job.toPath || !remoteFileSystem.moveEntry) {
-				throw createDriveSyncError(
-					!remoteFileSystem.moveEntry ? "REMOTE_UNSUPPORTED" : "SYNC_JOB_INVALID",
-					{
-						category: !remoteFileSystem.moveEntry ? "provider" : "sync",
-						userMessage: !remoteFileSystem.moveEntry
-							? "This remote operation is not supported."
-							: "Sync job is invalid.",
-						details: {
-							jobId: job.id,
-							op: job.op,
-							path: job.path,
-							missing: !job.remoteId
-								? "remoteId"
-								: !job.toPath
-									? "toPath"
-									: "moveEntry",
-						},
+		} else if (executableJob.op === "move-remote") {
+			if (!remoteFileSystem.moveEntry) {
+				throw createDriveSyncError("REMOTE_UNSUPPORTED", {
+					category: "provider",
+					userMessage: "This remote operation is not supported.",
+					details: {
+						jobId: executableJob.id,
+						op: executableJob.op,
+						path: executableJob.path,
+						missing: "moveEntry",
 					},
-				);
+				});
 			}
-			await remoteFileSystem.moveEntry(job.remoteId, job.toPath);
-			if (job.fromPath) {
+			await remoteFileSystem.moveEntry(executableJob.remoteId, executableJob.toPath);
+			if (executableJob.fromPath) {
 				entries.push({
-					relPath: job.fromPath,
-					type: job.entryType ?? "file",
+					relPath: executableJob.fromPath,
+					type: executableJob.entryType ?? "file",
 					tombstone: true,
 					localMtimeMs: undefined,
 					localSize: undefined,
@@ -242,11 +194,11 @@ export async function executeJobs(
 				});
 			}
 			entries.push({
-				relPath: job.toPath,
-				type: job.entryType ?? "file",
-				remoteId: job.remoteId,
-				remoteRev: job.remoteRev,
-				syncedRemoteRev: job.remoteRev,
+				relPath: executableJob.toPath,
+				type: executableJob.entryType ?? "file",
+				remoteId: executableJob.remoteId,
+				remoteRev: executableJob.remoteRev,
+				syncedRemoteRev: executableJob.remoteRev,
 				localMtimeMs: undefined,
 				localSize: undefined,
 				localHash: undefined,
@@ -257,12 +209,12 @@ export async function executeJobs(
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
-		} else if (job.op === "create-local-folder") {
-			await localFileSystem.ensureFolder(job.path);
+		} else if (executableJob.op === "create-local-folder") {
+			await localFileSystem.ensureFolder(executableJob.path);
 			entries.push({
-				relPath: job.path,
+				relPath: executableJob.path,
 				type: "folder",
-				remoteId: job.remoteId,
+				remoteId: executableJob.remoteId,
 				localMtimeMs: undefined,
 				localSize: undefined,
 				localHash: undefined,
@@ -273,22 +225,22 @@ export async function executeJobs(
 				lastSyncAt: now(),
 			});
 			jobsExecuted += 1;
-		} else if (job.op === "create-remote-folder") {
+		} else if (executableJob.op === "create-remote-folder") {
 			if (!remoteFileSystem.ensureFolder) {
 				throw createDriveSyncError("REMOTE_UNSUPPORTED", {
 					category: "provider",
 					userMessage: "This remote operation is not supported.",
 					details: {
-						jobId: job.id,
-						op: job.op,
-						path: job.path,
+						jobId: executableJob.id,
+						op: executableJob.op,
+						path: executableJob.path,
 						missing: "ensureFolder",
 					},
 				});
 			}
-			const result = await remoteFileSystem.ensureFolder(job.path);
+			const result = await remoteFileSystem.ensureFolder(executableJob.path);
 			entries.push({
-				relPath: job.path,
+				relPath: executableJob.path,
 				type: "folder",
 				remoteId: result.id,
 				localMtimeMs: undefined,
