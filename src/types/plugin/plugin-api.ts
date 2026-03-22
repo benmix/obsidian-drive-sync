@@ -28,6 +28,23 @@ export type RemoteConnectionView = {
 	isSessionValidated: boolean;
 };
 
+export type RemoteAuthStatus =
+	| "signed_out"
+	| "needs_attention"
+	| "pending_validation"
+	| "signed_in"
+	| "paused";
+
+export type RemoteAuthView = {
+	status: RemoteAuthStatus;
+	message?: string;
+	providerId: RemoteProviderId;
+	providerLabel: string;
+	accountEmail: string;
+	canConnect: boolean;
+	canBrowseRemoteFolder: boolean;
+};
+
 export type RemoteConnectionStatePatch<TProvider extends AnyRemoteProvider = AnyRemoteProvider> = {
 	scopeId?: string;
 	scopePath?: string;
@@ -65,6 +82,7 @@ export interface ObsidianDriveSyncPluginApi<
 	listRemoteProviderOptions(): RemoteProviderOption[];
 	getLocalProvider(): LocalProvider;
 	getRemoteConnectionView(): RemoteConnectionView;
+	getRemoteAuthView(): RemoteAuthView;
 
 	saveSettings(): Promise<void>;
 

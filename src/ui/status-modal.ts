@@ -20,7 +20,7 @@ export class SyncStatusModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass("drive-sync-status-modal");
 
-		const remoteState = this.plugin.getRemoteConnectionView();
+		const remoteAuth = this.plugin.getRemoteAuthView();
 		const state = await this.plugin.loadSyncState();
 		const conflicts = Object.values(state.entries ?? {}).filter((entry) => entry.conflict);
 		const entriesTracked = Object.keys(state.entries ?? {}).length;
@@ -28,7 +28,7 @@ export class SyncStatusModal extends Modal {
 		const taskLogs = logs.filter((entry) => entry.context === "task");
 		const jobs = state.jobs ?? [];
 		const nowTs = Date.now();
-		const authPaused = this.plugin.isAuthPaused();
+		const authPaused = remoteAuth.status === "paused";
 		const autoSyncPaused = this.plugin.isAutoSyncPaused() || authPaused;
 
 		const autoSyncStatus = this.plugin.settings.autoSyncEnabled
@@ -39,14 +39,8 @@ export class SyncStatusModal extends Modal {
 		const syncActivity = this.plugin.isSyncRunning()
 			? tr("status.inProgress")
 			: tr("status.idle");
-		const authStatus = authPaused
-			? tr("status.authPaused")
-			: remoteState.hasAuthSession
-				? remoteState.isSessionValidated
-					? tr("status.authOk")
-					: tr("status.authPending")
-				: tr("status.signedOut");
-		const authError = authPaused ? this.plugin.getLastAuthError() : undefined;
+		const authStatus = this.getAuthStatusText(remoteAuth.status);
+		const authError = authPaused ? remoteAuth.message : undefined;
 
 		const queueMeta = this.collectQueueMeta(jobs, nowTs);
 
@@ -286,6 +280,21 @@ export class SyncStatusModal extends Modal {
 					text: entry.code ? `${entry.message} [${entry.code}]` : entry.message,
 				});
 			}
+		}
+	}
+
+	private getAuthStatusText(
+		status: ReturnType<ObsidianDriveSyncPluginApi["getRemoteAuthView"]>["status"],
+	): string {
+		switch (status) {
+			case "paused":
+				return tr("status.authPaused");
+			case "pending_validation":
+				return tr("status.authPending");
+			case "signed_in":
+				return tr("status.authOk");
+			default:
+				return tr("status.signedOut");
 		}
 	}
 

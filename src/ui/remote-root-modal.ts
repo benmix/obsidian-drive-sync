@@ -46,10 +46,11 @@ export class RemoteFolderPickerModal extends Modal {
 		this.rootFolderId = "";
 		this.remoteFileSystem = null;
 		const remoteState = this.plugin.getRemoteConnectionView();
+		const remoteAuth = this.plugin.getRemoteAuthView();
 		this.selectedFolderId = remoteState.scopeId.trim();
 		this.render();
 
-		if (!remoteState.hasStoredCredentials && !remoteState.hasAuthSession) {
+		if (!remoteAuth.canBrowseRemoteFolder) {
 			this.error = tr("notice.signInToProviderFirst", {
 				provider: remoteState.providerLabel,
 			});

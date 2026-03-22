@@ -1,6 +1,7 @@
 import { registerCommands } from "@commands";
 import type {
 	ObsidianDriveSyncPluginRuntimeApi,
+	RemoteAuthView,
 	RemoteConnectionStatePatch,
 	RemoteConnectionView,
 	RemoteProviderOption,
@@ -60,6 +61,10 @@ export default class ObsidianDriveSyncPlugin
 
 	getRemoteConnectionView(): RemoteConnectionView {
 		return this.getState().getRemoteConnectionView();
+	}
+
+	getRemoteAuthView(): RemoteAuthView {
+		return this.getRuntime().getRemoteAuthView();
 	}
 
 	getRemoteProvider(providerId?: RemoteProviderId): RegisteredRemoteProvider {

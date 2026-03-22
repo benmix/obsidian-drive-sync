@@ -1,5 +1,8 @@
 import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "@config";
-import { type ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-api";
+import {
+	type ObsidianDriveSyncPluginRuntimeApi,
+	type RemoteAuthView,
+} from "@contracts/plugin/plugin-api";
 import type { RemoteProviderId } from "@contracts/provider/provider-ids";
 import type {
 	AnyRemoteProvider,
@@ -93,6 +96,61 @@ export class PluginRuntime<TProvider extends AnyRemoteProvider> {
 		return await this.sessionManager.openRemoteScopeFileSystem({
 			forceRefresh: true,
 		});
+	}
+
+	getRemoteAuthView(): RemoteAuthView {
+		const remoteState = this.plugin.getRemoteConnectionView();
+		const authPaused = this.sessionManager.isAuthPaused();
+		const hasStoredAccess = remoteState.hasAuthSession || remoteState.hasStoredCredentials;
+		if (authPaused) {
+			return {
+				status: "paused",
+				message: this.sessionManager.getLastAuthError(),
+				providerId: remoteState.providerId,
+				providerLabel: remoteState.providerLabel,
+				accountEmail: remoteState.accountEmail,
+				canConnect: false,
+				canBrowseRemoteFolder: false,
+			};
+		}
+		if (remoteState.hasAuthSession && !remoteState.isSessionValidated) {
+			return {
+				status: "pending_validation",
+				providerId: remoteState.providerId,
+				providerLabel: remoteState.providerLabel,
+				accountEmail: remoteState.accountEmail,
+				canConnect: true,
+				canBrowseRemoteFolder: true,
+			};
+		}
+		if (remoteState.hasAuthSession) {
+			return {
+				status: "signed_in",
+				providerId: remoteState.providerId,
+				providerLabel: remoteState.providerLabel,
+				accountEmail: remoteState.accountEmail,
+				canConnect: true,
+				canBrowseRemoteFolder: true,
+			};
+		}
+		if (hasStoredAccess) {
+			return {
+				status: "needs_attention",
+				providerId: remoteState.providerId,
+				providerLabel: remoteState.providerLabel,
+				accountEmail: remoteState.accountEmail,
+				canConnect: false,
+				canBrowseRemoteFolder: false,
+			};
+		}
+		return {
+			status: "signed_out",
+			providerId: remoteState.providerId,
+			providerLabel: remoteState.providerLabel,
+			accountEmail: remoteState.accountEmail,
+			canConnect: false,
+			canBrowseRemoteFolder: false,
+		};
 	}
 
 	refreshAutoSync(): void {

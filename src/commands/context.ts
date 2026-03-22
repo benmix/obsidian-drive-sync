@@ -31,8 +31,8 @@ export function createCommandContext<TProvider extends AnyRemoteProvider>(
 			if (!scopeId) {
 				return null;
 			}
-			const remoteState = plugin.getRemoteConnectionView();
-			if (!remoteState.hasStoredCredentials && !remoteState.hasAuthSession) {
+			const remoteAuth = plugin.getRemoteAuthView();
+			if (!remoteAuth.canConnect) {
 				new RemoteAuthRequiredModal(plugin.app, plugin).open();
 				return null;
 			}

@@ -22,7 +22,9 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 		const remoteState = this.plugin.getRemoteConnectionView();
-		const hasAuthSession = remoteState.hasAuthSession;
+		const remoteAuth = this.plugin.getRemoteAuthView();
+		const hasAuthSession =
+			remoteAuth.status === "signed_in" || remoteAuth.status === "pending_validation";
 
 		const accountSetting = new Setting(containerEl)
 			.setName(tr("settings.remoteAccount"))
@@ -30,9 +32,9 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		accountSetting.settingEl.addClass("drive-sync-account-setting");
 		const accountStatus = accountSetting.descEl.createDiv({
 			cls: "drive-sync-account-status",
-			text: this.getAuthStatusText(),
+			text: this.getAuthStatusText(remoteAuth),
 		});
-		const authPaused = this.plugin.isAuthPaused();
+		const authPaused = remoteAuth.status === "paused";
 		if (hasAuthSession) {
 			const providerChip = accountSetting.nameEl.createSpan({
 				cls: "drive-sync-account-chip drive-sync-account-provider",
@@ -153,23 +155,19 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			);
 	}
 
-	private getAuthStatusText(): string {
-		const remoteState = this.plugin.getRemoteConnectionView();
-		if (remoteState.hasAuthSession && !remoteState.isSessionValidated) {
-			return tr("settings.authStatus.pendingValidation");
+	private getAuthStatusText(remoteAuth = this.plugin.getRemoteAuthView()): string {
+		switch (remoteAuth.status) {
+			case "pending_validation":
+				return tr("settings.authStatus.pendingValidation");
+			case "signed_in":
+				return tr("settings.authStatus.signedIn");
+			case "paused":
+				return remoteAuth.message ?? tr("settings.authStatus.needsAttentionCommand");
+			case "needs_attention":
+				return tr("settings.authStatus.needsAttention");
+			default:
+				return tr("settings.authStatus.signInHint");
 		}
-		if (remoteState.hasAuthSession) {
-			return tr("settings.authStatus.signedIn");
-		}
-		if (this.plugin.isAuthPaused()) {
-			return (
-				this.plugin.getLastAuthError() ?? tr("settings.authStatus.needsAttentionCommand")
-			);
-		}
-		if (remoteState.hasStoredCredentials) {
-			return tr("settings.authStatus.needsAttention");
-		}
-		return tr("settings.authStatus.signInHint");
 	}
 
 	private renderProviderLoginOptions(containerEl: HTMLElement): void {
@@ -207,8 +205,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 	}
 
 	private async openRemoteFolderPicker(): Promise<void> {
-		const remoteState = this.plugin.getRemoteConnectionView();
-		if (!remoteState.hasStoredCredentials && !remoteState.hasAuthSession) {
+		if (!this.plugin.getRemoteAuthView().canBrowseRemoteFolder) {
 			openRemoteLoginModal(this.plugin, {
 				onCancel: () => {
 					this.display();
@@ -249,6 +246,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		message: string;
 	}> {
 		const remoteState = this.plugin.getRemoteConnectionView();
+		const remoteAuth = this.plugin.getRemoteAuthView();
 		const scopeId = remoteState.scopeId;
 		if (!scopeId) {
 			return {
@@ -256,7 +254,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 				message: tr("settings.validation.selectFolderFirst"),
 			};
 		}
-		if (!remoteState.hasStoredCredentials && !remoteState.hasAuthSession) {
+		if (!remoteAuth.canBrowseRemoteFolder) {
 			return {
 				ok: false,
 				message: tr("error.auth.signInFirst"),
