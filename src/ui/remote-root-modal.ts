@@ -42,11 +42,12 @@ export class RemoteFolderPickerModal extends Modal {
 		this.folders = [];
 		this.rootFolderId = "";
 		this.remoteFileSystem = null;
-		this.selectedFolderId = this.plugin.getRemoteScopeId().trim();
+		const remoteState = this.plugin.getRemoteConnectionState();
+		this.selectedFolderId = remoteState.scopeId.trim();
 		this.render();
 
-		const provider = this.plugin.getRemoteProvider();
-		if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
+		const provider = remoteState.provider;
+		if (!remoteState.credentials && !provider.getSession()) {
 			this.error = tr("notice.signInToProviderFirst", {
 				provider: provider.label,
 			});
@@ -277,7 +278,7 @@ export class RemoteFolderPickerModal extends Modal {
 				return selected;
 			}
 		}
-		const configuredId = this.plugin.getRemoteScopeId().trim();
+		const configuredId = this.plugin.getRemoteConnectionState().scopeId.trim();
 		if (configuredId) {
 			const configured = list.find((folder) => folder.id === configuredId);
 			if (configured) {
@@ -350,7 +351,7 @@ export class RemoteFolderPickerModal extends Modal {
 		this.render();
 		try {
 			// Rebuild client to avoid stale folder cache from provider SDK session.
-			this.plugin.getRemoteProvider().disconnect();
+			this.plugin.getRemoteConnectionState().provider.disconnect();
 			await this.loadFolders();
 			if (this.error) {
 				new Notice(this.error);
@@ -368,7 +369,10 @@ export class RemoteFolderPickerModal extends Modal {
 
 	private async selectFolder(folderId: string, folderPath: string): Promise<void> {
 		const absolutePath = this.toAbsolutePath(folderPath);
-		this.plugin.setRemoteScope(folderId, absolutePath);
+		this.plugin.updateRemoteConnectionState({
+			scopeId: folderId,
+			scopePath: absolutePath,
+		});
 		await this.plugin.saveSettings();
 		new Notice(
 			tr("remoteFolder.selectedPath", {

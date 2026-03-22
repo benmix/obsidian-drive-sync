@@ -36,16 +36,14 @@ export class RemoteProviderLoginModal extends Modal {
 	) {
 		super(app);
 		this.plugin = plugin;
-		this.providerId = options.providerId ?? plugin.getRemoteProviderId();
+		this.providerId = options.providerId ?? plugin.getRemoteConnectionState().providerId;
 		this.onCancel = options.onCancel;
 		this.onSuccess = options.onSuccess;
 	}
 
 	onOpen() {
-		this.username =
-			this.providerId === this.plugin.getRemoteProviderId()
-				? this.plugin.getRemoteAccountEmail()
-				: "";
+		const remoteState = this.plugin.getRemoteConnectionState();
+		this.username = this.providerId === remoteState.providerId ? remoteState.accountEmail : "";
 		this.password = "";
 		this.mailboxPassword = "";
 		this.requiresTwoFactor = false;
@@ -346,12 +344,14 @@ export class RemoteProviderLoginModal extends Modal {
 					: undefined,
 			});
 
-			if (this.providerId !== this.plugin.getRemoteProviderId()) {
+			if (this.providerId !== this.plugin.getRemoteConnectionState().providerId) {
 				this.plugin.setRemoteProviderId(this.providerId);
 			}
-			this.plugin.setStoredProviderCredentials(result.credentials);
-			this.plugin.setRemoteAccountEmail(result.userEmail ?? normalizedUsername);
-			this.plugin.setRemoteAuthSession(true);
+			this.plugin.updateRemoteConnectionState({
+				credentials: result.credentials,
+				accountEmail: result.userEmail ?? normalizedUsername,
+				hasAuthSession: true,
+			});
 			await this.plugin.saveSettings();
 			this.plugin.handleAuthRecovered();
 
@@ -369,7 +369,9 @@ export class RemoteProviderLoginModal extends Modal {
 				userMessage: tr("login.unableToSignIn"),
 				userMessageKey: "login.unableToSignIn",
 			});
-			this.plugin.setRemoteAuthSession(false);
+			this.plugin.updateRemoteConnectionState({
+				hasAuthSession: false,
+			});
 
 			if (normalized.code === "AUTH_2FA_REQUIRED") {
 				const shouldShakeTokenInputs = this.requiresTwoFactor;

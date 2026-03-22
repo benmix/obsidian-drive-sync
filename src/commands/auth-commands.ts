@@ -34,7 +34,7 @@ export function registerAuthCommands(context: CommandContext): void {
 		id: "drive-sync-logout",
 		name: tr("commands.logout.name"),
 		callback: async () => {
-			const provider = plugin.getRemoteProvider();
+			const { provider } = plugin.getRemoteConnectionState();
 			try {
 				await provider.logout();
 				plugin.clearStoredRemoteSession();
@@ -58,7 +58,7 @@ export function registerAuthCommands(context: CommandContext): void {
 		id: "drive-sync-reset-connection",
 		name: tr("commands.resetConnection.name"),
 		callback: () => {
-			const provider = plugin.getRemoteProvider();
+			const { provider } = plugin.getRemoteConnectionState();
 			provider.disconnect();
 			new Notice(
 				tr("notice.providerConnectionReset", {

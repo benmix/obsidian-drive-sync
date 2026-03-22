@@ -48,17 +48,18 @@ describe("SessionManager", () => {
 
 	test("records structured auth state and log when restoring a session fails", async () => {
 		const plugin = {
-			getRemoteProvider: () => ({
-				restore: async () => {
-					throw createDriveSyncError("AUTH_SESSION_EXPIRED", {
-						category: "auth",
-					});
+			getRemoteConnectionState: () => ({
+				provider: {
+					restore: async () => {
+						throw createDriveSyncError("AUTH_SESSION_EXPIRED", {
+							category: "auth",
+						});
+					},
+					getReusableCredentials: () => {},
 				},
-				getReusableCredentials: () => {},
+				credentials: { token: "secret" },
 			}),
-			getStoredProviderCredentials: () => ({ token: "secret" }),
-			setStoredProviderCredentials: vi.fn(),
-			setRemoteAuthSession: vi.fn(),
+			updateRemoteConnectionState: vi.fn(),
 			clearStoredRemoteSession: vi.fn(),
 			saveSettings: vi.fn(async () => {}),
 		};
@@ -93,22 +94,25 @@ describe("SessionManager", () => {
 		const session = { accessToken: "token" };
 		const reusableCredentials = { token: "next-secret" };
 		const plugin = {
-			getRemoteProvider: () => ({
-				getSession: () => null,
-				restore: vi.fn(async () => session),
-				getReusableCredentials: () => reusableCredentials,
+			getRemoteConnectionState: () => ({
+				provider: {
+					getSession: () => null,
+					restore: vi.fn(async () => session),
+					getReusableCredentials: () => reusableCredentials,
+				},
+				credentials: { token: "secret" },
 			}),
-			getStoredProviderCredentials: () => ({ token: "secret" }),
-			setStoredProviderCredentials: vi.fn(),
-			setRemoteAuthSession: vi.fn(),
+			updateRemoteConnectionState: vi.fn(),
 			clearStoredRemoteSession: vi.fn(),
 			saveSettings: vi.fn(async () => {}),
 		};
 		const manager = new SessionManager(plugin as never);
 
 		await expect(manager.buildActiveRemoteSession()).resolves.toBe(session);
-		expect(plugin.setStoredProviderCredentials).toHaveBeenCalledWith(reusableCredentials);
-		expect(plugin.setRemoteAuthSession).toHaveBeenCalledWith(true);
+		expect(plugin.updateRemoteConnectionState).toHaveBeenCalledWith({
+			credentials: reusableCredentials,
+			hasAuthSession: true,
+		});
 		expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
 		expect(manager.isAuthPaused()).toBe(false);
 	});
@@ -119,22 +123,23 @@ describe("SessionManager", () => {
 		});
 		let refreshCallback: (() => Promise<void>) | undefined;
 		const plugin = {
-			getRemoteProvider: () => ({
-				id: "proton-drive",
-				label: "Proton Drive",
-				getSession: () => ({ accessToken: "token" }),
-				connect: vi.fn(async (_session, options) => {
-					refreshCallback = options?.onTokenRefresh;
-					return { connected: true };
-				}),
-				refreshToken: vi.fn(async () => {
-					throw refreshError;
-				}),
-				getReusableCredentials: () => ({ token: "secret" }),
+			getRemoteConnectionState: () => ({
+				provider: {
+					id: "proton-drive",
+					label: "Proton Drive",
+					getSession: () => ({ accessToken: "token" }),
+					connect: vi.fn(async (_session, options) => {
+						refreshCallback = options?.onTokenRefresh;
+						return { connected: true };
+					}),
+					refreshToken: vi.fn(async () => {
+						throw refreshError;
+					}),
+					getReusableCredentials: () => ({ token: "secret" }),
+				},
+				credentials: { token: "secret" },
 			}),
-			getStoredProviderCredentials: () => ({ token: "secret" }),
-			setStoredProviderCredentials: vi.fn(),
-			setRemoteAuthSession: vi.fn(),
+			updateRemoteConnectionState: vi.fn(),
 			clearStoredRemoteSession: vi.fn(),
 			saveSettings: vi.fn(async () => {}),
 		};
@@ -146,7 +151,9 @@ describe("SessionManager", () => {
 		await expect(refreshCallback?.()).rejects.toMatchObject({
 			code: "AUTH_SESSION_EXPIRED",
 		});
-		expect(plugin.setRemoteAuthSession).toHaveBeenCalledWith(false);
+		expect(plugin.updateRemoteConnectionState).toHaveBeenCalledWith({
+			hasAuthSession: false,
+		});
 		expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
 		expect(manager.isAuthPaused()).toBe(true);
 		expect(stateHarness.state.logs).toEqual(

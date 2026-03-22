@@ -20,7 +20,8 @@ export class SyncStatusModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass("drive-sync-status-modal");
 
-		const provider = this.plugin.getRemoteProvider();
+		const remoteState = this.plugin.getRemoteConnectionState();
+		const provider = remoteState.provider;
 		const state = await this.plugin.loadSyncState();
 		const conflicts = Object.values(state.entries ?? {}).filter((entry) => entry.conflict);
 		const entriesTracked = Object.keys(state.entries ?? {}).length;
@@ -41,7 +42,7 @@ export class SyncStatusModal extends Modal {
 			: tr("status.idle");
 		const authStatus = authPaused
 			? tr("status.authPaused")
-			: this.plugin.hasRemoteAuthSession()
+			: remoteState.hasAuthSession
 				? provider.isSessionValidated()
 					? tr("status.authOk")
 					: tr("status.authPending")

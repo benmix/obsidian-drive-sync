@@ -1,5 +1,9 @@
 import { DEFAULT_SETTINGS } from "@contracts/plugin/default-settings";
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type {
+	ObsidianDriveSyncPluginApi,
+	RemoteConnectionState,
+	RemoteConnectionStatePatch,
+} from "@contracts/plugin/plugin-api";
 import type { DriveSyncSettings } from "@contracts/plugin/settings";
 import type { LocalProvider } from "@contracts/provider/local-provider";
 import {
@@ -56,7 +60,7 @@ export class PluginState {
 		return this.remoteProviderRegistry.list();
 	}
 
-	getRemoteProvider(): RegisteredRemoteProvider {
+	private getRemoteProvider(): RegisteredRemoteProvider {
 		return this.remoteProviderRegistry.get(this.getRemoteProviderId());
 	}
 
@@ -87,22 +91,7 @@ export class PluginState {
 		return this.localProviderRegistry.get(this.getLocalProviderId());
 	}
 
-	getRemoteScopeId(): string {
-		return this.mutableSettings.remoteScopeId.trim();
-	}
-
-	getRemoteScopePath(): string {
-		return this.mutableSettings.remoteScopePath.trim();
-	}
-
-	setRemoteScope(scopeId: string, scopePath: string): void {
-		this.updateSettings({
-			remoteScopeId: scopeId.trim(),
-			remoteScopePath: scopePath.trim(),
-		});
-	}
-
-	getStoredProviderCredentials():
+	private getStoredProviderCredentials():
 		| RemoteProviderCredentialsOf<RegisteredRemoteProvider>
 		| undefined {
 		return this.mutableSettings.remoteProviderCredentials as
@@ -110,38 +99,44 @@ export class PluginState {
 			| undefined;
 	}
 
-	setStoredProviderCredentials(
-		credentials: RemoteProviderCredentialsOf<RegisteredRemoteProvider> | undefined,
-	): void {
-		this.updateSettings({
-			remoteProviderCredentials: credentials,
-		});
+	getRemoteConnectionState(): RemoteConnectionState<RegisteredRemoteProvider> {
+		return {
+			providerId: this.getRemoteProviderId(),
+			provider: this.getRemoteProvider(),
+			scopeId: this.mutableSettings.remoteScopeId.trim(),
+			scopePath: this.mutableSettings.remoteScopePath.trim(),
+			credentials: this.getStoredProviderCredentials(),
+			accountEmail: this.mutableSettings.remoteAccountEmail,
+			hasAuthSession: this.mutableSettings.remoteHasAuthSession,
+		};
 	}
 
-	getRemoteAccountEmail(): string {
-		return this.mutableSettings.remoteAccountEmail;
-	}
-
-	setRemoteAccountEmail(email: string): void {
-		this.updateSettings({
-			remoteAccountEmail: email.trim(),
-		});
-	}
-
-	hasRemoteAuthSession(): boolean {
-		return this.mutableSettings.remoteHasAuthSession;
-	}
-
-	setRemoteAuthSession(hasAuthSession: boolean): void {
-		this.updateSettings({
-			remoteHasAuthSession: hasAuthSession,
-		});
+	updateRemoteConnectionState(patch: RemoteConnectionStatePatch<RegisteredRemoteProvider>): void {
+		const nextPatch: Partial<DriveSyncSettings> = {};
+		if ("scopeId" in patch) {
+			nextPatch.remoteScopeId = patch.scopeId?.trim() ?? "";
+		}
+		if ("scopePath" in patch) {
+			nextPatch.remoteScopePath = patch.scopePath?.trim() ?? "";
+		}
+		if ("credentials" in patch) {
+			nextPatch.remoteProviderCredentials = patch.credentials;
+		}
+		if ("accountEmail" in patch) {
+			nextPatch.remoteAccountEmail = patch.accountEmail?.trim() ?? "";
+		}
+		if ("hasAuthSession" in patch && typeof patch.hasAuthSession === "boolean") {
+			nextPatch.remoteHasAuthSession = patch.hasAuthSession;
+		}
+		this.updateSettings(nextPatch);
 	}
 
 	clearStoredRemoteSession(): void {
-		this.setStoredProviderCredentials(undefined);
-		this.setRemoteAccountEmail("");
-		this.setRemoteAuthSession(false);
+		this.updateRemoteConnectionState({
+			credentials: undefined,
+			accountEmail: "",
+			hasAuthSession: false,
+		});
 	}
 
 	async saveSettings(): Promise<void> {

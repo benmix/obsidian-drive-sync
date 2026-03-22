@@ -1,10 +1,6 @@
 import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "@config";
 import { type ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
-import type {
-	AnyRemoteProvider,
-	RemoteProviderClient,
-	RemoteProviderSessionOf,
-} from "@contracts/provider/remote-provider";
+import type { AnyRemoteProvider, RemoteProviderClient } from "@contracts/provider/remote-provider";
 import { type SyncRunRequest } from "@contracts/sync/run-request";
 import {
 	createDriveSyncError,
@@ -59,10 +55,6 @@ export class PluginRuntime<TProvider extends AnyRemoteProvider> {
 
 	async restoreSession(): Promise<void> {
 		await this.sessionManager.restoreSession();
-	}
-
-	async buildActiveRemoteSession(): Promise<RemoteProviderSessionOf<TProvider> | null> {
-		return await this.sessionManager.buildActiveRemoteSession();
 	}
 
 	async connectRemoteClient(): Promise<RemoteProviderClient<TProvider>> {

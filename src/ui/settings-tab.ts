@@ -21,8 +21,9 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 
 		containerEl.empty();
-		const provider = this.plugin.getRemoteProvider();
-		const hasAuthSession = this.plugin.hasRemoteAuthSession();
+		const remoteState = this.plugin.getRemoteConnectionState();
+		const provider = remoteState.provider;
+		const hasAuthSession = remoteState.hasAuthSession;
 
 		const accountSetting = new Setting(containerEl)
 			.setName(tr("settings.remoteAccount"))
@@ -42,7 +43,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 				cls: "drive-sync-account-provider-label",
 				text: provider.label,
 			});
-			const accountEmail = this.plugin.getRemoteAccountEmail();
+			const accountEmail = remoteState.accountEmail;
 			if (accountEmail) {
 				const accountChip = accountSetting.nameEl.createSpan({
 					cls: "drive-sync-account-chip drive-sync-account-user",
@@ -68,7 +69,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			accountSetting.addButton((button) => {
 				button.setButtonText(tr("settings.signOut"));
 				button.onClick(async () => {
-					const provider = this.plugin.getRemoteProvider();
+					const provider = this.plugin.getRemoteConnectionState().provider;
 					await provider.logout();
 					this.plugin.clearStoredRemoteSession();
 					provider.disconnect();
@@ -81,8 +82,8 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 			this.renderProviderLoginOptions(accountSetting.controlEl);
 		}
 
-		const remoteFolderPath = this.plugin.getRemoteScopePath();
-		const remoteScopeId = this.plugin.getRemoteScopeId();
+		const remoteFolderPath = remoteState.scopePath;
+		const remoteScopeId = remoteState.scopeId;
 		const remotePathLabel = remoteFolderPath
 			? remoteFolderPath
 			: remoteScopeId
@@ -158,11 +159,12 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 	}
 
 	private getAuthStatusText(): string {
-		const provider = this.plugin.getRemoteProvider();
-		if (this.plugin.hasRemoteAuthSession() && !provider.isSessionValidated()) {
+		const remoteState = this.plugin.getRemoteConnectionState();
+		const provider = remoteState.provider;
+		if (remoteState.hasAuthSession && !provider.isSessionValidated()) {
 			return tr("settings.authStatus.pendingValidation");
 		}
-		if (this.plugin.hasRemoteAuthSession()) {
+		if (remoteState.hasAuthSession) {
 			return tr("settings.authStatus.signedIn");
 		}
 		if (this.plugin.isAuthPaused()) {
@@ -170,7 +172,7 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 				this.plugin.getLastAuthError() ?? tr("settings.authStatus.needsAttentionCommand")
 			);
 		}
-		if (this.plugin.getStoredProviderCredentials()) {
+		if (remoteState.credentials) {
 			return tr("settings.authStatus.needsAttention");
 		}
 		return tr("settings.authStatus.signInHint");
@@ -211,8 +213,9 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 	}
 
 	private async openRemoteFolderPicker(): Promise<void> {
-		const provider = this.plugin.getRemoteProvider();
-		if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
+		const remoteState = this.plugin.getRemoteConnectionState();
+		const provider = remoteState.provider;
+		if (!remoteState.credentials && !provider.getSession()) {
 			openRemoteLoginModal(this.plugin, {
 				onCancel: () => {
 					this.display();
@@ -252,15 +255,16 @@ export class DriveSyncSettingTab extends PluginSettingTab {
 		ok: boolean;
 		message: string;
 	}> {
-		const scopeId = this.plugin.getRemoteScopeId();
-		const provider = this.plugin.getRemoteProvider();
+		const remoteState = this.plugin.getRemoteConnectionState();
+		const scopeId = remoteState.scopeId;
+		const provider = remoteState.provider;
 		if (!scopeId) {
 			return {
 				ok: false,
 				message: tr("settings.validation.selectFolderFirst"),
 			};
 		}
-		if (!this.plugin.getStoredProviderCredentials() && !provider.getSession()) {
+		if (!remoteState.credentials && !provider.getSession()) {
 			return {
 				ok: false,
 				message: tr("error.auth.signInFirst"),

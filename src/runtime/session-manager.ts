@@ -39,10 +39,13 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	constructor(private readonly plugin: ObsidianDriveSyncPluginApi<TProvider>) {}
 
 	async restoreSession(): Promise<void> {
-		const provider = bindRemoteProvider(this.plugin.getRemoteProvider());
-		const credentials = this.plugin.getStoredProviderCredentials();
+		const remoteState = this.plugin.getRemoteConnectionState();
+		const provider = bindRemoteProvider(remoteState.provider);
+		const credentials = remoteState.credentials;
 		if (!credentials) {
-			this.plugin.setRemoteAuthSession(false);
+			this.plugin.updateRemoteConnectionState({
+				hasAuthSession: false,
+			});
 			return;
 		}
 
@@ -71,8 +74,9 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	}
 
 	async buildActiveRemoteSession(): Promise<RemoteProviderSessionOf<TProvider> | null> {
-		const provider = bindRemoteProvider(this.plugin.getRemoteProvider());
-		const credentials = this.plugin.getStoredProviderCredentials();
+		const remoteState = this.plugin.getRemoteConnectionState();
+		const provider = bindRemoteProvider(remoteState.provider);
+		const credentials = remoteState.credentials;
 		let session = provider.getSession();
 
 		if (!session && credentials) {
@@ -89,7 +93,7 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	}
 
 	async connectClient(): Promise<RemoteProviderClient<TProvider>> {
-		const provider = bindRemoteProvider(this.plugin.getRemoteProvider());
+		const provider = bindRemoteProvider(this.plugin.getRemoteConnectionState().provider);
 		const session = await this.buildActiveRemoteSession();
 		if (!session) {
 			throw createDriveSyncError("AUTH_SIGN_IN_REQUIRED", {
@@ -119,7 +123,7 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	}
 
 	private async refreshAndPersistSession(): Promise<void> {
-		const provider = bindRemoteProvider(this.plugin.getRemoteProvider());
+		const provider = bindRemoteProvider(this.plugin.getRemoteConnectionState().provider);
 		try {
 			await provider.refreshToken();
 			await this.persistRecoveredSession(provider, {
@@ -130,7 +134,7 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 				warnMessage: "Failed to refresh remote session.",
 				logMessage: "Remote session refresh failed",
 				clearStoredSession: false,
-				hasRemoteAuthSession: false,
+				hasAuthSession: false,
 				persistSettings: true,
 			});
 			throw normalized;
@@ -158,8 +162,10 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 		>,
 		options: { persistSettings: boolean },
 	): Promise<void> {
-		this.plugin.setStoredProviderCredentials(provider.getReusableCredentials());
-		this.plugin.setRemoteAuthSession(true);
+		this.plugin.updateRemoteConnectionState({
+			credentials: provider.getReusableCredentials(),
+			hasAuthSession: true,
+		});
 		if (options.persistSettings) {
 			await this.plugin.saveSettings();
 		}
@@ -196,7 +202,7 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 			warnMessage: string;
 			logMessage: string;
 			clearStoredSession?: boolean;
-			hasRemoteAuthSession?: boolean;
+			hasAuthSession?: boolean;
 			persistSettings: boolean;
 		},
 	): Promise<DriveSyncError> {
@@ -205,8 +211,10 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 		if (options.clearStoredSession) {
 			this.plugin.clearStoredRemoteSession();
 		}
-		if (typeof options.hasRemoteAuthSession === "boolean") {
-			this.plugin.setRemoteAuthSession(options.hasRemoteAuthSession);
+		if (typeof options.hasAuthSession === "boolean") {
+			this.plugin.updateRemoteConnectionState({
+				hasAuthSession: options.hasAuthSession,
+			});
 		}
 		if (options.persistSettings) {
 			await this.plugin.saveSettings();

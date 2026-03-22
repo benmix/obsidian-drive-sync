@@ -17,7 +17,7 @@ export function createCommandContext<TProvider extends AnyRemoteProvider>(
 	const localProvider = plugin.getLocalProvider();
 
 	const requireScopeId = (): string | null => {
-		const scopeId = plugin.getRemoteScopeId();
+		const { scopeId } = plugin.getRemoteConnectionState();
 		if (!scopeId) {
 			new Notice(tr("notice.selectRemoteFolderFirst"));
 			return null;
@@ -31,8 +31,9 @@ export function createCommandContext<TProvider extends AnyRemoteProvider>(
 			if (!scopeId) {
 				return null;
 			}
-			const provider = plugin.getRemoteProvider();
-			if (!plugin.getStoredProviderCredentials() && !provider.getSession()) {
+			const remoteState = plugin.getRemoteConnectionState();
+			const provider = remoteState.provider;
+			if (!remoteState.credentials && !provider.getSession()) {
 				new RemoteAuthRequiredModal(plugin.app, plugin).open();
 				return null;
 			}

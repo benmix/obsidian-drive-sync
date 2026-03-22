@@ -102,11 +102,12 @@ export function renderRemoteProviderPickerCard(
 		cls: "drive-sync-provider-picker-grid",
 	});
 	const providers = plugin.listRemoteProviders();
+	const remoteState = plugin.getRemoteConnectionState();
 	for (const provider of providers) {
 		const providerButton = providerGrid.createEl("button", {
 			cls: "drive-sync-provider-picker-option",
 		});
-		if (provider.id === plugin.getRemoteProviderId()) {
+		if (provider.id === remoteState.providerId) {
 			providerButton.addClass("is-active");
 		}
 		const iconWrap = providerButton.createDiv({

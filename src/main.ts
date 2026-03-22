@@ -1,12 +1,12 @@
 import { registerCommands } from "@commands";
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type {
+	ObsidianDriveSyncPluginApi,
+	RemoteConnectionState,
+	RemoteConnectionStatePatch,
+} from "@contracts/plugin/plugin-api";
 import type { DriveSyncSettings } from "@contracts/plugin/settings";
 import type { LocalProvider } from "@contracts/provider/local-provider";
-import type {
-	RemoteProviderClient,
-	RemoteProviderCredentialsOf,
-	RemoteProviderSessionOf,
-} from "@contracts/provider/remote-provider";
+import type { RemoteProviderClient } from "@contracts/provider/remote-provider";
 import { createDriveSyncError } from "@errors";
 import type { RegisteredRemoteProvider } from "@provider/default-registry";
 import { PluginRuntime } from "@runtime/plugin-runtime";
@@ -34,68 +34,24 @@ export default class ObsidianDriveSyncPlugin
 		this.runtime?.teardown();
 	}
 
-	getRemoteProviderId(): string {
-		return this.getState().getRemoteProviderId();
-	}
-
 	listRemoteProviders(): RegisteredRemoteProvider[] {
 		return this.getState().listRemoteProviders();
-	}
-
-	getRemoteProvider(): RegisteredRemoteProvider {
-		return this.getState().getRemoteProvider();
 	}
 
 	setRemoteProviderId(providerId: string): void {
 		this.getState().setRemoteProviderId(providerId);
 	}
 
-	getLocalProviderId(): string {
-		return this.getState().getLocalProviderId();
-	}
-
 	getLocalProvider(): LocalProvider {
 		return this.getState().getLocalProvider();
 	}
 
-	getRemoteScopeId(): string {
-		return this.getState().getRemoteScopeId();
+	getRemoteConnectionState(): RemoteConnectionState<RegisteredRemoteProvider> {
+		return this.getState().getRemoteConnectionState();
 	}
 
-	getRemoteScopePath(): string {
-		return this.getState().getRemoteScopePath();
-	}
-
-	setRemoteScope(scopeId: string, scopePath: string): void {
-		this.getState().setRemoteScope(scopeId, scopePath);
-	}
-
-	getStoredProviderCredentials():
-		| RemoteProviderCredentialsOf<RegisteredRemoteProvider>
-		| undefined {
-		return this.getState().getStoredProviderCredentials();
-	}
-
-	setStoredProviderCredentials(
-		credentials: RemoteProviderCredentialsOf<RegisteredRemoteProvider> | undefined,
-	): void {
-		this.getState().setStoredProviderCredentials(credentials);
-	}
-
-	getRemoteAccountEmail(): string {
-		return this.getState().getRemoteAccountEmail();
-	}
-
-	setRemoteAccountEmail(email: string): void {
-		this.getState().setRemoteAccountEmail(email);
-	}
-
-	hasRemoteAuthSession(): boolean {
-		return this.getState().hasRemoteAuthSession();
-	}
-
-	setRemoteAuthSession(hasAuthSession: boolean): void {
-		this.getState().setRemoteAuthSession(hasAuthSession);
+	updateRemoteConnectionState(patch: RemoteConnectionStatePatch<RegisteredRemoteProvider>): void {
+		this.getState().updateRemoteConnectionState(patch);
 	}
 
 	clearStoredRemoteSession(): void {
@@ -136,10 +92,6 @@ export default class ObsidianDriveSyncPlugin
 
 	getLastAuthError(): string | undefined {
 		return this.runtime?.getLastAuthError();
-	}
-
-	async buildActiveRemoteSession(): Promise<RemoteProviderSessionOf<RegisteredRemoteProvider> | null> {
-		return (await this.runtime?.buildActiveRemoteSession()) ?? null;
 	}
 
 	async connectRemoteClient(): Promise<RemoteProviderClient<RegisteredRemoteProvider>> {

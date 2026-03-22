@@ -14,15 +14,15 @@ export class SyncCoordinator<TProvider extends AnyRemoteProvider> {
 	) {}
 
 	async run(request: SyncRunRequest): Promise<void> {
-		const scopeId = this.plugin.getRemoteScopeId();
+		const remoteState = this.plugin.getRemoteConnectionState();
+		const scopeId = remoteState.scopeId;
 		if (!scopeId) {
 			return;
 		}
 		const client = await this.sessionManager.connectClient();
-		const remoteProvider = this.plugin.getRemoteProvider();
 		const localProvider = this.plugin.getLocalProvider();
 		const localFileSystem = localProvider.createLocalFileSystem(this.plugin.app);
-		const remoteFileSystem = remoteProvider.createRemoteFileSystem(client, scopeId);
+		const remoteFileSystem = remoteState.provider.createRemoteFileSystem(client, scopeId);
 
 		await this.syncRunner.run(request, {
 			localFileSystem,

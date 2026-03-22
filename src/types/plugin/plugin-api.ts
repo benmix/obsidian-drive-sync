@@ -5,10 +5,27 @@ import type {
 	RemoteProvider,
 	RemoteProviderClient,
 	RemoteProviderCredentialsOf,
-	RemoteProviderSessionOf,
 } from "@contracts/provider/remote-provider";
 import type { SyncState } from "@contracts/sync/state";
 import type { App, Plugin } from "obsidian";
+
+export type RemoteConnectionState<TProvider extends AnyRemoteProvider = AnyRemoteProvider> = {
+	providerId: string;
+	provider: TProvider;
+	scopeId: string;
+	scopePath: string;
+	credentials: RemoteProviderCredentialsOf<TProvider> | undefined;
+	accountEmail: string;
+	hasAuthSession: boolean;
+};
+
+export type RemoteConnectionStatePatch<TProvider extends AnyRemoteProvider = AnyRemoteProvider> = {
+	scopeId?: string;
+	scopePath?: string;
+	credentials?: RemoteProviderCredentialsOf<TProvider> | undefined;
+	accountEmail?: string;
+	hasAuthSession?: boolean;
+};
 
 export interface ObsidianDriveSyncPluginApi<
 	TProvider extends AnyRemoteProvider = RemoteProvider,
@@ -17,26 +34,11 @@ export interface ObsidianDriveSyncPluginApi<
 	readonly settings: Readonly<DriveSyncSettings>;
 	updateSettings(patch: Partial<DriveSyncSettings>): void;
 
-	getRemoteProviderId(): string;
 	listRemoteProviders(): TProvider[];
-	getRemoteProvider(): TProvider;
 	setRemoteProviderId(providerId: string): void;
-	getLocalProviderId(): string;
 	getLocalProvider(): LocalProvider;
-	getRemoteScopeId(): string;
-	getRemoteScopePath(): string;
-	setRemoteScope(scopeId: string, scopePath: string): void;
-
-	getStoredProviderCredentials(): RemoteProviderCredentialsOf<TProvider> | undefined;
-	setStoredProviderCredentials(
-		credentials: RemoteProviderCredentialsOf<TProvider> | undefined,
-	): void;
-
-	getRemoteAccountEmail(): string;
-	setRemoteAccountEmail(email: string): void;
-
-	hasRemoteAuthSession(): boolean;
-	setRemoteAuthSession(hasAuthSession: boolean): void;
+	getRemoteConnectionState(): RemoteConnectionState<TProvider>;
+	updateRemoteConnectionState(patch: RemoteConnectionStatePatch<TProvider>): void;
 	clearStoredRemoteSession(): void;
 
 	saveSettings(): Promise<void>;
@@ -48,7 +50,6 @@ export interface ObsidianDriveSyncPluginApi<
 
 	isAuthPaused(): boolean;
 	getLastAuthError(): string | undefined;
-	buildActiveRemoteSession(): Promise<RemoteProviderSessionOf<TProvider> | null>;
 	connectRemoteClient(): Promise<RemoteProviderClient<TProvider>>;
 	runAutoSync(force?: boolean): Promise<void>;
 	isSyncRunning(): boolean;
