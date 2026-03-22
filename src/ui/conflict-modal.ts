@@ -1,4 +1,4 @@
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
 import { tr } from "@i18n";
 import { Modal, Notice, Setting } from "obsidian";
 import type { App } from "obsidian";

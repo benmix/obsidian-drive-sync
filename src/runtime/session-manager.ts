@@ -1,8 +1,8 @@
 import type {
 	BoundRemoteProvider,
 	ObsidianDriveSyncPluginRuntimeApi,
-	RemoteFolderBrowser,
-} from "@contracts/plugin/plugin-api";
+} from "@contracts/plugin/plugin-runtime-port";
+import type { RemoteFolderBrowser } from "@contracts/plugin/remote-connection-view";
 import type { RemoteProviderId } from "@contracts/provider/provider-ids";
 import type {
 	AnyRemoteProvider,

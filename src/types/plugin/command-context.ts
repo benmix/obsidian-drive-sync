@@ -1,7 +1,7 @@
 import type {
 	BoundRemoteProvider,
 	ObsidianDriveSyncPluginRuntimeApi,
-} from "@contracts/plugin/plugin-api";
+} from "@contracts/plugin/plugin-runtime-port";
 import type { LocalProvider } from "@contracts/provider/local-provider";
 import type { AnyRemoteProvider, RemoteProviderClient } from "@contracts/provider/remote-provider";
 

@@ -1,4 +1,4 @@
-import { type ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-api";
+import { type ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-runtime-port";
 import type { AnyRemoteProvider } from "@contracts/provider/remote-provider";
 import { type SyncRunRequest } from "@contracts/sync/run-request";
 import type { SessionManager } from "@runtime/session-manager";

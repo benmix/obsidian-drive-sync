@@ -2,9 +2,11 @@ import { DEFAULT_SETTINGS } from "@contracts/plugin/default-settings";
 import type {
 	ObsidianDriveSyncPluginRuntimeApi,
 	RemoteConnectionStatePatch,
+} from "@contracts/plugin/plugin-runtime-port";
+import type {
 	RemoteConnectionView,
 	RemoteProviderOption,
-} from "@contracts/plugin/plugin-api";
+} from "@contracts/plugin/remote-connection-view";
 import type { DriveSyncSettings } from "@contracts/plugin/settings";
 import type { LocalProvider } from "@contracts/provider/local-provider";
 import {

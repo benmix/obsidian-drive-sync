@@ -1,4 +1,4 @@
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
 import type { PreSyncEstimate } from "@contracts/ui/pre-sync";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";
 import { tr, trAny } from "@i18n";

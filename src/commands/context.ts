@@ -3,7 +3,7 @@ import type {
 	CommandErrorOptions,
 	ConnectedRemoteClient,
 } from "@contracts/plugin/command-context";
-import type { ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-api";
+import type { ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-runtime-port";
 import type { AnyRemoteProvider } from "@contracts/provider/remote-provider";
 import type { DriveSyncErrorCode, ErrorCategory } from "@errors";
 import { normalizeUnknownDriveSyncError, translateDriveSyncErrorUserMessage } from "@errors";

@@ -1,6 +1,7 @@
 import type { DriveSyncErrorCode } from "@contracts/data/error-types";
 import type { SyncJob } from "@contracts/data/sync-schema";
-import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-api";
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
+import type { RemoteAuthStatus } from "@contracts/plugin/remote-connection-view";
 import { getDriveSyncErrorMessageForCode } from "@errors";
 import { tr, trAny } from "@i18n";
 import { formatBytes } from "@ui/format";
@@ -283,9 +284,7 @@ export class SyncStatusModal extends Modal {
 		}
 	}
 
-	private getAuthStatusText(
-		status: ReturnType<ObsidianDriveSyncPluginApi["getRemoteAuthView"]>["status"],
-	): string {
+	private getAuthStatusText(status: RemoteAuthStatus): string {
 		switch (status) {
 			case "paused":
 				return tr("status.authPaused");

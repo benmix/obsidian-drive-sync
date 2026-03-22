@@ -1,8 +1,6 @@
 import { INTERNAL_NETWORK_POLICY_FAILURE_COOLDOWN_MS } from "@config";
-import {
-	type ObsidianDriveSyncPluginRuntimeApi,
-	type RemoteAuthView,
-} from "@contracts/plugin/plugin-api";
+import { type ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-runtime-port";
+import { type RemoteAuthView } from "@contracts/plugin/remote-connection-view";
 import type { RemoteProviderId } from "@contracts/provider/provider-ids";
 import type {
 	AnyRemoteProvider,

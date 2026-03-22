@@ -1,8 +1,8 @@
+import type { ObsidianDriveSyncPluginApi } from "@contracts/plugin/plugin-ui-port";
 import type {
-	ObsidianDriveSyncPluginApi,
 	RemoteFolderBrowser,
 	RemoteFolderEntry,
-} from "@contracts/plugin/plugin-api";
+} from "@contracts/plugin/remote-connection-view";
 import {
 	createDriveSyncError,
 	normalizeUnknownDriveSyncError,
