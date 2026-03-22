@@ -7,6 +7,7 @@ import type {
 	RemoteProviderClient,
 	RemoteProviderCredentialsOf,
 	RemoteProviderLoginInput,
+	RemoteProviderSessionOf,
 } from "@contracts/provider/remote-provider";
 import type { SyncState } from "@contracts/sync/state";
 import type { App, Plugin } from "obsidian";
@@ -47,6 +48,12 @@ export type RemoteFolderBrowser = {
 	listChildFolderEntries?(): Promise<RemoteFolderEntry[]>;
 	ensureFolder?(path: string): Promise<{ id?: string }>;
 };
+
+export type BoundRemoteProvider<TProvider extends AnyRemoteProvider> = RemoteProvider<
+	RemoteProviderClient<TProvider>,
+	RemoteProviderSessionOf<TProvider>,
+	RemoteProviderCredentialsOf<TProvider>
+>;
 
 export interface ObsidianDriveSyncPluginApi<
 	TProvider extends AnyRemoteProvider = RemoteProvider,
@@ -98,9 +105,9 @@ export interface ObsidianDriveSyncPluginApi<
 export interface ObsidianDriveSyncPluginRuntimeApi<
 	TProvider extends AnyRemoteProvider = RemoteProvider,
 > extends ObsidianDriveSyncPluginApi<TProvider> {
-	listRemoteProviders(): TProvider[];
+	listRemoteProviders(): BoundRemoteProvider<TProvider>[];
 	setRemoteProviderId(providerId: RemoteProviderId): void;
-	getRemoteProvider(providerId?: RemoteProviderId): TProvider;
+	getRemoteProvider(providerId?: RemoteProviderId): BoundRemoteProvider<TProvider>;
 	getStoredRemoteCredentials(): RemoteProviderCredentialsOf<TProvider> | undefined;
 	updateRemoteConnectionState(patch: RemoteConnectionStatePatch<TProvider>): void;
 	clearStoredRemoteSession(): void;

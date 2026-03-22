@@ -1,11 +1,11 @@
 import type {
+	BoundRemoteProvider,
 	ObsidianDriveSyncPluginRuntimeApi,
 	RemoteFolderBrowser,
 } from "@contracts/plugin/plugin-api";
 import type { RemoteProviderId } from "@contracts/provider/provider-ids";
 import type {
 	AnyRemoteProvider,
-	RemoteProvider,
 	RemoteProviderClient,
 	RemoteProviderCredentialsOf,
 	RemoteProviderLoginInput,
@@ -23,20 +23,6 @@ import {
 import { trAny } from "@i18n";
 import { PluginDataStateStore } from "@sync/state/state-store";
 import { now } from "@sync/support/utils";
-
-function bindRemoteProvider<TProvider extends AnyRemoteProvider>(
-	provider: TProvider,
-): RemoteProvider<
-	RemoteProviderClient<TProvider>,
-	RemoteProviderSessionOf<TProvider>,
-	RemoteProviderCredentialsOf<TProvider>
-> {
-	return provider as unknown as RemoteProvider<
-		RemoteProviderClient<TProvider>,
-		RemoteProviderSessionOf<TProvider>,
-		RemoteProviderCredentialsOf<TProvider>
-	>;
-}
 
 export class SessionManager<TProvider extends AnyRemoteProvider> {
 	private authPaused = false;
@@ -230,11 +216,7 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	}
 
 	private async persistRecoveredSession(
-		provider: RemoteProvider<
-			RemoteProviderClient<TProvider>,
-			RemoteProviderSessionOf<TProvider>,
-			RemoteProviderCredentialsOf<TProvider>
-		>,
+		provider: BoundRemoteProvider<TProvider>,
 		options: { persistSettings: boolean },
 	): Promise<void> {
 		this.plugin.updateRemoteConnectionState({
@@ -248,11 +230,7 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	}
 
 	private async restoreStoredSession(
-		provider: RemoteProvider<
-			RemoteProviderClient<TProvider>,
-			RemoteProviderSessionOf<TProvider>,
-			RemoteProviderCredentialsOf<TProvider>
-		>,
+		provider: BoundRemoteProvider<TProvider>,
 		credentials: RemoteProviderCredentialsOf<TProvider>,
 		options: { persistSettings: boolean },
 	): Promise<RemoteProviderSessionOf<TProvider> | null> {
@@ -329,6 +307,6 @@ export class SessionManager<TProvider extends AnyRemoteProvider> {
 	}
 
 	private getProvider(providerId?: RemoteProviderId) {
-		return bindRemoteProvider(this.plugin.getRemoteProvider(providerId));
+		return this.plugin.getRemoteProvider(providerId);
 	}
 }

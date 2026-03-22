@@ -47,18 +47,17 @@ describe("SessionManager", () => {
 	});
 
 	test("records structured auth state and log when restoring a session fails", async () => {
+		const provider = {
+			restore: async () => {
+				throw createDriveSyncError("AUTH_SESSION_EXPIRED", {
+					category: "auth",
+				});
+			},
+			getReusableCredentials: () => {},
+		};
 		const plugin = {
-			getRemoteConnectionState: () => ({
-				provider: {
-					restore: async () => {
-						throw createDriveSyncError("AUTH_SESSION_EXPIRED", {
-							category: "auth",
-						});
-					},
-					getReusableCredentials: () => {},
-				},
-				credentials: { token: "secret" },
-			}),
+			getRemoteProvider: () => provider,
+			getStoredRemoteCredentials: () => ({ token: "secret" }),
 			updateRemoteConnectionState: vi.fn(),
 			clearStoredRemoteSession: vi.fn(),
 			saveSettings: vi.fn(async () => {}),
@@ -93,15 +92,14 @@ describe("SessionManager", () => {
 	test("restores and persists a stored session when no active session is loaded", async () => {
 		const session = { accessToken: "token" };
 		const reusableCredentials = { token: "next-secret" };
+		const provider = {
+			getSession: () => null,
+			restore: vi.fn(async () => session),
+			getReusableCredentials: () => reusableCredentials,
+		};
 		const plugin = {
-			getRemoteConnectionState: () => ({
-				provider: {
-					getSession: () => null,
-					restore: vi.fn(async () => session),
-					getReusableCredentials: () => reusableCredentials,
-				},
-				credentials: { token: "secret" },
-			}),
+			getRemoteProvider: () => provider,
+			getStoredRemoteCredentials: () => ({ token: "secret" }),
 			updateRemoteConnectionState: vi.fn(),
 			clearStoredRemoteSession: vi.fn(),
 			saveSettings: vi.fn(async () => {}),
@@ -122,23 +120,22 @@ describe("SessionManager", () => {
 			category: "auth",
 		});
 		let refreshCallback: (() => Promise<void>) | undefined;
-		const plugin = {
-			getRemoteConnectionState: () => ({
-				provider: {
-					id: "proton-drive",
-					label: "Proton Drive",
-					getSession: () => ({ accessToken: "token" }),
-					connect: vi.fn(async (_session, options) => {
-						refreshCallback = options?.onTokenRefresh;
-						return { connected: true };
-					}),
-					refreshToken: vi.fn(async () => {
-						throw refreshError;
-					}),
-					getReusableCredentials: () => ({ token: "secret" }),
-				},
-				credentials: { token: "secret" },
+		const provider = {
+			id: "proton-drive",
+			label: "Proton Drive",
+			getSession: () => ({ accessToken: "token" }),
+			connect: vi.fn(async (_session, options) => {
+				refreshCallback = options?.onTokenRefresh;
+				return { connected: true };
 			}),
+			refreshToken: vi.fn(async () => {
+				throw refreshError;
+			}),
+			getReusableCredentials: () => ({ token: "secret" }),
+		};
+		const plugin = {
+			getRemoteProvider: () => provider,
+			getStoredRemoteCredentials: () => ({ token: "secret" }),
 			updateRemoteConnectionState: vi.fn(),
 			clearStoredRemoteSession: vi.fn(),
 			saveSettings: vi.fn(async () => {}),

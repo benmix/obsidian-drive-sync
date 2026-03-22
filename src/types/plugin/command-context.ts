@@ -1,9 +1,12 @@
-import type { ObsidianDriveSyncPluginRuntimeApi } from "@contracts/plugin/plugin-api";
+import type {
+	BoundRemoteProvider,
+	ObsidianDriveSyncPluginRuntimeApi,
+} from "@contracts/plugin/plugin-api";
 import type { LocalProvider } from "@contracts/provider/local-provider";
 import type { AnyRemoteProvider, RemoteProviderClient } from "@contracts/provider/remote-provider";
 
 export type ConnectedRemoteClient<TProvider extends AnyRemoteProvider = AnyRemoteProvider> = {
-	provider: TProvider;
+	provider: BoundRemoteProvider<TProvider>;
 	client: RemoteProviderClient<TProvider>;
 	scopeId: string;
 };
