@@ -99,6 +99,7 @@ export class SyncEngine {
 			lastErrorRetryable: overrides?.lastErrorRetryable ?? base.lastErrorRetryable,
 			remoteEventCursor: overrides?.remoteEventCursor ?? base.remoteEventCursor,
 			logs: base.logs,
+			runtimeMetrics: base.runtimeMetrics,
 		};
 		await this.stateStore.save(state);
 	}

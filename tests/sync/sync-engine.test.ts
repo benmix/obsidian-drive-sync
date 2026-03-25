@@ -4,7 +4,7 @@ import type { StateStore } from "@contracts/sync/state-store";
 import { createDriveSyncError } from "@errors";
 import { SyncEngine } from "@sync/engine/sync-engine";
 import { createJob, createState, textBytes } from "@tests/helpers/sync-fixtures";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 class MemoryStateStore implements StateStore {
 	state: SyncState;
@@ -131,6 +131,69 @@ describe("SyncEngine", () => {
 					path: "notes/a.md",
 				}),
 			]),
+		);
+	});
+
+	test("persists runtime metrics for a successful run", async () => {
+		const stateStore = new MemoryStateStore({
+			...createState(),
+			jobs: [createJob()],
+		});
+		const engine = new SyncEngine(
+			createLocalFs(),
+			createRemoteFs(async () => ({
+				id: "remote-a",
+				revisionId: "rev-2",
+			})),
+			stateStore,
+		);
+
+		await engine.load();
+		await expect(engine.runOnce()).resolves.toEqual({
+			jobsExecuted: 1,
+			entriesUpdated: 1,
+		});
+
+		expect(stateStore.state.runtimeMetrics).toMatchObject({
+			lastRunJobsExecuted: 1,
+			lastRunEntriesUpdated: 1,
+			lastRunFailures: 0,
+			totalRuns: 1,
+			totalFailures: 0,
+			totalUploadBytes: 3,
+			totalDownloadBytes: 0,
+			peakQueueDepth: 1,
+			peakPendingJobs: 1,
+			peakBlockedJobs: 0,
+		});
+	});
+
+	test("invokes auth error callback when an auth failure pauses the run", async () => {
+		const stateStore = new MemoryStateStore({
+			...createState(),
+			jobs: [createJob()],
+		});
+		const onAuthError = vi.fn();
+		const engine = new SyncEngine(
+			createLocalFs(),
+			createRemoteFs(async () => {
+				throw createDriveSyncError("AUTH_REAUTH_REQUIRED", {
+					category: "auth",
+				});
+			}),
+			stateStore,
+			{ onAuthError },
+		);
+
+		await engine.load();
+		await engine.runOnce();
+
+		expect(onAuthError).toHaveBeenCalledTimes(1);
+		expect(onAuthError).toHaveBeenCalledWith(
+			expect.objectContaining({
+				code: "AUTH_REAUTH_REQUIRED",
+				category: "auth",
+			}),
 		);
 	});
 });

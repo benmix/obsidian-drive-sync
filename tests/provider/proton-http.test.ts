@@ -36,4 +36,63 @@ describe("requestHttp", () => {
 
 		await assertion;
 	});
+
+	test("rejects with AbortError when the caller aborts the request", async () => {
+		requestUrlMock.mockImplementation(() => new Promise(() => {}));
+		const controller = new AbortController();
+		const request = requestHttp(
+			"https://example.test/core/v4/users",
+			{
+				signal: controller.signal,
+			},
+			"json",
+		);
+
+		controller.abort();
+
+		await expect(request).rejects.toMatchObject({
+			name: "AbortError",
+			message: "Request was aborted.",
+		});
+	});
+
+	test("serializes form data bodies and returns JSON responses", async () => {
+		requestUrlMock.mockResolvedValue({
+			status: 201,
+			headers: {
+				"x-request-id": "req-1",
+			},
+			json: {
+				Code: 1000,
+			},
+		});
+		const body = new FormData();
+		body.set("file", new Blob(["hello"], { type: "text/plain" }), "note.txt");
+
+		const response = await requestHttp(
+			"https://example.test/core/v4/upload",
+			{
+				method: "POST",
+				headers: [["x-test", "1"]],
+				body,
+			},
+			"json",
+		);
+
+		expect(requestUrlMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				method: "POST",
+				headers: expect.objectContaining({
+					"x-test": "1",
+					"content-type": expect.stringContaining("multipart/form-data"),
+				}),
+				body: expect.any(ArrayBuffer),
+				throw: false,
+			}),
+		);
+		await expect(response.json()).resolves.toEqual({
+			Code: 1000,
+		});
+		expect(response.headers.get("x-request-id")).toBe("req-1");
+	});
 });

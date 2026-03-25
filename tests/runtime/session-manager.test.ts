@@ -162,4 +162,25 @@ describe("SessionManager", () => {
 			]),
 		);
 	});
+
+	test("throws sign-in-required when no active or stored session is available", async () => {
+		const provider = {
+			id: "proton-drive",
+			label: "Proton Drive",
+			getSession: () => null,
+		};
+		const plugin = {
+			getRemoteProvider: () => provider,
+			getStoredRemoteCredentials: () => null,
+			updateRemoteConnectionState: vi.fn(),
+			clearStoredRemoteSession: vi.fn(),
+			saveSettings: vi.fn(async () => {}),
+		};
+		const manager = new SessionManager(plugin as never);
+
+		await expect(manager.connectClient()).rejects.toMatchObject({
+			code: "AUTH_SIGN_IN_REQUIRED",
+			category: "auth",
+		});
+	});
 });
