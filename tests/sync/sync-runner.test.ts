@@ -67,7 +67,7 @@ describe("SyncRunner", () => {
 		for (const fn of Object.values(harness.engine)) {
 			fn.mockReset();
 		}
-		harness.engine.load.mockResolvedValue();
+		harness.engine.load.mockImplementation(async () => {});
 		harness.engine.getStateSnapshot.mockReturnValue({
 			entries: {},
 			jobs: [],
@@ -79,7 +79,7 @@ describe("SyncRunner", () => {
 			jobsPlanned: 0,
 			entries: 0,
 		});
-		harness.engine.runOnce.mockResolvedValue();
+		harness.engine.runOnce.mockImplementation(async () => {});
 		harness.isInitializationPhase.mockReturnValue(false);
 	});
 

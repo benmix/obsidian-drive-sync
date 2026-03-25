@@ -1,3 +1,4 @@
+import type { SyncState } from "@contracts/sync/state";
 import { exportDiagnostics } from "@runtime/use-cases/diagnostics";
 import { describe, expect, test, vi } from "vitest";
 
@@ -36,7 +37,7 @@ const stateHarness = vi.hoisted(() => ({
 			},
 		],
 		runtimeMetrics: {},
-	},
+	} as SyncState,
 }));
 
 vi.mock("@sync/state/state-store", () => ({

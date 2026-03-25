@@ -90,7 +90,7 @@ describe("sync workflow use cases", () => {
 			logs: [],
 			runtimeMetrics: {},
 		});
-		harness.engine.load.mockResolvedValue();
+		harness.engine.load.mockImplementation(async () => {});
 		harness.isInitializationPhase.mockReturnValue(false);
 	});
 

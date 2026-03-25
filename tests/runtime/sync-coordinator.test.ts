@@ -21,7 +21,7 @@ describe("SyncCoordinator", () => {
 	beforeEach(() => {
 		harness.syncRunnerCtor.mockReset();
 		harness.syncRunnerRun.mockReset();
-		harness.syncRunnerRun.mockResolvedValue();
+		harness.syncRunnerRun.mockImplementation(async () => {});
 	});
 
 	test("returns early when no remote scope is configured", async () => {
